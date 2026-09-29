@@ -9,9 +9,6 @@ using UnityGraph.Core.Graph;
 
 namespace UnityGraph.Code;
 
-/// <summary>What one file adds to the graph.</summary>
-public sealed record FileContribution(FileRecord File, IReadOnlyList<Node> Nodes, IReadOnlyList<Edge> Edges);
-
 /// <summary>
 /// A Unity project's C#, loaded from its generated `.csproj` files (SPEC-code-index). Knows which
 /// files are indexed, builds one Roslyn compilation per project on demand (project references

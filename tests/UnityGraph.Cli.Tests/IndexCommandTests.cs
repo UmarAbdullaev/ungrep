@@ -94,7 +94,7 @@ public sealed partial class IndexCommandTests : IDisposable
     [Fact]
     public void Warnings_past_ten_are_counted()
     {
-        var summary = new UnityGraph.Code.IndexSummary(1, 0, 2, 3, 0, TimeSpan.FromSeconds(1.25), [.. Enumerable.Range(1, 12).Select(i => "p" + i)]);
+        var summary = new UnityGraph.Core.Graph.IndexSummary(1, 0, 2, 3, 0, TimeSpan.FromSeconds(1.25), [.. Enumerable.Range(1, 12).Select(i => "p" + i)]);
 
         string text = IndexCommand.Render(summary, rebuilt: true);
 

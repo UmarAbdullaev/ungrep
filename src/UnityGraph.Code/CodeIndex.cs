@@ -3,9 +3,6 @@ using UnityGraph.Core.Graph;
 
 namespace UnityGraph.Code;
 
-/// <summary>What an index run did. <see cref="Files"/> counts the files written, vendored ones included.</summary>
-public sealed record IndexSummary(int Files, int Vendored, int Nodes, int Edges, int Removed, TimeSpan Elapsed, IReadOnlyList<string> Problems);
-
 /// <summary>
 /// Writes a <see cref="CodeWorkspace"/> into the graph (SPEC-code-index, Incremental reindex):
 /// everything through a bulk writer, or only what changed since the last run.
@@ -51,8 +48,10 @@ public static class CodeIndex
     /// Brings <paramref name="store"/> up to date: reindexes changed and added files (and
     /// <paramref name="extra"/>, e.g. files a hook just edited), removes deleted ones, and
     /// reindexes files whose edges pointed at keys that went away. A new store gets a full index.
+    /// <paramref name="dirty"/> is the store's dirty list when another indexer took it first;
+    /// null takes it here.
     /// </summary>
-    public static IndexSummary Update(CodeWorkspace workspace, GraphStore store, IEnumerable<string>? extra = null)
+    public static IndexSummary Update(CodeWorkspace workspace, GraphStore store, IEnumerable<string>? extra = null, IReadOnlyList<string>? dirty = null)
     {
         if (store.Created)
         {
@@ -72,7 +71,7 @@ public static class CodeIndex
         }
 
         var reindex = new SortedSet<string>(report.Changed.Concat(report.Added), StringComparer.Ordinal);
-        reindex.UnionWith(store.TakeDirty().Concat(extra ?? []).Where(workspace.IsTracked));
+        reindex.UnionWith((dirty ?? store.TakeDirty()).Concat(extra ?? []).Where(workspace.IsTracked));
 
         var lost = new HashSet<string>(StringComparer.Ordinal);
         foreach (string removed in report.Removed)
