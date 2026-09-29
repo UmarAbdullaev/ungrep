@@ -1,20 +1,27 @@
 $ ug find Turntable
-Game.Lab.Turntable            class  Assets/Scripts/Lab/Turntable.cs:7-26
-Game.Lab.LabStage._turntable  field  Assets/Scripts/Lab/LabStage.cs:12     Turntable, serialized
-2 found
+Turntable                                game_object      Assets/Prefabs/Turntable.prefab:3-16
+Game.Lab.Turntable                       class            Assets/Scripts/Lab/Turntable.cs:7-26
+Assets/Scripts/Lab/Turntable.cs          script           guid 0f9e8d7c6b5a49382716a5b4c3d2e1f0
+Assets/Prefabs/Turntable.prefab          prefab           guid b1000000000000000000000000000001
+Assets/Prefabs/Turntable Variant.prefab  prefab           guid b2000000000000000000000000000002
+Game.Lab.LabStage._turntable             field            Assets/Scripts/Lab/LabStage.cs:12             Turntable, serialized
+Turntable Variant                        prefab_instance  Assets/Prefabs/Turntable Variant.prefab:3-30  of Assets/Prefabs/Turntable.prefab
+Lab Turntable                            prefab_instance  Assets/Scenes/Lab.unity:117-145               of Assets/Prefabs/Turntable.prefab
+8 found
 
 $ ug find turn --kind field
 Game.Lab.LabStage._turntable  field  Assets/Scripts/Lab/LabStage.cs:12  Turntable, serialized
 1 found
 
 $ ug find Open
-Game.Core.IOpenable.Open           method  Assets/Scripts/Core/Stage.cs:9        Open(int)
-Game.Core.Stage.Open               method  Assets/Scripts/Core/Stage.cs:14       Open(int)
-Game.Lab.LabStage.Open             method  Assets/Scripts/Lab/LabStage.cs:24-36  Open(int)
-Game.Lab.LabStage._opened          field   Assets/Scripts/Lab/LabStage.cs:16     int
-Game.EditorTools.LabTools.OpenLab  method  Assets/Editor/LabTools.cs:9-13        OpenLab()
-Game.Lab.LabStage.OpenFirst        method  Assets/Scripts/Lab/LabStage.cs:55-56  OpenFirst()
-6 found
+Game.Core.IOpenable.Open           method       Assets/Scripts/Core/Stage.cs:9        Open(int)
+Game.Core.Stage.Open               method       Assets/Scripts/Core/Stage.cs:14       Open(int)
+Game.Lab.LabStage.Open             method       Assets/Scripts/Lab/LabStage.cs:24-36  Open(int)
+Game.Lab.LabStage._opened          field        Assets/Scripts/Lab/LabStage.cs:16     int
+Canvas/Open Button                 game_object  Assets/Scenes/Lab.unity:38-50
+Game.EditorTools.LabTools.OpenLab  method       Assets/Editor/LabTools.cs:9-13        OpenLab()
+Game.Lab.LabStage.OpenFirst        method       Assets/Scripts/Lab/LabStage.cs:55-56  OpenFirst()
+7 found
 
 $ ug find Nothing
 nothing found: Nothing
@@ -23,13 +30,15 @@ $ ug refs Turntable.Stop
 Game.Lab.Turntable.Stop()  method  Assets/Scripts/Lab/Turntable.cs:23  [exact]
   called from  Game.Broken.Run             Assets/Scripts/Broken.cs:10
   called from  Game.Lab.LabStage.OnClosed  Assets/Scripts/Lab/LabStage.cs:51
-2 references
+  unity event  Extra: m_OnDone             Assets/Data/LabSettings.asset:20
+3 references
 
 $ ug refs Turntable.Rotate
 Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21  [exact]
-  called from  Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:27
-  called from  Game.Lab.LabStage.Spin  Assets/Scripts/Lab/LabStage.cs:43
-2 references
+  called from  Game.Lab.LabStage.Open                  Assets/Scripts/Lab/LabStage.cs:27
+  called from  Game.Lab.LabStage.Spin                  Assets/Scripts/Lab/LabStage.cs:43
+  unity event  Canvas/Open Button > Button: m_OnClick  Assets/Scenes/Lab.unity:102  [heuristic]
+3 references
 
 $ ug refs Game.Core.Stage
 Game.Core.Stage  class  Assets/Scripts/Core/Stage.cs:12-17  [exact]
@@ -38,10 +47,11 @@ Game.Core.Stage  class  Assets/Scripts/Core/Stage.cs:12-17  [exact]
 
 $ ug refs LabStage
 Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
-  used by       Game.EditorTools.LabStageEditor     Assets/Editor/LabTools.cs:16
-  used by       Game.EditorTools.LabTools.OpenLab   Assets/Editor/LabTools.cs:12
-  script asset  a:5a1b2c3d4e5f60718293a4b5c6d7e8f9  Assets/Scripts/Lab/LabStage.cs:7
-3 references
+  used by       Game.EditorTools.LabStageEditor    Assets/Editor/LabTools.cs:16
+  used by       Game.EditorTools.LabTools.OpenLab  Assets/Editor/LabTools.cs:12
+  script asset  Assets/Scripts/Lab/LabStage.cs     Assets/Scripts/Lab/LabStage.cs:7
+  on            Turntable > LabStage               Assets/Prefabs/Turntable.prefab:56
+4 references
 
 $ ug refs ILabDebug
 Game.Lab.ILabDebug  interface  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  [exact]
@@ -78,6 +88,7 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
   serialized    _turntable: Turntable, _data: StageData, speed: float
   members       7 methods, 6 fields
   used by       Game.EditorTools.LabStageEditor, Game.EditorTools.LabTools.OpenLab
+  on            Turntable.prefab > Turntable > LabStage
   more  ug explain LabStage --members | ug refs LabStage
 
 $ ug explain LabStage --members
@@ -89,6 +100,7 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
   serialized    _turntable: Turntable, _data: StageData, speed: float
   members       7 methods, 6 fields
   used by       Game.EditorTools.LabStageEditor, Game.EditorTools.LabTools.OpenLab
+  on            Turntable.prefab > Turntable > LabStage
     Trace        method  7   Trace(int)  public
     ResetMethod  field   10  string  const
     _turntable   field   12  Turntable  serialized
@@ -123,9 +135,10 @@ Game.Core.Stage.Open(int)  method  Assets/Scripts/Core/Stage.cs:14  public  [exa
 
 $ ug explain Turntable.Rotate(float)
 Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21  public  [exact]
-  in           Game.Lab.Turntable
-  called from  Game.Lab.LabStage.Open, Game.Lab.LabStage.Spin
-  calls        Game.Lab.Turntable.Rotated
+  in            Game.Lab.Turntable
+  called from   Game.Lab.LabStage.Open, Game.Lab.LabStage.Spin
+  unity events  Lab.unity > Canvas/Open Button > Button: m_OnClick [heuristic]
+  calls         Game.Lab.Turntable.Rotated
   more  ug refs 'Turntable.Rotate(float)'
 
 $ ug explain Turntable._speed
@@ -163,11 +176,170 @@ not found: Nope.Missing
 
 $ ug refs cs:T:Game.Lab.LabStage
 Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
-  used by       Game.EditorTools.LabStageEditor     Assets/Editor/LabTools.cs:16
-  used by       Game.EditorTools.LabTools.OpenLab   Assets/Editor/LabTools.cs:12
-  script asset  a:5a1b2c3d4e5f60718293a4b5c6d7e8f9  Assets/Scripts/Lab/LabStage.cs:7
-3 references
+  used by       Game.EditorTools.LabStageEditor    Assets/Editor/LabTools.cs:16
+  used by       Game.EditorTools.LabTools.OpenLab  Assets/Editor/LabTools.cs:12
+  script asset  Assets/Scripts/Lab/LabStage.cs     Assets/Scripts/Lab/LabStage.cs:7
+  on            Turntable > LabStage               Assets/Prefabs/Turntable.prefab:56
+4 references
 
 $ ug refs cs:T:Game.Lab.Gone
 not found: cs:T:Game.Lab.Gone
+
+$ ug find Turntable --kind asset
+Assets/Scripts/Lab/Turntable.cs          script  guid 0f9e8d7c6b5a49382716a5b4c3d2e1f0
+Assets/Prefabs/Turntable.prefab          prefab  guid b1000000000000000000000000000001
+Assets/Prefabs/Turntable Variant.prefab  prefab  guid b2000000000000000000000000000002
+3 found
+
+$ ug find Platter --kind game_object
+Turntable/Platter  game_object  Assets/Prefabs/Turntable.prefab:65-77  inactive
+1 found
+
+$ ug find Lab --kind prefab_instance
+Lab Turntable  prefab_instance  Assets/Scenes/Lab.unity:117-145  of Assets/Prefabs/Turntable.prefab
+1 found
+
+$ ug refs Assets/Prefabs/Turntable.prefab
+Assets/Prefabs/Turntable.prefab  prefab  guid b1000000000000000000000000000001  [exact]
+  prefab instance  Lab Turntable                                       Assets/Scenes/Lab.unity:145
+  prefab instance  Turntable Variant                                   Assets/Prefabs/Turntable Variant.prefab:30
+  variant          Assets/Prefabs/Turntable Variant.prefab             Assets/Prefabs/Turntable Variant.prefab:30
+  referenced by    Assets/Data/LabSettings.asset: stagePrefab          Assets/Data/LabSettings.asset:35
+  referenced by    Lab Turntable: _turntable                           Assets/Scenes/Lab.unity:140
+  overridden in    Lab Turntable: _speed = 3                           Assets/Scenes/Lab.unity:133
+  overridden in    Lab Turntable: _turntable -> Turntable > Turntable  Assets/Scenes/Lab.unity:137
+  overridden in    Lab Turntable: m_Name = Lab Turntable               Assets/Scenes/Lab.unity:125
+  overridden in    Turntable Variant: _speed = 5                       Assets/Prefabs/Turntable Variant.prefab:19
+  overridden in    Turntable Variant: m_Name = Turntable Variant       Assets/Prefabs/Turntable Variant.prefab:11
+10 references
+
+$ ug refs Lab.mat
+Assets/Materials/Lab.mat  material  guid d4000000000000000000000000000004  [exact]
+  referenced by  Assets/Scenes/Lab.unity: RenderSettings.m_SkyboxMaterial  Assets/Scenes/Lab.unity:8
+  referenced by  Turntable/Platter > MeshRenderer: m_Materials[0]          Assets/Prefabs/Turntable.prefab:103
+2 references
+
+$ ug refs a:e5000000000000000000000000000005
+Assets/Textures/Grid.png  texture  guid e5000000000000000000000000000005  [exact]
+  referenced by  Assets/Materials/Lab.mat: m_SavedProperties.m_TexEnvs[1]._MainTex.m_Texture  Assets/Materials/Lab.mat:21
+1 reference
+
+$ ug refs Turntable.cs
+Assets/Scripts/Lab/Turntable.cs  script  guid 0f9e8d7c6b5a49382716a5b4c3d2e1f0  [exact]
+  on  Turntable > Turntable  Assets/Prefabs/Turntable.prefab:42
+1 reference
+
+$ ug explain Turntable.prefab
+Assets/Prefabs/Turntable.prefab  prefab  guid b1000000000000000000000000000001  [exact]
+  objects      2 game objects, 3 components
+  scripts      Game.Lab.LabStage, Game.Lab.Turntable
+  uses         Assets/Materials/Lab.mat
+  used by      Assets/Data/LabSettings.asset, Assets/Prefabs/Turntable Variant.prefab, Assets/Scenes/Lab.unity
+  addressable  "Prefabs/Turntable" in Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset, labels lab, turntables
+  more  ug refs Turntable.prefab
+
+$ ug explain Turntable Variant.prefab
+Assets/Prefabs/Turntable Variant.prefab  prefab  guid b2000000000000000000000000000002  [exact]
+  objects     1 component, 1 prefab instance
+  variant of  Assets/Prefabs/Turntable.prefab
+  used by     Assets/Scenes/Lab.unity
+  more  ug refs 'Turntable Variant.prefab'
+
+$ ug explain Lab.unity
+Assets/Scenes/Lab.unity  scene  guid c3000000000000000000000000000003  [exact]
+  objects       3 game objects, 1 component, 2 prefab instances
+  scripts       UnityEngine.UI.Button
+  prefabs       Assets/Prefabs/Turntable Variant.prefab, Assets/Prefabs/Turntable.prefab
+  uses          Assets/Materials/Lab.mat, Assets/Prefabs/Turntable.prefab
+  unity events  Game.Lab.LabStage.Open, Game.Lab.LabStage.OpenFirst, Game.Lab.Turntable.Rotate [heuristic]
+  used by       Assets/Data/LabSettings.asset
+  addressable   "Lab" in Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset
+  more  ug refs Lab.unity
+
+$ ug explain LabSettings.asset
+Assets/Data/LabSettings.asset  scriptable_object  guid f6000000000000000000000000000006  [exact]
+  objects       1 sub asset
+  scripts       Game.Data.LabExtra, script guid a7000000000000000000000000000007
+  uses          Assets/Prefabs/Turntable.prefab, Assets/Scenes/Lab.unity
+  unity events  Game.Lab.Turntable.Stop
+  used by       (none)
+  more  ug refs LabSettings.asset
+
+$ ug explain Turntable.cs
+Assets/Scripts/Lab/Turntable.cs  script  guid 0f9e8d7c6b5a49382716a5b4c3d2e1f0  [exact]
+  defines  Game.Lab.Turntable
+  used by  (none)
+  on       Turntable.prefab > Turntable > Turntable
+  more  ug refs Turntable.cs
+
+$ ug explain Default Local Group.asset
+Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset  scriptable_object  guid a8000000000000000000000000000008  [exact]
+  scripts  script guid bbb281ee3bf0b054c82ac2347e9e782c
+  uses     a:5a2e0b7fd2d2e4b4c8a0e5b1d3c9f7a1
+  used by  (none)
+  more  ug refs 'Default Local Group.asset'
+
+$ ug explain c3000000000000000000000000000003
+Assets/Scenes/Lab.unity  scene  guid c3000000000000000000000000000003  [exact]
+  objects       3 game objects, 1 component, 2 prefab instances
+  scripts       UnityEngine.UI.Button
+  prefabs       Assets/Prefabs/Turntable Variant.prefab, Assets/Prefabs/Turntable.prefab
+  uses          Assets/Materials/Lab.mat, Assets/Prefabs/Turntable.prefab
+  unity events  Game.Lab.LabStage.Open, Game.Lab.LabStage.OpenFirst, Game.Lab.Turntable.Rotate [heuristic]
+  used by       Assets/Data/LabSettings.asset
+  addressable   "Lab" in Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset
+  more  ug refs c3000000000000000000000000000003
+
+$ ug explain Assets/Nowhere.prefab
+not found: Assets/Nowhere.prefab
+
+$ ug explain o:c3000000000000000000000000000003:512
+Canvas/Open Button > Button  component  Assets/Scenes/Lab.unity:60-116  [exact]
+  in            Assets/Scenes/Lab.unity
+  on            Canvas/Open Button
+  script        UnityEngine.UI.Button
+  unity events  m_OnClick -> Game.Lab.LabStage.Open, m_OnClick -> Game.Lab.LabStage.OpenFirst, m_OnClick -> Game.Lab.Turntable.Rotate [heuristic]
+  more  ug refs o:c3000000000000000000000000000003:512
+
+$ ug explain o:c3000000000000000000000000000003:600
+Lab Turntable  prefab_instance  Assets/Scenes/Lab.unity:117-145  [exact]
+  in           Assets/Scenes/Lab.unity
+  children     Lab Turntable/Marker
+  instance of  Assets/Prefabs/Turntable.prefab
+  overrides    m_Name = Lab Turntable, _speed = 3, _turntable -> Turntable > Turntable
+  more  ug refs o:c3000000000000000000000000000003:600
+
+$ ug explain o:b1000000000000000000000000000001:200
+Turntable/Platter  game_object  Assets/Prefabs/Turntable.prefab:65-77  [exact]
+  in          Assets/Prefabs/Turntable.prefab
+  parent      Turntable
+  components  MeshRenderer
+  more  ug refs o:b1000000000000000000000000000001:200
+
+$ ug explain o:f6000000000000000000000000000006:-5
+Extra  sub_asset  Assets/Data/LabSettings.asset:3-22  [exact]
+  in            Assets/Data/LabSettings.asset
+  script        Game.Data.LabExtra
+  unity events  m_OnDone -> Game.Lab.Turntable.Stop
+  more  ug refs o:f6000000000000000000000000000006:-5
+
+$ ug explain LabStage.OpenFirst
+Game.Lab.LabStage.OpenFirst()  method  Assets/Scripts/Lab/LabStage.cs:55-56  [exact]
+  in            Game.Lab.LabStage
+  called from   (none)
+  unity events  Lab.unity > Canvas/Open Button > Button: m_OnClick
+  calls         Game.Lab.LabStage.Open
+  flags         [ContextMenu]
+  more  ug refs LabStage.OpenFirst
+
+$ ug refs Turntable
+Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
+  used by       Game.Broken.Run                  Assets/Scripts/Broken.cs:8
+  used by       Game.Lab.LabStage                Assets/Scripts/Lab/LabStage.cs:7
+  used by       Game.Lab.LabStage.Awake          Assets/Scripts/Lab/LabStage.cs:20
+  used by       Game.Lab.LabStage.OnClosed       Assets/Scripts/Lab/LabStage.cs:49
+  used by       Game.Lab.LabStage._turntable     Assets/Scripts/Lab/LabStage.cs:12
+  script asset  Assets/Scripts/Lab/Turntable.cs  Assets/Scripts/Lab/Turntable.cs:7
+  on            Turntable > Turntable            Assets/Prefabs/Turntable.prefab:42
+7 references
 

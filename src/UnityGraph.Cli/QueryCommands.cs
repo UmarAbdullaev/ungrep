@@ -15,9 +15,9 @@ internal static class QueryCommands
     public static IEnumerable<Command> Create()
     {
         var text = new Argument<string>("text") { Description = "Name or words of a name." };
-        var kind = new Option<string>("--kind") { Description = "Only this kind: type, method, field, property, event." };
-        kind.AcceptOnlyFromAmong("type", "method", "field", "property", "event");
-        yield return Command("find", "Find types and members by name.", [text, kind], (result, engine, budget) =>
+        var kind = new Option<string>("--kind") { Description = "Only this kind: type, method, field, property, event, asset, game_object, prefab_instance." };
+        kind.AcceptOnlyFromAmong("type", "method", "field", "property", "event", "asset", "game_object", "prefab_instance");
+        yield return Command("find", "Find types, members, assets and game objects by name.", [text, kind], (result, engine, budget) =>
             engine.Find(result.GetValue(text)!, result.GetValue(kind) is { } k ? KindNames.ParseNode(k) : null, budget));
 
         var symbol = new Argument<string>("symbol") { Description = "Type or member: Name, Type.Member, Namespace.Type.Member(args), or a cs: key." };

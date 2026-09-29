@@ -46,8 +46,8 @@ public sealed partial class QueryCommandTests : IDisposable
 
         Assert.Equal("""
             Game.Lab.Turntable.Stop()  method  Assets/Scripts/Lab/Turntable.cs:23  [exact]
-              called from       Game.Lab.LabStage.OnClosed             Assets/Scripts/Lab/LabStage.cs:51
-              event_calls from  o:f6000000000000000000000000000006:-5  Assets/Data/LabSettings.asset:20
+              called from  Game.Lab.LabStage.OnClosed  Assets/Scripts/Lab/LabStage.cs:51
+              unity event  Extra: m_OnDone             Assets/Data/LabSettings.asset:20
             2 references
 
             """.ReplaceLineEndings("\n"), second);
@@ -126,10 +126,10 @@ public sealed partial class QueryCommandTests : IDisposable
     {
         var error = new StringWriter();
 
-        int exitCode = CliApp.Run(["find", "x", "--kind", "asset", "--project", _root], new StringWriter(), error);
+        int exitCode = CliApp.Run(["find", "x", "--kind", "component", "--project", _root], new StringWriter(), error);
 
         Assert.NotEqual(0, exitCode);
-        Assert.Contains("asset", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("component", error.ToString(), StringComparison.Ordinal);
         Assert.StartsWith("Game.Lab.LabStage._turntable  field", Run("find", "turn", "--kind", "field").Output.Split('\n')[1], StringComparison.Ordinal);
     }
 

@@ -531,24 +531,57 @@ public sealed class GraphStore : IDisposable
     /// <summary>Edges arriving at <paramref name="key"/>, ordered by kind, source, line.</summary>
     public Page<EdgeHit> EdgesTo(string key, EdgeKindSet kinds, int limit) => Edges("dst", "src", key, kinds, limit);
 
+    /// <summary>
+    /// Edges arriving at the asset `a:<paramref name="guid"/>` or at any of its objects
+    /// (`o:<paramref name="guid"/>:…`), ordered by kind, source, line.
+    /// </summary>
+    public Page<EdgeHit> EdgesIntoAsset(string guid, EdgeKindSet kinds, int limit)
+    {
+        // `;` follows `:` in ASCII, so the range is every key with the `o:<guid>:` prefix.
+        using SqliteCommand command = EdgeCommand(
+            "src", "(e.dst = $asset OR (e.dst >= $low AND e.dst < $high))" + KindFilter("e.kind", kinds.IsAll, kinds.Names), "e.kind, e.src", limit);
+        command.Parameters.AddWithValue("$asset", NodeKeys.Asset(guid));
+        command.Parameters.AddWithValue("$low", "o:" + guid + ":");
+        command.Parameters.AddWithValue("$high", "o:" + guid + ";");
+        return ReadEdges(command, limit);
+    }
+
+    /// <summary>Edges <paramref name="path"/> owns, ordered by line, source, kind, destination.</summary>
+    public Page<EdgeHit> EdgesInFile(string path, EdgeKindSet kinds, int limit)
+    {
+        using SqliteCommand command = EdgeCommand("dst", "f.path = $path" + KindFilter("e.kind", kinds.IsAll, kinds.Names), "e.line, e.src, e.kind, e.dst", limit);
+        command.Parameters.AddWithValue("$path", path);
+        return ReadEdges(command, limit);
+    }
+
     private Page<EdgeHit> Edges(string near, string far, string key, EdgeKindSet kinds, int limit)
     {
+        using SqliteCommand command = EdgeCommand(far, $"e.{near} = $key{KindFilter("e.kind", kinds.IsAll, kinds.Names)}", $"e.kind, e.{far}", limit);
+        command.Parameters.AddWithValue("$key", key);
+        return ReadEdges(command, limit);
+    }
+
+    // `far` is the end whose node existence becomes EdgeHit.Resolved.
+    private SqliteCommand EdgeCommand(string far, string where, string order, int limit)
+    {
         CheckLimit(limit);
-        using SqliteCommand command = ReadCommand($"""
+        SqliteCommand command = ReadCommand($"""
             SELECT e.src, e.kind, e.dst, e.confidence, f.path, e.line, e.props,
                    EXISTS (SELECT 1 FROM nodes n WHERE n.key = e.{far})
             FROM edges e JOIN files f ON f.id = e.file_id
-            WHERE e.{near} = $key{KindFilter("e.kind", kinds.IsAll, kinds.Names)}
-            ORDER BY e.kind, e.{far}, e.line, f.path, e.props
+            WHERE {where}
+            ORDER BY {order}, e.line, f.path, e.props
             LIMIT $limit
             """);
-        command.Parameters.AddWithValue("$key", key);
         command.Parameters.AddWithValue("$limit", limit + 1);
-        return ReadPage(command, limit, r => new EdgeHit(
+        return command;
+    }
+
+    private static Page<EdgeHit> ReadEdges(SqliteCommand command, int limit) =>
+        ReadPage(command, limit, r => new EdgeHit(
             new Edge(r.GetString(0), KindNames.ParseEdge(r.GetString(1)), r.GetString(2), (Confidence)r.GetInt32(3),
                 r.GetString(4), r.GetInt32(5), r.IsDBNull(6) ? null : r.GetString(6)),
             r.GetBoolean(7)));
-    }
 
     // Kind names come from the closed vocabulary, never from input, so inlining them is safe.
     private static string KindFilter(string column, bool all, IEnumerable<string> names) =>

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using UnityGraph.Assets;
 using UnityGraph.Code;
 using UnityGraph.Core;
 using UnityGraph.Core.Graph;
@@ -14,6 +15,7 @@ public sealed class QueryFixture : IDisposable
         Copy(Path.Combine(RepoRoot(), "fixtures", "CodeProject"), Root);
         using GraphStore store = GraphStore.Open(Root, StoreMode.ReadWrite);
         CodeIndex.Update(CodeWorkspace.Load(Root, VendoredFolders.Default), store);
+        AssetIndex.Update(AssetWorkspace.Scan(Root, VendoredFolders.Default), store, []);
     }
 
     public string Root { get; }

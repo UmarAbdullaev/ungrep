@@ -9,8 +9,9 @@ public sealed record Resolution(IReadOnlyList<Node> Nodes, bool Ambiguous)
 }
 
 /// <summary>
-/// Turns `&lt;symbol&gt;` text into nodes (SPEC-query, Resolving): a `cs:` key, or a dotted name that
-/// a node's qualified name ends with, optionally with a parameter list matched against `sig`.
+/// Turns `&lt;symbol&gt;` text into nodes (SPEC-query, Resolving): a `cs:`, `a:` or `o:` key, a GUID,
+/// an asset path or file name, or a dotted name that a node's qualified name ends with,
+/// optionally with a parameter list matched against `sig`.
 /// Overloads of one method named without parameters are one symbol.
 /// </summary>
 public static class SymbolResolver
@@ -20,9 +21,31 @@ public static class SymbolResolver
     public static Resolution Resolve(GraphStore store, string text)
     {
         text = text.Trim();
-        if (text.StartsWith("cs:", StringComparison.Ordinal))
+        if (text.StartsWith("cs:", StringComparison.Ordinal) || text.StartsWith("a:", StringComparison.Ordinal) || text.StartsWith("o:", StringComparison.Ordinal))
         {
-            return store.GetNode(text) is { } node ? new Resolution([node], false) : new Resolution([], false);
+            return One(store.GetNode(text));
+        }
+
+        if (text.Length == 32 && text.All(char.IsAsciiHexDigitLower))
+        {
+            return One(store.GetNode(NodeKeys.Asset(text)));
+        }
+
+        if (text.Contains('/', StringComparison.Ordinal))
+        {
+            string meta = (text.EndsWith(".meta", StringComparison.Ordinal) ? text : text + ".meta").TrimStart('/');
+            return One(store.KeysInFile(meta).Select(store.GetNode).FirstOrDefault(n => n?.Kind == NodeKind.Asset));
+        }
+
+        if (text.Contains('.', StringComparison.Ordinal) && !text.Contains('(', StringComparison.Ordinal))
+        {
+            List<Node> assets = store.FindByName(text, NodeKindSet.Of(NodeKind.Asset), Candidates).Items.ToList();
+            List<Node> files = assets.Where(n => n.Name == text).ToList();
+            files = files.Count > 0 ? files : assets.Where(n => string.Equals(n.Name, text, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (files.Count > 0)
+            {
+                return new Resolution([.. files.OrderBy(n => n.File, StringComparer.Ordinal)], files.Count > 1);
+            }
         }
 
         int paren = text.IndexOf('(', StringComparison.Ordinal);
@@ -54,6 +77,8 @@ public static class SymbolResolver
                 && matches.Select(n => Names.Qualified(n.Key)).Distinct(StringComparer.Ordinal).Count() == 1);
         return new Resolution(matches, !oneSymbol);
     }
+
+    private static Resolution One(Node? node) => node is null ? new Resolution([], false) : new Resolution([node], false);
 
     private static List<Node> Matching(List<Node> nodes, string name, StringComparison comparison) =>
         nodes.Where(n =>

@@ -57,9 +57,13 @@ internal static class Names
         return qualified;
     }
 
-    /// <summary>The subkind for types (`class`, `struct`, ...), the node kind otherwise.</summary>
-    public static string Kind(Node node) =>
-        node.Kind == NodeKind.Type && Prop(node, "subkind") is { } subkind ? subkind : KindNames.Of(node.Kind);
+    /// <summary>The subkind for types (`class`, `struct`, ...), the asset type for assets, the node kind otherwise.</summary>
+    public static string Kind(Node node) => node.Kind switch
+    {
+        NodeKind.Type when Prop(node, "subkind") is { } subkind => subkind,
+        NodeKind.Asset when Prop(node, "asset_type") is { } type => type,
+        _ => KindNames.Of(node.Kind),
+    };
 
     public static string Location(Node node) =>
         node.LineEnd > node.LineStart ? $"{node.File}:{node.LineStart}-{node.LineEnd}" : $"{node.File}:{node.LineStart}";
@@ -68,12 +72,21 @@ internal static class Names
 
     public static string Confidence(Confidence confidence) => confidence == Core.Graph.Confidence.Exact ? "[exact]" : "[heuristic]";
 
-    public static string? Prop(Node node, string name) =>
-        Props(node) is { } props && props.TryGetValue(name, out JsonElement value)
+    public static string? Prop(Node node, string name) => Prop(node.Props, name);
+
+    public static string? Prop(Edge edge, string name) => Prop(edge.Props, name);
+
+    /// <summary>An asset's project path: the path of the `.meta` that owns its node, without `.meta`.</summary>
+    public static string AssetPath(Node asset) =>
+        asset.File.EndsWith(".meta", StringComparison.Ordinal) ? asset.File[..^".meta".Length] : asset.File;
+
+    private static string? Prop(string? json, string name) =>
+        Props(json) is { } props && props.TryGetValue(name, out JsonElement value)
             ? value.ValueKind switch
             {
                 JsonValueKind.String => value.GetString(),
                 JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
                 JsonValueKind.Number => value.GetRawText(),
                 _ => null,
             }
@@ -81,8 +94,12 @@ internal static class Names
 
     public static bool Flag(Node node, string name) => Prop(node, name) == "true";
 
-    public static IReadOnlyList<string> List(Node node, string name) =>
-        Props(node) is { } props && props.TryGetValue(name, out JsonElement value) && value.ValueKind == JsonValueKind.Array
+    public static IReadOnlyList<string> List(Node node, string name) => List(node.Props, name);
+
+    public static IReadOnlyList<string> List(Edge edge, string name) => List(edge.Props, name);
+
+    private static IReadOnlyList<string> List(string? json, string name) =>
+        Props(json) is { } props && props.TryGetValue(name, out JsonElement value) && value.ValueKind == JsonValueKind.Array
             ? [.. value.EnumerateArray().Select(v => v.GetString() ?? "")]
             : [];
 
@@ -98,16 +115,16 @@ internal static class Names
             ? text
             : "'" + text.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 
-    private static Dictionary<string, JsonElement>? Props(Node node)
+    private static Dictionary<string, JsonElement>? Props(string? json)
     {
-        if (node.Props is null)
+        if (json is null)
         {
             return null;
         }
 
         try
         {
-            return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(node.Props);
+            return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
         }
         catch (JsonException)
         {
