@@ -1,0 +1,28 @@
+{
+    "name": "UnityGraph.Bridge.Editor.TestRuns",
+    "rootNamespace": "UnityGraph.Bridge",
+    "references": [
+        "UnityGraph.Bridge.Editor",
+        "UnityEditor.TestRunner",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UG_TEST_FRAMEWORK"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.test-framework",
+            "expression": "1.1.0",
+            "define": "UG_TEST_FRAMEWORK"
+        }
+    ],
+    "noEngineReferences": false
+}

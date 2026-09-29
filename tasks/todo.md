@@ -66,7 +66,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] A5 query: asset answers (Query coverage 96%)
 - [x] A6 asset-index: purge-squad measurement (full 0.6 s, no-op update p95 351 ms, one prefab p95 401 ms)
 - [x] E1 editor-link spec
-- [ ] E2 editor-link: bridge package and BridgeHost
+- [x] E2 editor-link: bridge package and BridgeHost (19 EditMode tests green in batch mode; live smoke run)
 - [ ] E3 editor-link: client and Editor.log
 - [ ] E4 editor-link: CLI and end to end
 - [ ] E5 editor-link: purge-squad measurement (ask before installing the bridge there)

@@ -40,8 +40,9 @@ bridge; Unity's official CLI adapter (after v1, Decisions #3); Linux.
   package adds no dependency to the user's project.
 - **Transport.** `System.Net.HttpListener` (Mono's managed listener: no URL reservation, no
   admin) on `http://127.0.0.1:<port>/`, loopback only. The port is the one used before the last
-  domain reload when it is still free, otherwise a free one the OS picks. HTTP/1.1, `GET` only,
-  parameters in the query string, answers in JSON (written by a small writer in the package,
+  domain reload when it is still free, otherwise a free one the OS picks. HTTP/1.1, `GET` only
+  (other methods get `405`; Mono itself answers a bodiless `POST` with `411`), parameters in the
+  query string, answers in JSON (written by a small writer in the package,
   not `JsonUtility`).
 - **Discovery.** `Library/unitygraph/bridge.json`, rewritten on each start and deleted on quit:
 
@@ -188,7 +189,23 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
 
 ## Measured
 
-Not yet (E5).
+E2 smoke run (2026-09-29), BridgeHost in batch mode on Unity 6000.3.14f1 (`-batchmode
+-nographics -ugBridge`, no `-quit`), requests with curl over loopback:
+
+- `EditorApplication.update` ticks in batch mode, so queued requests are answered: `/refresh`
+  5–45 ms, `/compile`, `/console`, `/run`, `/tests` 1–40 ms; `/status` 2–24 ms.
+- A file with an error: `/refresh` said `compiling`, `/status` reached `compile: 1` in 1.3 s,
+  and `/compile` gave `Assets/Editor/Broken.cs`, line 1, column 78, `CS0103` and its text.
+- Fixing it: the successful compile reloaded the domain; the bridge came back on the same port
+  and token within 2.1 s of the refresh, with the console history and compile counter kept.
+- `/run` on a fixture method, on one that throws (frame `Assets/Editor/FixtureMethods.cs:12`),
+  on a menu item, and on `UnityEditor.EditorApplication.Exit` (refused); `/tests` with a filter
+  ran one EditMode test and `/tests/result` gave its totals.
+- Killing the editor leaves `bridge.json` behind: the client's stale check (pid) matters.
+- Mono's traces name frames without symbols `in <41d29b35...>:0`; the first EditMode run caught
+  `Path.IsPathRooted` throwing on them, fixed in `StackFrames.Relative`.
+
+Client and CLI numbers: E4 and E5.
 
 ## Open points
 
