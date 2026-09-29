@@ -175,3 +175,28 @@ Acceptance: golden transcript extended; SPEC-query updated.
 
 ### A6. asset-index: purge-squad measurement
 Acceptance: env-gated test passes; Measured section filled; targets met or explained.
+
+```
+E1 spec ──> E2 bridge package + BridgeHost ──> E3 client + Editor.log ──> E4 CLI + end to end ──> E5 purge-squad
+```
+
+### E1. editor-link spec
+`specs/SPEC-editor-link.md`.
+
+### E2. editor-link: bridge package
+- `unity/com.unitygraph.bridge`: listener, discovery file, token, main-thread queue, status,
+  refresh, compile capture, console buffer, tests, run. `fixtures/BridgeHost` loads it.
+Acceptance: EditMode tests pass in batch mode on Unity 6000.3.14f1.
+
+### E3. editor-link: client and Editor.log
+- `src/UnityGraph.EditorLink`: discovery, requests, compile flow with reload wait and deadline,
+  `Editor.log` reader with markers recorded from BridgeHost runs.
+Acceptance: fake-bridge and log golden tests; EditorLink coverage ≥ 80%.
+
+### E4. editor-link: CLI and end to end
+- `ug status`, `ug compile`, `ug run`, `ug bridge install|remove`; skill table.
+Acceptance: `UG_UNITY` end-to-end test passes against BridgeHost in batch mode; times recorded.
+
+### E5. editor-link: purge-squad measurement
+Needs the bridge installed in purge-squad: ask the user first. Otherwise measured on BridgeHost
+only and the open point stays open.

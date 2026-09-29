@@ -45,9 +45,10 @@ Details and acceptance criteria: `plan.md`.
 
 ## Checkpoint
 - [x] Spike results recorded in SPEC.md
-- [ ] Step-2 module specs written (code-index, asset-index, editor-link)
+- [x] Step-2 module specs written (code-index, asset-index, editor-link)
   - [x] code-index (`specs/SPEC-code-index.md`)
   - [x] asset-index (`specs/SPEC-asset-index.md`)
+  - [x] editor-link (`specs/SPEC-editor-link.md`)
 
 # Todo: step 2 (query pulled forward, see plan.md)
 
@@ -64,3 +65,8 @@ Details and acceptance criteria: `plan.md`.
 - [x] A4 asset-index: workspace, incremental, `ug index`
 - [x] A5 query: asset answers (Query coverage 96%)
 - [x] A6 asset-index: purge-squad measurement (full 0.6 s, no-op update p95 351 ms, one prefab p95 401 ms)
+- [x] E1 editor-link spec
+- [ ] E2 editor-link: bridge package and BridgeHost
+- [ ] E3 editor-link: client and Editor.log
+- [ ] E4 editor-link: CLI and end to end
+- [ ] E5 editor-link: purge-squad measurement (ask before installing the bridge there)
