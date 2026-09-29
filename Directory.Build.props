@@ -30,6 +30,8 @@
 
   <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <PackageReference Include="xunit.v3" />
+    <Compile Include="$(MSBuildThisFileDirectory)tests\Shared\Golden.cs" Link="Golden.cs" />
     <Using Include="Xunit" />
+    <Using Include="UnityGraph.Tests" />
   </ItemGroup>
 </Project>

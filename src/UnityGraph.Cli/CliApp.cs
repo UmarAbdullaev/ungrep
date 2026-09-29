@@ -8,9 +8,14 @@ namespace UnityGraph.Cli;
 /// </summary>
 internal static class CliApp
 {
-    public static int Run(string[] args, TextWriter output, TextWriter error)
+    // claudeConfigDir: Claude Code's config folder; null means CLAUDE_CONFIG_DIR, then ~/.claude.
+    // Tests point it at fixtures.
+    public static int Run(string[] args, TextWriter output, TextWriter error, string? claudeConfigDir = null)
     {
-        var root = new RootCommand("unitygraph: Unity project graph for Claude Code.");
+        var root = new RootCommand("unitygraph: Unity project graph for Claude Code.")
+        {
+            StatsCommand.Create(claudeConfigDir),
+        };
 
         return root.Parse(args).Invoke(new InvocationConfiguration { Output = output, Error = error });
     }

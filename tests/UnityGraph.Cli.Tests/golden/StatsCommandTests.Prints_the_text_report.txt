@@ -1,0 +1,9 @@
+Game  until 2026-09-22T23:59:59Z
+sessions 2 | turns 6 | context 336.0k | avg/turn 56.0k
+first turn median 100.0k | compactions 1 | tool calls 3
+context charged to tool calls 26.0k (7.7%)
+
+category                            calls  context  share
+search: grep/glob                       1    12.0k   3.6%
+read: .cs                               1     7.0k   2.1%
+shell: git                              1     7.0k   2.1%

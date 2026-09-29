@@ -1,0 +1,9 @@
+Game  all time  vs baseline Game  until 2026-09-21T00:00:00Z
+sessions 2 (0) | turns 8 (+100.0%) | context 431.0k (+216.9%) | avg/turn 53.9k (+58.4%)
+first turn median 100.0k (0.0%) | compactions 1 (+1) | tool calls 3 (0.0%)
+context charged to tool calls 26.0k (6.0%)
+
+category                            calls  context  share   ctx chg share chg
+search: grep/glob                       1    12.0k   2.8%      0.0%    -6.0pp
+read: .cs                               1     7.0k   1.6%      0.0%    -3.5pp
+shell: git                              1     7.0k   1.6%      0.0%    -3.5pp

@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "project": "purge-squad",
+  "since": null,
+  "until": "2026-09-28T11:00:00+00:00",
+  "sessions": 34,
+  "turns": 2861,
+  "contextTokens": 754178425,
+  "compactions": 5,
+  "firstTurnMedian": 73072,
+  "categories": [
+    {
+      "name": "unity: eval/run_script",
+      "calls": 581,
+      "contextTokens": 125128104
+    },
+    {
+      "name": "shell: search/read",
+      "calls": 526,
+      "contextTokens": 119771806
+    },
+    {
+      "name": "write: .cs",
+      "calls": 442,
+      "contextTokens": 76918290
+    },
+    {
+      "name": "shell: git",
+      "calls": 183,
+      "contextTokens": 49233165
+    },
+    {
+      "name": "read/search: unity yaml",
+      "calls": 178,
+      "contextTokens": 40702196
+    },
+    {
+      "name": "unity: compile/refresh/status",
+      "calls": 189,
+      "contextTokens": 39871127
+    },
+    {
+      "name": "shell: other",
+      "calls": 145,
+      "contextTokens": 36594783
+    },
+    {
+      "name": "unity: play/screenshot",
+      "calls": 187,
+      "contextTokens": 30434311
+    },
+    {
+      "name": "unity: console/logs",
+      "calls": 123,
+      "contextTokens": 27764268
+    },
+    {
+      "name": "unity: other mcp",
+      "calls": 116,
+      "contextTokens": 21003072
+    },
+    {
+      "name": "write: other",
+      "calls": 59,
+      "contextTokens": 20913054
+    },
+    {
+      "name": "unity: tests",
+      "calls": 60,
+      "contextTokens": 16409058
+    },
+    {
+      "name": "read: .cs",
+      "calls": 101,
+      "contextTokens": 16207974
+    },
+    {
+      "name": "toolsearch",
+      "calls": 62,
+      "contextTokens": 13401687
+    },
+    {
+      "name": "browser",
+      "calls": 49,
+      "contextTokens": 11862766
+    },
+    {
+      "name": "search: grep/glob",
+      "calls": 73,
+      "contextTokens": 11548910
+    },
+    {
+      "name": "write: .md",
+      "calls": 93,
+      "contextTokens": 10454904
+    },
+    {
+      "name": "read: image",
+      "calls": 41,
+      "contextTokens": 7680123
+    },
+    {
+      "name": "read: .md (plan/map/docs)",
+      "calls": 66,
+      "contextTokens": 7299055
+    },
+    {
+      "name": "unity: other cli",
+      "calls": 10,
+      "contextTokens": 7038118
+    },
+    {
+      "name": "other mcp",
+      "calls": 19,
+      "contextTokens": 5523436
+    },
+    {
+      "name": "unity: scene/asset inspect+edit",
+      "calls": 28,
+      "contextTokens": 3907990
+    },
+    {
+      "name": "other: AskUserQuestion",
+      "calls": 12,
+      "contextTokens": 3845394
+    },
+    {
+      "name": "read: other",
+      "calls": 11,
+      "contextTokens": 2933393
+    },
+    {
+      "name": "other: WebFetch",
+      "calls": 10,
+      "contextTokens": 882541
+    },
+    {
+      "name": "shell: waiting",
+      "calls": 1,
+      "contextTokens": 264032
+    },
+    {
+      "name": "other: SendUserFile",
+      "calls": 1,
+      "contextTokens": 238626
+    },
+    {
+      "name": "other: WebSearch",
+      "calls": 2,
+      "contextTokens": 158582
+    },
+    {
+      "name": "other: TaskStop",
+      "calls": 1,
+      "contextTokens": 146024
+    }
+  ],
+  "toolCalls": 3369,
+  "chargedContextTokens": 708136789
+}

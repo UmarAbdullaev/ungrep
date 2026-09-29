@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "project": "Game",
+  "since": null,
+  "until": "2026-09-23T12:00:00+00:00",
+  "sessions": 2,
+  "turns": 7,
+  "contextTokens": 391014,
+  "compactions": 1,
+  "firstTurnMedian": 100000,
+  "categories": [
+    {
+      "name": "search: grep/glob",
+      "calls": 1,
+      "contextTokens": 12000
+    },
+    {
+      "name": "read: .cs",
+      "calls": 1,
+      "contextTokens": 7002
+    },
+    {
+      "name": "shell: git",
+      "calls": 1,
+      "contextTokens": 7002
+    }
+  ],
+  "toolCalls": 3,
+  "chargedContextTokens": 26004
+}

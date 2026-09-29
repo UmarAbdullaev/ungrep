@@ -256,7 +256,7 @@ building further.
   network at view time).
 - Build: .NET 10 SDK (pinned in `global.json`) targeting `net8.0`; central package versions in
   `Directory.Packages.props`; output under `artifacts/`.
-- Tests: xUnit v3 on Microsoft.Testing.Platform; Verify for golden CLI output; Unity Test Framework for the bridge.
+- Tests: xUnit v3 on Microsoft.Testing.Platform; golden files for CLI output (`tests/Shared/Golden.cs`; Verify dropped 2026-09-29: it now needs a paid or declared license to build); Unity Test Framework for the bridge.
 - Claude Code plugin format: `.claude-plugin/plugin.json`, `skills/`, `agents/`, `hooks/hooks.json`.
 
 ## Commands
@@ -380,7 +380,7 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
   Unity's serialization rules are table-tested: public fields, `[SerializeField]`,
   `[NonSerialized]`, `[SerializeReference]`, `[field: SerializeField]` properties, and the
   static/readonly/const exclusions.
-- **Golden:** CLI output compared with Verify snapshots. Hook handlers are fed recorded hook
+- **Golden:** CLI output compared with committed golden files (`UG_ACCEPT_GOLDEN=1` rewrites them). Hook handlers are fed recorded hook
   JSON payloads.
 - **Integration:** index the fixture projects end to end; freshness (an edit, then a query that
   sees it).

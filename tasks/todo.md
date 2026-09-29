@@ -17,7 +17,8 @@ Details and acceptance criteria: `plan.md`.
 - [x] T2 stats: transcript reader and categorizer (matches Evidence ±2 pp; exact match with the
   prototype at `--until 2026-09-28T11:00Z`, the Evidence snapshot; acceptance test runs when
   UG_PURGE_SQUAD_TRANSCRIPTS is set)
-- [ ] T3 stats: report, JSON, baseline compare
+- [x] T3 stats: report, JSON, baseline compare (golden files instead of Verify: Verify 33 needs
+  a license declaration to build; baseline committed with the project name only)
 - [ ] T4 plugin-shell: plugin files, launcher, config, `ug doctor`
 - [ ] T5 plugin-shell: hook dispatcher, fail-open
 - [ ] T6 graph-core: store

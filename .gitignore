@@ -7,3 +7,6 @@ dist/
 .vs/
 .idea/
 TestResults/
+
+# Golden tests: output that didn't match the committed golden file
+*.received.*

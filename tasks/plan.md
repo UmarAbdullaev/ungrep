@@ -66,7 +66,7 @@ category and ±1% on total context tokens.
   context tokens, first-turn baseline, category table.
 - `--baseline <file>` compares against a saved `--json` report; prints deltas.
 - Output within ~40 lines; deterministic.
-Acceptance: golden (Verify) test for text and JSON output; baseline file for purge-squad saved at
+Acceptance: golden-file test for text and JSON output; baseline file for purge-squad saved at
 `bench/baselines/purge-squad-2026-09.json` (not committed if it contains paths the user doesn't
 want public; ask).
 
