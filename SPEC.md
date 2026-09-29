@@ -37,6 +37,8 @@ Unity's official Claude Code plugin and Unity MCP servers (scene editing), witho
 
 Measured on purge-squad: 34 Claude Code sessions, ~2,900 model turns, ~760M context tokens,
 21 active hours. Method and scripts: `research/transcript-analysis/`.
+Snapshot: transcript entries up to 2026-09-28T11:00Z (later entries, including resumed
+sessions, are excluded), so `ug stats --until 2026-09-28T11:00Z` reproduces it.
 
 - **Cost is turns × context.** Average context per turn: 264k tokens. Tool output itself is only
   ~16% of context. A session's first turn already carries ~71k (system prompt, tools, CLAUDE.md,

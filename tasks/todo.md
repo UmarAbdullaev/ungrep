@@ -14,7 +14,9 @@ Details and acceptance criteria: `plan.md`.
 ## Build
 - [x] T1 solution skeleton + CI (Core/Stats/Hooks test projects come with their first test in
   T6/T2/T5: MTP fails a test project with zero tests; CI not run yet, no GitHub remote)
-- [ ] T2 stats: transcript reader and categorizer (matches Evidence ±2 pp)
+- [x] T2 stats: transcript reader and categorizer (matches Evidence ±2 pp; exact match with the
+  prototype at `--until 2026-09-28T11:00Z`, the Evidence snapshot; acceptance test runs when
+  UG_PURGE_SQUAD_TRANSCRIPTS is set)
 - [ ] T3 stats: report, JSON, baseline compare
 - [ ] T4 plugin-shell: plugin files, launcher, config, `ug doctor`
 - [ ] T5 plugin-shell: hook dispatcher, fail-open
