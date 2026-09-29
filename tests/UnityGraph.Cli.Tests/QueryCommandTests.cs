@@ -35,8 +35,8 @@ public sealed partial class QueryCommandTests : IDisposable
         var (exitCode, first) = Run("refs", "Turntable.Stop");
 
         Assert.Equal(0, exitCode);
-        Assert.StartsWith("indexed 9 files in <t> s\nGame.Lab.Turntable.Stop()  method", first, StringComparison.Ordinal);
-        Assert.EndsWith("2 references\n", first, StringComparison.Ordinal);
+        Assert.StartsWith("indexed 28 files in <t> s\nGame.Lab.Turntable.Stop()  method", first, StringComparison.Ordinal);
+        Assert.EndsWith("3 references\n", first, StringComparison.Ordinal);
 
         string broken = Path.Combine(_root, "Assets", "Scripts", "Broken.cs");
         File.WriteAllText(broken, File.ReadAllText(broken).Replace("table.Stop();", "", StringComparison.Ordinal));
@@ -46,8 +46,9 @@ public sealed partial class QueryCommandTests : IDisposable
 
         Assert.Equal("""
             Game.Lab.Turntable.Stop()  method  Assets/Scripts/Lab/Turntable.cs:23  [exact]
-              called from  Game.Lab.LabStage.OnClosed  Assets/Scripts/Lab/LabStage.cs:51
-            1 reference
+              called from       Game.Lab.LabStage.OnClosed             Assets/Scripts/Lab/LabStage.cs:51
+              event_calls from  o:f6000000000000000000000000000006:-5  Assets/Data/LabSettings.asset:20
+            2 references
 
             """.ReplaceLineEndings("\n"), second);
     }

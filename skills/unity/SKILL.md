@@ -16,7 +16,7 @@ anchors; read only the lines you need after that.
 | `ug explain <symbol>` | What it is: location, base types, Unity kind and script GUID, engine messages, entry points, serialized fields, who uses or calls it. `--members` lists members. |
 | `ug refs <symbol>` | Everything pointing at it, with `file:line`: callers, string dispatch (`Invoke`, `SendMessage`), overrides, subclasses, implementations, type uses. |
 | `ug find <text>` | Types and members whose name starts with the words; `--kind type\|method\|field\|property\|event`. |
-| `ug index` | Build or update the code graph (queries do this themselves). |
+| `ug index` | Build or update the code and asset graph (queries do this themselves). |
 | `ug doctor` | Is the plugin working here: runtime, Unity project, config, graph. |
 | `ug stats` | Where this project's context tokens went, by tool category. |
 

@@ -61,6 +61,6 @@ Details and acceptance criteria: `plan.md`.
 - [x] A1 asset-index spec
 - [x] A2 asset-index: YAML and meta readers
 - [x] A3 asset-index: file indexer and fixture assets
-- [ ] A4 asset-index: workspace, incremental, `ug index`
+- [x] A4 asset-index: workspace, incremental, `ug index`
 - [ ] A5 query: asset answers
 - [ ] A6 asset-index: purge-squad measurement

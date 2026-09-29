@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.Globalization;
-using UnityGraph.Code;
 using UnityGraph.Core;
 using UnityGraph.Core.Graph;
 using UnityGraph.Query;
@@ -95,10 +94,10 @@ internal static class QueryCommands
             return 0;
         }
 
-        CodeWorkspace workspace = CodeWorkspace.Load(unity.Root, config.Vendored);
-        if (!workspace.HasProjects)
+        GraphUpdate update = GraphUpdate.Load(unity.Root, config);
+        if (update.Code is null)
         {
-            text = "no .csproj files: in Unity, Preferences > External Tools > Regenerate project files\n";
+            text = GraphUpdate.NoProjects + "\n";
             return 0;
         }
 
@@ -106,7 +105,7 @@ internal static class QueryCommands
         {
             using GraphStore store = GraphStore.Open(unity.Root, StoreMode.ReadWrite, graphDirectory: graphDirectory);
             bool created = store.Created;
-            IndexSummary summary = CodeIndex.Update(workspace, store);
+            IndexSummary summary = update.Update(store);
             string indexed = created
                 ? string.Create(CultureInfo.InvariantCulture, $"indexed {summary.Files:N0} files in {summary.Elapsed.TotalSeconds:0.0} s\n")
                 : "";

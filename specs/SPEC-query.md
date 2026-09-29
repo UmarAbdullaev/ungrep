@@ -137,8 +137,8 @@ edges yet).
 
 ## Freshness
 
-Before answering, the query brings the code graph up to date with `CodeIndex.Update` (design
-rule 5: a stale answer is worse than grep). A new graph is built there, and the answer starts
+Before answering, the query brings the graph up to date through the CLI's `GraphUpdate` (code,
+then assets; design rule 5: a stale answer is worse than grep). A new graph is built there, and the answer starts
 with one line `indexed N files in S s`. If another writer holds the lock (1 s timeout), the
 query answers from the graph as it is and ends with `note: graph busy, edits from the last
 seconds may be missing`. `code-index` off in config: `code-index is off; nothing to query`.

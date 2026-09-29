@@ -33,7 +33,7 @@ public sealed partial class IndexCommandTests : IDisposable
     {
         var (exitCode, first) = Run();
         Assert.Equal(0, exitCode);
-        Assert.StartsWith("indexed 9 files (8 own, 1 vendored): ", first, StringComparison.Ordinal);
+        Assert.StartsWith("indexed 28 files (26 own, 2 vendored): ", first, StringComparison.Ordinal);
         Assert.Contains("  warning: missing reference Library/ScriptAssemblies/Missing.dll\n", first, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(_root, "Library", "unitygraph", "graph.db")));
 
@@ -53,7 +53,7 @@ public sealed partial class IndexCommandTests : IDisposable
         var (exitCode, output) = Run("--full", "--graph-dir", graph);
 
         Assert.Equal(0, exitCode);
-        Assert.StartsWith("indexed 9 files", output, StringComparison.Ordinal);
+        Assert.StartsWith("indexed 28 files", output, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(graph, "graph.db")));
         Assert.False(Directory.Exists(Path.Combine(_root, "Library", "unitygraph")));
     }
@@ -66,16 +66,44 @@ public sealed partial class IndexCommandTests : IDisposable
             File.Delete(csproj);
         }
 
-        Assert.Equal((0, "no .csproj files: in Unity, Preferences > External Tools > Regenerate project files\n"), Run());
+        (int exitCode, string output) = Run();
+        Assert.Equal(0, exitCode);
+        Assert.StartsWith("indexed 19 files (18 own, 1 vendored): ", output, StringComparison.Ordinal);
+        Assert.Contains("  warning: no .csproj files: in Unity, Preferences > External Tools > Regenerate project files\n", output, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Module_off_does_nothing()
+    public void Modules_off_do_nothing()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".claude"));
+        File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), """{ "modules": { "code-index": false, "asset-index": false } }""");
+
+        Assert.Equal((0, "code-index and asset-index are off in .claude/unitygraph.json\n"), Run());
+    }
+
+    [Fact]
+    public void Code_index_off_still_indexes_assets()
     {
         Directory.CreateDirectory(Path.Combine(_root, ".claude"));
         File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), """{ "modules": { "code-index": false } }""");
 
-        Assert.Equal((0, "code-index is off in .claude/unitygraph.json\n"), Run());
+        (int exitCode, string output) = Run();
+        Assert.Equal(0, exitCode);
+        Assert.StartsWith("indexed 19 files (18 own, 1 vendored): ", output, StringComparison.Ordinal);
+        Assert.DoesNotContain(".csproj", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Asset_edits_are_reindexed_with_their_meta()
+    {
+        Assert.Equal(0, Run().ExitCode);
+        string meta = Path.Combine(_root, "Assets", "Materials", "Lab.mat.meta");
+        File.WriteAllText(meta, File.ReadAllText(meta).Replace("d4000000000000000000000000000004", "d4000000000000000000000000000044", StringComparison.Ordinal));
+
+        Assert.StartsWith("reindexed 2 files, removed 0 in <t> s\n", Run().Output, StringComparison.Ordinal);
+        File.Delete(Path.Combine(_root, "Assets", "Scenes", "New.unity"));
+        Assert.StartsWith("reindexed 0 files, removed 1 in <t> s\n", Run().Output, StringComparison.Ordinal);
+        Assert.StartsWith("up to date\n", Run().Output, StringComparison.Ordinal);
     }
 
     [Fact]

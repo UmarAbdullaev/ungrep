@@ -1,13 +1,13 @@
 using System.CommandLine;
 using System.Globalization;
-using UnityGraph.Code;
 using UnityGraph.Core;
 using UnityGraph.Core.Graph;
 
 namespace UnityGraph.Cli;
 
 /// <summary>
-/// `ug index`: builds or updates the code graph (SPEC-code-index, CLI). Writes only the graph
+/// `ug index`: builds or updates the graph of code and assets (SPEC-code-index, CLI;
+/// SPEC-asset-index, Running with code-index). Writes only the graph
 /// under `Library/unitygraph/` (or `--graph-dir`); reads the project.
 /// </summary>
 internal static class IndexCommand
@@ -29,7 +29,7 @@ internal static class IndexCommand
             Description = "Keep the graph in this folder instead of Library/unitygraph/.",
             Hidden = true,
         };
-        var command = new Command("index", "Build or update the code graph.") { project, full, graphDir };
+        var command = new Command("index", "Build or update the code and asset graph.") { project, full, graphDir };
 
         command.SetAction(result =>
         {
@@ -63,16 +63,12 @@ internal static class IndexCommand
             return 1;
         }
 
-        if (!config.IsEnabled("code-index"))
+        GraphUpdate update = GraphUpdate.Load(unity.Root, config);
+        if (update.IsEmpty)
         {
-            text = $"code-index is off in {UnityGraphConfig.RelativePath}\n";
-            return 0;
-        }
-
-        CodeWorkspace workspace = CodeWorkspace.Load(unity.Root, config.Vendored);
-        if (!workspace.HasProjects)
-        {
-            text = "no .csproj files: in Unity, Preferences > External Tools > Regenerate project files\n";
+            text = update.Warnings.Count > 0
+                ? update.Warnings[0] + "\n"
+                : $"code-index and asset-index are off in {UnityGraphConfig.RelativePath}\n";
             return 0;
         }
 
@@ -85,7 +81,7 @@ internal static class IndexCommand
                 using GraphStore staging = GraphStore.OpenStaging(unity.Root, graphDirectory: graphDirectory);
                 using (BulkWriter writer = staging.BeginBulk())
                 {
-                    summary = CodeIndex.Full(workspace, writer);
+                    summary = update.Full(writer);
                     writer.Commit();
                 }
 
@@ -96,7 +92,7 @@ internal static class IndexCommand
             {
                 using GraphStore store = GraphStore.Open(unity.Root, StoreMode.ReadWrite, graphDirectory: graphDirectory);
                 rebuilt = store.Created;
-                summary = CodeIndex.Update(workspace, store);
+                summary = update.Update(store);
             }
         }
         catch (GraphLockedException e)

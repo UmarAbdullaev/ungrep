@@ -18,29 +18,9 @@ public static class CodeIndex
     {
         var clock = Stopwatch.StartNew();
         var problems = new List<string>();
-        var owners = new Dictionary<string, string>(StringComparer.Ordinal);
-        int nodes = 0, edges = 0, vendored = 0;
         IReadOnlyList<FileContribution> files = workspace.IndexMany();
-        foreach (FileContribution file in files)
-        {
-            var kept = new List<Node>(file.Nodes.Count);
-            foreach (Node node in file.Nodes)
-            {
-                if (owners.TryAdd(node.Key, file.File.Path))
-                {
-                    kept.Add(node);
-                }
-                else
-                {
-                    problems.Add(Conflict(file.File.Path, node.Key, owners[node.Key]));
-                }
-            }
-
-            writer.Add(file.File, kept, file.Edges);
-            (nodes, edges) = (nodes + kept.Count, edges + file.Edges.Count);
-            vendored += workspace.IsVendored(file.File.Path) ? 1 : 0;
-        }
-
+        (int nodes, int edges) = Contributions.AddAll(writer, files, problems);
+        int vendored = files.Count(f => workspace.IsVendored(f.File.Path));
         return new IndexSummary(files.Count, vendored, nodes, edges, 0, clock.Elapsed, [.. workspace.Problems, .. problems]);
     }
 
@@ -96,7 +76,7 @@ public static class CodeIndex
             files.Sort((a, b) => string.CompareOrdinal(a.File.Path, b.File.Path));
         }
 
-        (int nodes, int edges) = Write(store, files, problems);
+        (int nodes, int edges) = Contributions.Write(store, files, problems);
         return new IndexSummary(
             files.Count,
             files.Count(f => workspace.IsVendored(f.File.Path)),
@@ -106,76 +86,4 @@ public static class CodeIndex
             clock.Elapsed,
             [.. workspace.Problems, .. problems]);
     }
-
-    // A key two files declare (the same type in two assemblies, or a member that moved between
-    // files that are both being rewritten) stays with its current owner. A file that gave way to
-    // a file later in this batch is written again once that file has had its turn.
-    private static (int Nodes, int Edges) Write(GraphStore store, List<FileContribution> files, List<string> problems)
-    {
-        var batch = files.Select(f => f.File.Path).ToHashSet(StringComparer.Ordinal);
-        var claimed = new Dictionary<string, string>(StringComparer.Ordinal);
-        var retry = new List<FileContribution>();
-        int nodes = 0, edges = 0;
-        foreach (FileContribution file in files)
-        {
-            string path = file.File.Path;
-            var kept = new List<Node>(file.Nodes.Count);
-            bool deferred = false;
-            foreach (Node node in file.Nodes)
-            {
-                string? owner = claimed.GetValueOrDefault(node.Key);
-                if (owner is null && store.GetNode(node.Key)?.File is { } stored && stored != path)
-                {
-                    if (batch.Contains(stored))
-                    {
-                        deferred = true;
-                        continue;
-                    }
-
-                    owner = stored;
-                }
-
-                if (owner is null)
-                {
-                    kept.Add(node);
-                    claimed[node.Key] = path;
-                }
-                else
-                {
-                    problems.Add(Conflict(path, node.Key, owner));
-                }
-            }
-
-            store.ReplaceFile(file.File, kept, file.Edges);
-            (nodes, edges) = (nodes + kept.Count, edges + file.Edges.Count);
-            if (deferred)
-            {
-                retry.Add(file);
-            }
-        }
-
-        foreach (FileContribution file in retry)
-        {
-            string path = file.File.Path;
-            var kept = new List<Node>(file.Nodes.Count);
-            foreach (Node node in file.Nodes)
-            {
-                if (store.GetNode(node.Key)?.File is { } owner && owner != path)
-                {
-                    problems.Add(Conflict(path, node.Key, owner));
-                }
-                else
-                {
-                    kept.Add(node);
-                }
-            }
-
-            nodes += kept.Count - store.KeysInFile(path).Count;
-            store.ReplaceFile(file.File, kept, file.Edges);
-        }
-
-        return (nodes, edges);
-    }
-
-    private static string Conflict(string path, string key, string owner) => $"{path}: {key} is also declared in {owner}; kept there";
 }
