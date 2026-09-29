@@ -408,4 +408,32 @@ public sealed class GraphStoreTests : IDisposable
         command.Parameters.AddWithValue("$v", version);
         command.ExecuteNonQuery();
     }
+
+    [Fact]
+    public void A_rejected_file_keeps_its_record_without_rows_and_the_rest_still_indexes()
+    {
+        var (health, healthNodes, healthEdges) = HealthFile(methodName: "");
+        var (damage, damageNodes, damageEdges) = DamageFile();
+        string expected = $"{Health}: node '{_takeDamage}': empty name; its rows are left out";
+
+        var problems = new List<string>();
+        using (GraphStore store = GraphStore.Open(_root, StoreMode.ReadWrite))
+        {
+            using BulkWriter writer = store.BeginBulk();
+            Contributions.AddAll(writer, [new(health, healthNodes, healthEdges), new(damage, damageNodes, damageEdges)], problems);
+            writer.Commit();
+        }
+
+        Assert.Equal([expected], problems);
+        using (GraphStore store = GraphStore.Open(_root, StoreMode.ReadWrite))
+        {
+            Assert.Empty(store.KeysInFile(Health));
+            Assert.NotNull(store.GetNode(_apply));
+
+            problems.Clear();
+            Contributions.Write(store, [new(health, healthNodes, healthEdges)], problems);
+            Assert.Equal([expected], problems);
+            Assert.Empty(store.KeysInFile(Health));
+        }
+    }
 }

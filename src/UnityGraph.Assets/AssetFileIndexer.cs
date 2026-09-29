@@ -244,7 +244,7 @@ internal static partial class AssetFileIndexer
             var props = new Props();
             props.Text("path", Cut(PathOf(document.FileId) ?? "", MaxPath));
             props.Flag("active", false, Text(document, "m_IsActive") == "0");
-            Nodes.Add(new Node(key, NodeKind.GameObject, Text(document, "m_Name") ?? "", path, document.LineStart, document.LineEnd, props.ToJson()));
+            Nodes.Add(new Node(key, NodeKind.GameObject, NameOf(document), path, document.LineStart, document.LineEnd, props.ToJson()));
             Edge(_asset, EdgeKind.Contains, key, document.LineStart);
             if (_objectTransform.TryGetValue(document.FileId, out long transform)
                 && RefOf(_byId[transform], "m_Father") is { FileId: not 0 } father
@@ -266,10 +266,7 @@ internal static partial class AssetFileIndexer
             string? script = ScriptOf(document);
             props.Text("script", script);
             props.Flag("enabled", false, Text(document, "m_Enabled") == "0");
-            string name = document.ClassId == ClassMonoBehaviour
-                ? fullName is null ? "MonoBehaviour" : fullName[(fullName.LastIndexOf('.') + 1)..]
-                : document.ClassName;
-            Nodes.Add(new Node(key, NodeKind.Component, name, path, document.LineStart, document.LineEnd, props.ToJson()));
+            Nodes.Add(new Node(key, NodeKind.Component, TypeLabel(document), path, document.LineStart, document.LineEnd, props.ToJson()));
             Edge(Local(owner), EdgeKind.Contains, key, document.LineStart);
             if (script is not null)
             {
@@ -287,7 +284,7 @@ internal static partial class AssetFileIndexer
             props.Text("class", ClassOf(document));
             string? script = ScriptOf(document);
             props.Text("script", script);
-            Nodes.Add(new Node(key, NodeKind.SubAsset, Text(document, "m_Name") ?? "", path, document.LineStart, document.LineEnd, props.ToJson()));
+            Nodes.Add(new Node(key, NodeKind.SubAsset, NameOf(document), path, document.LineStart, document.LineEnd, props.ToJson()));
             Edge(_asset, EdgeKind.Contains, key, document.LineStart);
             if (script is not null)
             {
@@ -555,7 +552,7 @@ internal static partial class AssetFileIndexer
                 return null;
             }
 
-            string name = Text(document, "m_Name") ?? "";
+            string name = NameOf(document);
             string? parent = null;
             if (_objectTransform.TryGetValue(gameObject, out long transform) && RefOf(_byId[transform], "m_Father") is { FileId: not 0 } father)
             {
@@ -625,6 +622,14 @@ internal static partial class AssetFileIndexer
             RefOf(document, "m_Script") is { Guid: { } script } && MetaFile.IsGuid(script) && !IsBuiltin(script) ? script : null;
 
         // The full type name Unity recorded for a MonoBehaviour: `Assembly::Namespace.Type`.
+        // The short script class for a MonoBehaviour, else the YAML class (`MeshRenderer`).
+        private string TypeLabel(YamlDocument document) => document.ClassId == ClassMonoBehaviour
+            ? ClassOf(document) is { } full ? full[(full.LastIndexOf('.') + 1)..] : "MonoBehaviour"
+            : document.ClassName;
+
+        // Unity allows a blank `m_Name` (hidden sub-assets, unnamed objects); a node needs a name.
+        private string NameOf(YamlDocument document) => Text(document, "m_Name") is { Length: > 0 } name ? name : TypeLabel(document);
+
         private string? ClassOf(YamlDocument document)
         {
             string? identifier = Text(document, "m_EditorClassIdentifier");

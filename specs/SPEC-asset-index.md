@@ -266,7 +266,21 @@ so both indexers share them.
 
 ## Measured
 
-Not yet (A6).
+purge-squad, 2026-09-29, Release build, warm file cache.
+
+- **Acceptance test** (`PurgeSquadAcceptanceTests`, read-only on the project, graph in a temp
+  folder): 6,150 files tracked (5,890 file `.meta`, 260 own content files; 5,345 of them
+  vendored), 8,218 nodes, 7,285 edges, 0 problems. Scan 0.07 s, full asset index 0.6 s in
+  process (target 20 s: met). `GalaxyMap.unity` (633 KiB) reads and indexes in 27 ms (target
+  100 ms: met). `Hub.unity` places the `TopBar` instance. graph.db 6.3 MiB (assets alone).
+- **Fresh process** (`ug`, 21 runs each, on a copy of the index inputs): first `ug index`, code
+  and assets, 10.2 s for 7,533 files (968 own), 32,620 nodes, 39,965 edges. Nothing changed:
+  median 340 ms, p95 351 ms (target 400 ms: met). One own prefab changed: median 393 ms, p95
+  401 ms (target 600 ms: met). Asset queries (`explain TopBar.prefab`, `refs TopBar.prefab`,
+  `explain Hub.unity`, `find TopBar --kind asset`): p95 389 ms, 80 to 421 tokens.
+- The first run found a URP material whose hidden `AssetVersion` sub-asset has a blank
+  `m_Name`; the store rejects empty names, which aborted the whole index. Blank names now fall
+  back to the class (`AssetVersion`, `GameObject`).
 
 ## Open points
 

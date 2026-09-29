@@ -202,7 +202,9 @@ public static class FileHash { public static string Of(string fullPath); }  // S
 - Kinds are enums (`NodeKind`, `EdgeKind`) stored by their snake_case names; `NodeKeys` builds
   keys. Rows are validated before any write (relative forward-slash paths, 64-hex hashes, known
   kinds, valid keys, nodes owned by the file, props a JSON object ≤ 1 KB); a bad row throws
-  `ArgumentException` and nothing is written.
+  `ArgumentException` and nothing is written. The indexers write through `Contributions`,
+  which turns that into a problem line and keeps the file's record without rows, so one odd
+  file never stops an index (fail open).
 - A read-only open with no graph, a corrupt one or another schema version throws
   `GraphRebuildRequiredException` (a mismatched file is deleted first); a read-write open
   rebuilds it empty and sets `Created`.

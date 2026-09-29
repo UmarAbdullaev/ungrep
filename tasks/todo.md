@@ -63,4 +63,4 @@ Details and acceptance criteria: `plan.md`.
 - [x] A3 asset-index: file indexer and fixture assets
 - [x] A4 asset-index: workspace, incremental, `ug index`
 - [x] A5 query: asset answers (Query coverage 96%)
-- [ ] A6 asset-index: purge-squad measurement
+- [x] A6 asset-index: purge-squad measurement (full 0.6 s, no-op update p95 351 ms, one prefab p95 401 ms)

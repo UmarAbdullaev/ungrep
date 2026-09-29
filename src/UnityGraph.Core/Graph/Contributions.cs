@@ -27,8 +27,10 @@ public static class Contributions
                 }
             }
 
-            writer.Add(file.File, kept, file.Edges);
-            (nodes, edges) = (nodes + kept.Count, edges + file.Edges.Count);
+            if (TryWrite(writer.Add, file, kept, problems))
+            {
+                (nodes, edges) = (nodes + kept.Count, edges + file.Edges.Count);
+            }
         }
 
         return (nodes, edges);
@@ -75,8 +77,11 @@ public static class Contributions
                 }
             }
 
-            store.ReplaceFile(file.File, kept, file.Edges);
-            (nodes, edges) = (nodes + kept.Count, edges + file.Edges.Count);
+            if (TryWrite(store.ReplaceFile, file, kept, problems))
+            {
+                (nodes, edges) = (nodes + kept.Count, edges + file.Edges.Count);
+            }
+
             if (deferred)
             {
                 retry.Add(file);
@@ -99,11 +104,28 @@ public static class Contributions
                 }
             }
 
-            nodes += kept.Count - store.KeysInFile(path).Count;
-            store.ReplaceFile(file.File, kept, file.Edges);
+            int before = store.KeysInFile(path).Count;
+            nodes += TryWrite(store.ReplaceFile, file, kept, problems) ? kept.Count - before : -before;
         }
 
         return (nodes, edges);
+    }
+
+    // A row the store rejects is an indexer bug. The file keeps its record without rows and gets a
+    // problem line, so one odd file never stops the index (fail open).
+    private static bool TryWrite(Action<FileRecord, IReadOnlyList<Node>, IReadOnlyList<Edge>> write, FileContribution file, List<Node> kept, List<string> problems)
+    {
+        try
+        {
+            write(file.File, kept, file.Edges);
+            return true;
+        }
+        catch (ArgumentException e)
+        {
+            problems.Add(e.Message.Replace($" (Parameter '{e.ParamName}')", "", StringComparison.Ordinal) + "; its rows are left out");
+            write(file.File, [], []);
+            return false;
+        }
     }
 
     private static string Conflict(string path, string key, string owner) => $"{path}: {key} is also declared in {owner}; kept there";

@@ -86,6 +86,44 @@ public sealed class AssetFileIndexerTests : IDisposable
     }
 
     [Fact]
+    public void Blank_names_fall_back_to_the_class()
+    {
+        // As in URP materials: a hidden AssetVersion sub-asset with an empty m_Name.
+        Write("Assets/Ground.mat.meta", "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcded\nNativeFormatImporter:\n  mainObjectFileID: 2100000\n");
+        Write("Assets/Ground.mat", """
+            %YAML 1.1
+            %TAG !u! tag:unity3d.com,2011:
+            --- !u!114 &-563
+            MonoBehaviour:
+              m_GameObject: {fileID: 0}
+              m_Name: 
+              m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+            --- !u!21 &2100000
+            Material:
+              m_Name: Ground
+
+            """);
+        Write("Assets/Blank.prefab.meta", "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcdec\nPrefabImporter:\n");
+        Write("Assets/Blank.prefab", """
+            %YAML 1.1
+            %TAG !u! tag:unity3d.com,2011:
+            --- !u!1 &1
+            GameObject:
+              m_Name: 
+              m_IsActive: 1
+
+            """);
+
+        var problems = new List<string>();
+        FileContribution material = AssetFileIndexer.Content(_root, "Assets/Ground.mat", problems);
+        FileContribution prefab = AssetFileIndexer.Content(_root, "Assets/Blank.prefab", problems);
+
+        Assert.Empty(problems);
+        Assert.Equal("AssetVersion", Assert.Single(material.Nodes, n => n.Kind == NodeKind.SubAsset).Name);
+        Assert.Equal("GameObject", Assert.Single(prefab.Nodes, n => n.Kind == NodeKind.GameObject).Name);
+    }
+
+    [Fact]
     public void Unsupported_yaml_keeps_what_came_before()
     {
         Write("Assets/Odd.asset.meta", "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcdee\nNativeFormatImporter:\n  mainObjectFileID: 11400000\n");
