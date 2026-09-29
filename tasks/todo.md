@@ -12,7 +12,8 @@ Details and acceptance criteria: `plan.md`.
   tokens, +62% calls; no-go, off by default; subagents, model not told about unitygraph)
 
 ## Build
-- [ ] T1 solution skeleton + CI
+- [x] T1 solution skeleton + CI (Core/Stats/Hooks test projects come with their first test in
+  T6/T2/T5: MTP fails a test project with zero tests; CI not run yet, no GitHub remote)
 - [ ] T2 stats: transcript reader and categorizer (matches Evidence ±2 pp)
 - [ ] T3 stats: report, JSON, baseline compare
 - [ ] T4 plugin-shell: plugin files, launcher, config, `ug doctor`

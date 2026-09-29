@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UnityGraph.Cli\UnityGraph.Cli.csproj" />
+  </ItemGroup>
+</Project>

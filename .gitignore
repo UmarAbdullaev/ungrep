@@ -1,1 +1,9 @@
 .claude/settings.local.json
+
+# Build output (UseArtifactsOutput puts everything here; repo-root bin/ holds the launchers)
+artifacts/
+dist/
+*.user
+.vs/
+.idea/
+TestResults/

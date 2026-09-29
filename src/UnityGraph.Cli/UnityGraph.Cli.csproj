@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ug</AssemblyName>
+    <RootNamespace>UnityGraph.Cli</RootNamespace>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UnityGraph.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UnityGraph.Core\UnityGraph.Core.csproj" />
+    <ProjectReference Include="..\UnityGraph.Stats\UnityGraph.Stats.csproj" />
+    <ProjectReference Include="..\UnityGraph.Hooks\UnityGraph.Hooks.csproj" />
+  </ItemGroup>
+</Project>

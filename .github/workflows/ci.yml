@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      # SDK from global.json builds net8.0; the 8.0 runtime runs the tests.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build unitygraph.sln -c Release
+
+      - name: Test
+        run: dotnet test --solution unitygraph.sln -c Release --no-build
+
+      - name: Format
+        run: dotnet format unitygraph.sln --verify-no-changes

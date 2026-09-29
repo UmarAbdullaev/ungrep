@@ -252,14 +252,16 @@ building further.
   `Library/unitygraph/bridge.json`.
 - Viewer: Cytoscape.js, vendored into the published CLI and inlined into the generated page (no
   network at view time).
-- Tests: xUnit; Verify for golden CLI output; Unity Test Framework for the bridge.
+- Build: .NET 10 SDK (pinned in `global.json`) targeting `net8.0`; central package versions in
+  `Directory.Packages.props`; output under `artifacts/`.
+- Tests: xUnit v3 on Microsoft.Testing.Platform; Verify for golden CLI output; Unity Test Framework for the bridge.
 - Claude Code plugin format: `.claude-plugin/plugin.json`, `skills/`, `agents/`, `hooks/hooks.json`.
 
 ## Commands
 
 ```
 Build         dotnet build unitygraph.sln -c Release
-Test          dotnet test unitygraph.sln
+Test          dotnet test --solution unitygraph.sln
 Format        dotnet format unitygraph.sln --verify-no-changes
 Publish CLI   dotnet publish src/UnityGraph.Cli -c Release -r win-x64 -o dist/win-x64
 Bridge tests  <Unity> -batchmode -projectPath fixtures/BridgeHost -runTests -testPlatform EditMode -testResults artifacts/bridge.xml
