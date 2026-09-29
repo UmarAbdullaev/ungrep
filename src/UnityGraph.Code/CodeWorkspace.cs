@@ -209,6 +209,13 @@ public sealed class CodeWorkspace
         return errors;
     }
 
+    /// <summary>The bound model of a tracked file, for measurements in tests.</summary>
+    internal SemanticModel? ModelOf(string path) =>
+        _projectOfFile.TryGetValue(path, out string? project) && Load(project) is var loaded
+            && loaded.Sources.TryGetValue(path, out Source? source) && source.Tree is { } tree
+            ? loaded.Compilation.GetSemanticModel(tree)
+            : null;
+
     /// <summary>Indexes one tracked file.</summary>
     /// <exception cref="ArgumentException">Not a tracked file.</exception>
     public FileContribution Index(string path)

@@ -158,8 +158,8 @@ serialization table test (SPEC Testing strategy).
 
 - **Targets:** only symbols declared in indexed files (own or vendored) get `calls` and
   `uses_type` edges. Calls into `UnityEngine`, the BCL and package code are dropped. This
-  settles SPEC-graph-core open point 2 by measurement (see Measured): edges into engine and BCL
-  outnumber project edges several times, and no v1 query asks "who calls `Debug.Log`".
+  settles SPEC-graph-core open point 2 (see Measured): keeping them would add ~60% more `calls`
+  edges and a node per engine or BCL target, and no v1 query asks "who calls `Debug.Log`".
 - Implicit (compiler-generated) constructors have no node and get no `calls` edge; `new T()`
   still gives `uses_type T`.
 - Generic targets point at the original definition (`List<int>.Add` → `List`1.Add`), so edges
@@ -296,8 +296,31 @@ it; `GraphStore.Open`/`OpenStaging` gain an optional `graphDirectory` for it.
 
 ## Measured
 
-Filled in by the purge-squad acceptance run: projects, indexed files (own/vendored), nodes,
-edges by kind, edges dropped by the `calls` scope, database size, full index time, update times.
+purge-squad, 2026-09-29, dev machine (Windows 11, Release build, `ug index --graph-dir` into a
+temp folder; update times on a copy of its index inputs, fresh process each run, median of 11).
+Acceptance test: `UG_PURGE_SQUAD=<project> dotnet test tests/UnityGraph.Code.Tests`.
+
+| What | Measured |
+| --- | --- |
+| Projects | 21 `.csproj` (package-only ones bound from `Library/ScriptAssemblies`) |
+| Indexed files | 1,380: 161 own, 1,219 vendored (`Assets/3rd Party`, `Assets/Plugins`) |
+| Nodes | 24,402 (own 3,081): 11,998 field, 8,001 method, 2,121 type, 2,119 property, 163 event |
+| Edges | 32,680 (own files 7,984): 22,779 contains, 2,966 calls, 2,720 overrides, 1,751 uses_type, 1,154 script_defines, 1,120 inherits, 190 implements, 0 dispatches |
+| Serialized fields | 4,341 (own 720); 89 own MonoBehaviours |
+| `calls` dropped by scope | 1,765 (own code into engine, BCL, packages; deduped like edges) vs 2,966 kept |
+| Problems | none |
+| `graph.db` | 21 MB, mostly vendored declarations |
+| Full index | 3.0 s in-process, 3.7 s wall (6 s on a cold disk cache); target ≤ 60 s, goal ≤ 20 s: met |
+| `Update`, nothing changed | 261 ms wall; target ≤ 300 ms: met |
+| `Update`, one own file changed | 1.21 s wall; target ≤ 1 s: **missed** |
+
+The one-file miss is Roslyn's cold start, not our work: loading and parsing every project the
+file needs takes ~120 ms, then binding the one file takes ~750 ms (declaration tables and
+metadata import of ~300 referenced DLLs, mostly JIT), and the walk itself 11 ms once warm.
+Runtime knobs (tiered PGO, quick JIT for loops, GC) move it by under 15%. Options, in order:
+ReadyToRun-compile the published `ug` for the desktop RIDs (needs the crossgen pack, a new
+download: ask first); or have the hook run the update in the background so its time never
+blocks a turn (it's already fail-open). Until then the target stands as missed.
 
 ## Open points
 

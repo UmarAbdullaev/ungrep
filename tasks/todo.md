@@ -55,5 +55,5 @@ Details and acceptance criteria: `plan.md`.
 - [x] C3 code-index: nodes and Unity rules
 - [x] C4 code-index: edges
 - [x] C5 code-index: incremental and `ug index` (Code line coverage 92.8%)
-- [ ] C6 code-index: purge-squad measurement
+- [x] C6 code-index: purge-squad measurement (one-file update 1.21 s vs 1 s target: Roslyn cold start, see spec)
 - [ ] Q query: spec, `ug find/refs/explain`, skill update

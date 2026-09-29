@@ -285,7 +285,9 @@ revisit first (keys are stored as text in `edges` and in both edge indexes).
 
 ## Open points
 
-1. Sizes above are estimates. `code-index` step 2 records real counts on purge-squad; the
-   targets are revisited then.
-2. Whether `calls` from every method body is worth its size, or only calls between project types
-   (not into `UnityEngine`/BCL). Decided in `SPEC-code-index.md` with measured numbers.
+1. Sizes above are estimates. Code measured 2026-09-29: 24,402 nodes, 32,680 edges, 21 MB on
+   purge-squad (`SPEC-code-index.md`, Measured), well under the estimate. Revisit once
+   asset-index adds its nodes and edges.
+2. ~~Whether `calls` from every method body is worth its size.~~ Settled 2026-09-29: only calls
+   to symbols declared in indexed files; calls into `UnityEngine`/BCL/packages are dropped
+   (purge-squad: 1,765 dropped vs 2,966 kept). See `SPEC-code-index.md`, Measured.
