@@ -56,4 +56,4 @@ Details and acceptance criteria: `plan.md`.
 - [x] C4 code-index: edges
 - [x] C5 code-index: incremental and `ug index` (Code line coverage 92.8%)
 - [x] C6 code-index: purge-squad measurement (one-file update 1.21 s vs 1 s target: Roslyn cold start, see spec)
-- [ ] Q query: spec, `ug find/refs/explain`, skill update
+- [x] Q query: spec, `ug find/refs/explain`, skill update (p95 345 ms on purge-squad; Query coverage 94.7%)

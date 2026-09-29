@@ -19,6 +19,7 @@
     <ProjectReference Include="..\UnityGraph.Core\UnityGraph.Core.csproj" />
     <ProjectReference Include="..\UnityGraph.Stats\UnityGraph.Stats.csproj" />
     <ProjectReference Include="..\UnityGraph.Hooks\UnityGraph.Hooks.csproj" />
+    <ProjectReference Include="..\UnityGraph.Query\UnityGraph.Query.csproj" />
   </ItemGroup>
 
   <!-- SQLitePCLRaw ships e_sqlite3 for ~22 platforms; dist/ug keeps the desktop ones. -->

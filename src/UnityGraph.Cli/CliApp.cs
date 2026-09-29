@@ -19,6 +19,10 @@ internal static class CliApp
             IndexCommand.Create(),
             StatsCommand.Create(claudeConfigDir),
         };
+        foreach (Command command in QueryCommands.Create())
+        {
+            root.Subcommands.Add(command);
+        }
 
         return root.Parse(args).Invoke(new InvocationConfiguration { Output = output, Error = error });
     }

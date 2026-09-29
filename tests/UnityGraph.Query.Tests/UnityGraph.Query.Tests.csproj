@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UnityGraph.Query\UnityGraph.Query.csproj" />
+    <ProjectReference Include="..\..\src\UnityGraph.Code\UnityGraph.Code.csproj" />
+  </ItemGroup>
+</Project>

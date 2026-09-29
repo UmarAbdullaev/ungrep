@@ -1,0 +1,173 @@
+$ ug find Turntable
+Game.Lab.Turntable            class  Assets/Scripts/Lab/Turntable.cs:7-26
+Game.Lab.LabStage._turntable  field  Assets/Scripts/Lab/LabStage.cs:12     Turntable, serialized
+2 found
+
+$ ug find turn --kind field
+Game.Lab.LabStage._turntable  field  Assets/Scripts/Lab/LabStage.cs:12  Turntable, serialized
+1 found
+
+$ ug find Open
+Game.Core.IOpenable.Open           method  Assets/Scripts/Core/Stage.cs:9        Open(int)
+Game.Core.Stage.Open               method  Assets/Scripts/Core/Stage.cs:14       Open(int)
+Game.Lab.LabStage.Open             method  Assets/Scripts/Lab/LabStage.cs:24-36  Open(int)
+Game.Lab.LabStage._opened          field   Assets/Scripts/Lab/LabStage.cs:16     int
+Game.EditorTools.LabTools.OpenLab  method  Assets/Editor/LabTools.cs:9-13        OpenLab()
+Game.Lab.LabStage.OpenFirst        method  Assets/Scripts/Lab/LabStage.cs:55-56  OpenFirst()
+6 found
+
+$ ug find Nothing
+nothing found: Nothing
+
+$ ug refs Turntable.Stop
+Game.Lab.Turntable.Stop()  method  Assets/Scripts/Lab/Turntable.cs:23  [exact]
+  called from  Game.Broken.Run             Assets/Scripts/Broken.cs:10
+  called from  Game.Lab.LabStage.OnClosed  Assets/Scripts/Lab/LabStage.cs:51
+2 references
+
+$ ug refs Turntable.Rotate
+Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21  [exact]
+  called from  Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:27
+  called from  Game.Lab.LabStage.Spin  Assets/Scripts/Lab/LabStage.cs:43
+2 references
+
+$ ug refs Game.Core.Stage
+Game.Core.Stage  class  Assets/Scripts/Core/Stage.cs:12-17  [exact]
+  subclass  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:8
+1 reference
+
+$ ug refs LabStage
+Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+  used by       Game.EditorTools.LabStageEditor     Assets/Editor/LabTools.cs:16
+  used by       Game.EditorTools.LabTools.OpenLab   Assets/Editor/LabTools.cs:12
+  script asset  a:5a1b2c3d4e5f60718293a4b5c6d7e8f9  Assets/Scripts/Lab/LabStage.cs:7
+3 references
+
+$ ug refs ILabDebug
+Game.Lab.ILabDebug  interface  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  [exact]
+  implemented by  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.Debug.cs:5
+1 reference
+
+$ ug refs ILabDebug.Trace
+Game.Lab.ILabDebug.Trace(int)  method  Assets/Scripts/Lab/LabStage.Debug.cs:12  [exact]
+  implemented by  Game.Lab.LabStage.Trace  Assets/Scripts/Lab/LabStage.Debug.cs:7
+1 reference
+
+$ ug refs Pool
+Game.Core.Pool  class  Assets/Scripts/Core/Pool.cs:6-24  [exact]
+  used by  Game.Core.Pool.Handle.Owner  Assets/Scripts/Core/Pool.cs:22
+  used by  Game.Lab.LabStage.OnClosed   Assets/Scripts/Lab/LabStage.cs:49
+2 references
+
+$ ug refs Pool.Release
+Game.Core.Pool.Release(T)  method  Assets/Scripts/Core/Pool.cs:18  [exact]
+  called from  Game.Lab.LabStage.OnClosed  Assets/Scripts/Lab/LabStage.cs:50
+1 reference
+
+$ ug refs OnOpened
+Game.Lab.Turntable.OnOpened()  method  Assets/Scripts/Lab/Turntable.cs:25  [exact]
+  dispatched from  Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:31  [heuristic]
+1 reference
+
+$ ug explain LabStage
+Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+  also in       Assets/Scripts/Lab/LabStage.Debug.cs
+  unity         MonoBehaviour, script guid 5a1b2c3d4e5f60718293a4b5c6d7e8f9
+  engine calls  Awake
+  entry points  OpenFirst [ContextMenu]
+  serialized    _turntable: Turntable, _data: StageData, speed: float
+  members       7 methods, 6 fields
+  used by       Game.EditorTools.LabStageEditor, Game.EditorTools.LabTools.OpenLab
+  more  ug explain LabStage --members | ug refs LabStage
+
+$ ug explain LabStage --members
+Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+  also in       Assets/Scripts/Lab/LabStage.Debug.cs
+  unity         MonoBehaviour, script guid 5a1b2c3d4e5f60718293a4b5c6d7e8f9
+  engine calls  Awake
+  entry points  OpenFirst [ContextMenu]
+  serialized    _turntable: Turntable, _data: StageData, speed: float
+  members       7 methods, 6 fields
+  used by       Game.EditorTools.LabStageEditor, Game.EditorTools.LabTools.OpenLab
+    Trace        method  7   Trace(int)  public
+    ResetMethod  field   10  string  const
+    _turntable   field   12  Turntable  serialized
+    _data        field   13  StageData  serialized
+    speed        field   14  float  public  serialized
+    Count        field   15  int  public  static
+    _opened      field   16  int
+    Awake        method  18  Awake()  message
+    Open         method  24  Open(int)  public  override
+    ResetStage   method  38  ResetStage()
+    Spin         method  40  Spin()
+    OnClosed     method  46  OnClosed()  protected  override
+    OpenFirst    method  55  OpenFirst()  [ContextMenu]
+  more  ug refs LabStage
+
+$ ug explain Game.Lab.ILabDebug
+Game.Lab.ILabDebug  interface  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  [exact]
+  members         1 method
+  used by         (none)
+  implemented by  Game.Lab.LabStage
+  more  ug explain Game.Lab.ILabDebug --members | ug refs Game.Lab.ILabDebug
+
+$ ug explain Stage.Open
+Game.Core.Stage.Open(int)  method  Assets/Scripts/Core/Stage.cs:14  public  [exact]
+  in             Game.Core.Stage
+  overrides      Game.Core.IOpenable.Open
+  called from    (none)
+  overridden by  Game.Lab.LabStage.Open
+  calls          (none)
+  flags          abstract
+  more  ug refs Stage.Open
+
+$ ug explain Turntable.Rotate(float)
+Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21  public  [exact]
+  in           Game.Lab.Turntable
+  called from  Game.Lab.LabStage.Open, Game.Lab.LabStage.Spin
+  calls        Game.Lab.Turntable.Rotated
+  more  ug refs 'Turntable.Rotate(float)'
+
+$ ug explain Turntable._speed
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:9-11  [exact]
+  in          Game.Lab.Turntable
+  type        float
+  serialized  yes, formerly _rpm, rpm
+  more  ug refs Turntable._speed
+
+$ ug explain Turntable.Tint
+Game.Lab.Turntable.Tint  property  Assets/Scripts/Lab/Turntable.cs:13  public  [exact]
+  in           Game.Lab.Turntable
+  type         Color
+  serialized   yes
+  called from  (none)
+  calls        (none)
+  more  ug refs Turntable.Tint
+
+$ ug explain labstage.resetstage
+Game.Lab.LabStage.ResetStage()  method  Assets/Scripts/Lab/LabStage.cs:38  [exact]
+  in               Game.Lab.LabStage
+  called from      (none)
+  dispatched from  Game.Lab.LabStage.Open [heuristic]
+  calls            (none)
+  more  ug refs labstage.resetstage
+
+$ ug explain Trace
+ambiguous: Trace
+  Game.Lab.ILabDebug.Trace  method  Assets/Scripts/Lab/LabStage.Debug.cs:12  Trace(int)
+  Game.Lab.LabStage.Trace   method  Assets/Scripts/Lab/LabStage.Debug.cs:7   Trace(int)
+  more  ug explain Game.Lab.ILabDebug.Trace
+
+$ ug explain Nope.Missing
+not found: Nope.Missing
+
+$ ug refs cs:T:Game.Lab.LabStage
+Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+  used by       Game.EditorTools.LabStageEditor     Assets/Editor/LabTools.cs:16
+  used by       Game.EditorTools.LabTools.OpenLab   Assets/Editor/LabTools.cs:12
+  script asset  a:5a1b2c3d4e5f60718293a4b5c6d7e8f9  Assets/Scripts/Lab/LabStage.cs:7
+3 references
+
+$ ug refs cs:T:Game.Lab.Gone
+not found: cs:T:Game.Lab.Gone
+
