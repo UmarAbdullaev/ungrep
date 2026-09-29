@@ -130,6 +130,30 @@ under 10%.
 2. **CLI and indexers in C# on .NET 8 with Roslyn.** They run on an installed .NET runtime or on
    the one bundled with the Unity Editor (spike S1), and fall back to syntax-only C# (every code
    edge `heuristic`) when neither is usable.
+
+   **Spike S1 result (2026-09-29): the bundled Unity runtime is not usable.** Every editor
+   checked ships .NET **6.0.21** in `<Editor>/Data/NetCoreRuntime` (runtime and host only, no
+   SDK). A `net8.0` app started through Unity's `dotnet.exe` fails unless a global .NET 8 install
+   exists, in which case the host silently uses that one (confirmed with `COREHOST_TRACE`).
+
+   | Unity | OS | Bundled runtime | `net8.0` app on it |
+   | --- | --- | --- | --- |
+   | 2022.3.62f1, 2022.3.62f3 | Windows 11 | 6.0.21 | no (falls through to a global 8.x if installed) |
+   | 6000.3.9f1, 6000.3.11f1, 6000.3.14f1 | Windows 11 | 6.0.21 | no (same) |
+   | 2022.3 / Unity 6 | macOS | not tested (no Mac available) | expected the same |
+
+   Roslyn on Unity's generated `.csproj` works **without MSBuild**: they are legacy (non-SDK)
+   projects targeting `v4.7.1` with every `Compile` item, `HintPath` (relative ones resolve
+   against the project root), `ProjectReference`, `DefineConstants` and `LangVersion` spelled
+   out, so reading the XML and building a `CSharpCompilation` directly gives a full semantic
+   model. On purge-squad: `Assembly-CSharp` 864 files, 344 references, 0 errors, 1.6 s;
+   `GunLab.Runtime` 105 files, 0 errors; `Assembly-CSharp-Editor` 92 files, 0 errors (project
+   references taken from `Library/ScriptAssemblies`; `code-index` should compile them from
+   source instead). `MSBuildWorkspace` is not used: it would need the .NET SDK or Visual
+   Studio's MSBuild for these `net471` projects.
+
+   Launcher strategy: **pending decision** (the S1 result reopens this decision; see
+   `tasks/todo.md` checkpoint).
 3. **Own editor bridge.** Live Unity access goes through a small editor-only package the plugin
    ships (`com.unitygraph.bridge`), independent of which Unity MCP server the user runs.
    `Editor.log` is the fallback when Unity is unreachable. An adapter for Unity's official CLI may
@@ -369,7 +393,8 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
 
 None blocking. Decided 2026-09-29 (see Decisions). Left for the spikes to settle:
 
-- S1: can `ug` run on the .NET runtime bundled with Unity 2022.3 and Unity 6?
+- ~~S1: can `ug` run on the .NET runtime bundled with Unity 2022.3 and Unity 6?~~ No (bundled
+  runtime is 6.0.21), see Decisions #2. Launcher strategy to decide.
 - ~~S2: the exact plugin marketplace and install commands for a local dev install.~~ Answered
   2026-09-29, see Commands.
 - S3: does PreToolUse deny + graph answer stop Claude from re-running the grep?
