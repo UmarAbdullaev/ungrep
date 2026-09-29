@@ -19,11 +19,16 @@ Details and acceptance criteria: `plan.md`.
   UG_PURGE_SQUAD_TRANSCRIPTS is set)
 - [x] T3 stats: report, JSON, baseline compare (golden files instead of Verify: Verify 33 needs
   a license declaration to build; baseline committed with the project name only)
-- [ ] T4 plugin-shell: plugin files, launcher, config, `ug doctor`
+- [x] T4 plugin-shell: plugin files, launcher, config, `ug doctor`
   - [x] plugin files, `bin/ug` + `bin/ug.cmd`, config, `ug doctor` (passes on purge-squad:
     Unity 6000.3.14f1, Force Text, default config, graph warning; launchers skip Unity's 6.0.21)
-  - [ ] local install per S2 (writes ~/.claude/settings.json; ask first)
-  - [ ] idle cost ≤ 300 tokens on a fresh session (needs a live session; ask first)
+  - [x] local install per S2 (run by the user from the repo; `claude plugin details`: 1 skill,
+    0 hooks, always-on ~40 tokens, on-invoke ~110)
+  - [x] idle cost ≤ 300 tokens: measured offline (headless runs failed OAuth, so no API usage;
+    diffed the prompt payload recorded in the transcripts, with and without `--plugin-dir`).
+    The plugin adds only the skill listing line, 154 chars (~40 tokens, as `plugin details`
+    says). With many skills installed the listing is capped: ours pushed two other skills'
+    descriptions out, net +40 chars (~10 tokens). Re-measure with real usage once logged in.
 - [ ] T5 plugin-shell: hook dispatcher, fail-open
 - [ ] T6 graph-core: store
 - [ ] T7 graph-core: freshness + concurrency
