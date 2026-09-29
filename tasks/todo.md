@@ -46,3 +46,14 @@ Details and acceptance criteria: `plan.md`.
 ## Checkpoint
 - [x] Spike results recorded in SPEC.md
 - [ ] Step-2 module specs written (code-index, asset-index, editor-link)
+  - [x] code-index (`specs/SPEC-code-index.md`)
+
+# Todo: step 2 (query pulled forward, see plan.md)
+
+- [x] C1 code-index spec
+- [ ] C2 code-index: project loader
+- [ ] C3 code-index: nodes and Unity rules
+- [ ] C4 code-index: edges
+- [ ] C5 code-index: incremental and `ug index`
+- [ ] C6 code-index: purge-squad measurement
+- [ ] Q query: spec, `ug find/refs/explain`, skill update

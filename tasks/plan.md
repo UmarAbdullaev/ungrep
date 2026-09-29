@@ -106,3 +106,39 @@ Acceptance: all targets met in Release on the dev machine; CI runs them with a 2
 - ~~Review spike results~~ Done 2026-09-29: installed .NET 8+ required (S1); interception
   dropped from v1 and from `query`'s scope (S3).
 - Write `SPEC-code-index.md`, `SPEC-asset-index.md`, `SPEC-editor-link.md` for step 2.
+
+## Step 2 (and query, pulled forward)
+
+Order changed 2026-09-29 (user): `query` comes right after `code-index`, before `asset-index`
+and `editor-link`, so the graph is usable on C# as early as possible. Each module's spec is
+written, committed and built without a review stop (user, 2026-09-29).
+
+```
+C1 spec ──> C2 loader ──> C3 nodes + Unity rules ──> C4 edges ──> C5 incremental + ug index ──> C6 purge-squad
+                                                                                    └─> Q query (spec, ug find/refs/explain)
+then asset-index, editor-link, unity-loop
+```
+
+### C1. code-index spec
+`specs/SPEC-code-index.md`.
+
+### C2. code-index: project loader
+- Legacy `.csproj` reader, references (with runtime BCL fallback), compilation per project,
+  project references as compilation references. Fixture `fixtures/CodeProject/`.
+Acceptance: the fixture loads with 0 errors in own files; a missing reference is reported.
+
+### C3. code-index: nodes and Unity rules
+- Node rules, partial types, props; serialization table; messages and entry points.
+Acceptance: serialization table test passes; golden node list for the fixture.
+
+### C4. code-index: edges
+- contains, inherits, implements, overrides, calls, uses_type, dispatches, script_defines.
+Acceptance: golden edge list for the fixture; vendored files have declarations only.
+
+### C5. code-index: incremental and `ug index`
+- `CodeIndex.Full/Update`, lost-key dependents, csproj changes, new files by folder; CLI.
+Acceptance: incremental tests pass; determinism test; ≥ 80% coverage on Code.
+
+### C6. code-index: purge-squad measurement
+- Acceptance test (env-gated, graph outside purge-squad). Fill in the spec's Measured section.
+Acceptance: targets met, or the spec says why not.

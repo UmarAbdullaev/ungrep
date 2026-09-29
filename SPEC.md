@@ -245,7 +245,7 @@ building further.
 
 ## Tech stack
 
-- C# 12 on .NET 8: Roslyn (`Microsoft.CodeAnalysis.CSharp.Workspaces`), `Microsoft.Data.Sqlite`,
+- C# 12 on .NET 8: Roslyn (`Microsoft.CodeAnalysis.CSharp`; no Workspaces or MSBuild, see Decisions #2), `Microsoft.Data.Sqlite`,
   `System.CommandLine`.
 - Unity YAML: a hand-written streaming reader for Unity's subset (`--- !u!1 &123` document
   headers, stripped objects, multi-document files). General YAML libraries are slow on it or
