@@ -5,7 +5,7 @@ Details and acceptance criteria: `plan.md`.
 ## Spikes
 - [x] S1 .NET runtime inside Unity 2022.3 / Unity 6 (Windows; macOS not tested): bundled runtime
   is 6.0.21, not usable for net8.0; Roslyn over Unity csproj works without MSBuild
-- [ ] S1 follow-up: launcher strategy decided (installed runtime vs self-contained)
+- [x] S1 follow-up: launcher strategy decided: installed .NET 8+, install hint, fail open
 - [x] S2 local plugin install commands confirmed (SPEC.md Commands; skill load by the model not
   checked: CLI login expired, hook firing confirmed)
 - [x] S3 hook interception: retry rate and token delta measured (9/10 retried, +27% context

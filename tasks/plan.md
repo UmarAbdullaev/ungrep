@@ -103,8 +103,6 @@ Acceptance: all targets met in Release on the dev machine; CI runs them with a 2
 
 ## Checkpoint at the end of step 1
 
-- Review spike results; if S1 says no usable runtime anywhere, decide between requiring
-  .NET 8 install and self-contained publish (size) before step 2.
-- If S3 says interception doesn't work, remove it from `query`'s scope before writing
-  `SPEC-query.md`.
+- ~~Review spike results~~ Done 2026-09-29: installed .NET 8+ required (S1); interception
+  dropped from v1 and from `query`'s scope (S3).
 - Write `SPEC-code-index.md`, `SPEC-asset-index.md`, `SPEC-editor-link.md` for step 2.

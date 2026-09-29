@@ -81,9 +81,9 @@ calls. Module `bench` replaces these estimates with measurements.
 3. **Zero idle cost.** No MCP server: a CLI, one on-demand skill, one subagent, and hooks that
    say nothing unless they have something to say. The plugin adds at most 300 tokens to a
    session's baseline.
-4. **Answer where Claude already goes.** When Claude greps a symbol or opens a big scene or
-   prefab, a hook answers with the graph result in that same step (a PreToolUse hook denies the
-   call and returns the graph answer as the reason; spike S3 confirms it, see Decisions).
+4. **Point Claude at `ug` before it searches.** The `unity` skill tells Claude which `ug`
+   command answers which question, so the first call is the graph call. Denying a grep and
+   returning the answer instead was measured in spike S3 and dropped from v1 (see Decisions #4).
 5. **Never stale.** Edited files are reindexed on edit; assets Unity saved are picked up before
    the next query. A stale answer is worse than grep.
 6. **Exact over guessed, and say which.** Every edge is `exact` (Roslyn, GUID) or `heuristic`
@@ -105,7 +105,6 @@ measures each one, and `bench` fails a release that breaks one.
 | Skill and agent descriptions, loaded every session | ≤ 300 tokens | ~0.1% of context on purge-squad's sessions |
 | `unity` skill body, loaded when first used | ≤ 1,500 tokens | once per session, not per turn |
 | Generated per-folder map | ≤ 600 tokens per folder, loaded only when a file there is read | replaces an always-loaded monolithic map |
-| Hook answers (interception) | only symbol-shaped greps and YAML reads over 32 KB (configurable); within the answer budget | replaces output Claude would have received anyway |
 | Compile gate | 0 tokens when clean; ≤ 20 lines on errors | replaces 3–4 turns of recompile, wait and console |
 | Worker delegation | only chores of 3 or more steps; verdict ≤ 800 tokens | a 1-step chore costs more delegated than done inline |
 | Index builds and updates | 0 tokens: deterministic, no LLM | unlike Graphify's LLM extraction |
@@ -127,9 +126,12 @@ under 10%.
 
 1. **Unity 2022.3 LTS or newer** (tested on 2022.3 and Unity 6). Asset Serialization is Force
    Text (Unity's default); binary assets are reported, not indexed.
-2. **CLI and indexers in C# on .NET 8 with Roslyn.** They run on an installed .NET runtime or on
-   the one bundled with the Unity Editor (spike S1), and fall back to syntax-only C# (every code
-   edge `heuristic`) when neither is usable.
+2. **CLI and indexers in C# on .NET 8 with Roslyn, on an installed .NET 8 or newer runtime.**
+   `ug` is published framework-dependent with `RollForward=Major`. The launcher looks for
+   `dotnet` (`DOTNET_ROOT`, `PATH`, the default install folders); when none is found it prints
+   a one-line install hint and exits 0, so the session carries on (design rule 9). A
+   self-contained build may follow after v1 if missing runtimes turn out to be common.
+   Decided 2026-09-29 after spike S1.
 
    **Spike S1 result (2026-09-29): the bundled Unity runtime is not usable.** Every editor
    checked ships .NET **6.0.21** in `<Editor>/Data/NetCoreRuntime` (runtime and host only, no
@@ -152,18 +154,19 @@ under 10%.
    source instead). `MSBuildWorkspace` is not used: it would need the .NET SDK or Visual
    Studio's MSBuild for these `net471` projects.
 
-   Launcher strategy: **pending decision** (the S1 result reopens this decision; see
-   `tasks/todo.md` checkpoint).
+   Launcher strategy: installed runtime, as above (the bundled runtime is too old, and a
+   self-contained build would add an estimated 70–90 MB per OS).
 3. **Own editor bridge.** Live Unity access goes through a small editor-only package the plugin
    ships (`com.unitygraph.bridge`), independent of which Unity MCP server the user runs.
    `Editor.log` is the fallback when Unity is unreachable. An adapter for Unity's official CLI may
    follow after v1.
-4. **Hook interception by PreToolUse deny.** A symbol-shaped grep or a big-YAML read is denied
-   and the graph answer is returned as the reason. Spike S3 measures, on replayed purge-squad
-   calls, how often Claude retries the original call anyway; above ~10%, interception is off by
-   default and the skill alone points Claude at `ug`.
+4. **No hook interception in v1; the skill alone points Claude at `ug`.** The plan was to deny
+   a symbol-shaped grep or a big-YAML read in a PreToolUse hook and return the graph answer as
+   the reason, off by default if Claude retried more than ~10% of the time. Spike S3 measured
+   90%, so interception is dropped from v1 (decided 2026-09-29). It can come back only after a
+   rerun with the skill loaded shows retries under ~10%.
 
-   **Spike S3 result (2026-09-29): 90% retries, so interception is off by default.** Ten
+   **Spike S3 result (2026-09-29): 90% retries.** Ten
    navigation questions taken from purge-squad transcripts, each run twice as an Opus 5.5
    subagent: once with no hook, once with a stub PreToolUse hook. When the question's symbol
    appeared in a Grep pattern or a Bash `grep`/`rg` command, the hook denied the call and returned
@@ -217,7 +220,7 @@ Standing assumptions:
 | `graph-core` | SQLite store: node and edge schema with confidence, file hashes, incremental updates, freshness checks. | — |
 | `code-index` | Roslyn over Unity's generated `.csproj` files: types, members, serialized fields (by Unity's rules), calls, overrides, implementations, attributes, engine entry points, string dispatch (heuristic). | `graph-core` |
 | `asset-index` | `.meta` GUID table and Unity YAML (scenes, prefabs with nesting, variants and overrides, ScriptableObjects, materials, animators, animations, input actions, asmdefs, Addressables): objects, components, references, UnityEvent calls. | `graph-core` |
-| `query` | `ug find / explain / refs / impact / outline / batch`; answer budgets, `file:line` anchors, confidence tags; reindex on edit; hooks that answer symbol greps and big-YAML reads. | `code-index`, `asset-index`, `plugin-shell` |
+| `query` | `ug find / explain / refs / impact / outline / batch`; answer budgets, `file:line` anchors, confidence tags; reindex on edit. | `code-index`, `asset-index`, `plugin-shell` |
 | `editor-link` | Bridge package and client: status, refresh and compile, compile errors, console, tests, run a static method; `Editor.log` fallback when Unity is unreachable. | `plugin-shell` |
 | `unity-loop` | Compile gate (edit tracking + Stop hook, silent when clean); compact `ug console`, `ug test`, `ug log` (digest of the last play session). | `editor-link` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
@@ -313,7 +316,7 @@ src/UnityGraph.Code             code-index
 src/UnityGraph.Assets           asset-index
 src/UnityGraph.Query            query
 src/UnityGraph.EditorLink       editor-link client
-src/UnityGraph.Hooks            hook handlers (unity-loop, guards, query interception)
+src/UnityGraph.Hooks            hook handlers (unity-loop, guards, reindex on edit)
 src/UnityGraph.Stats            stats
 src/UnityGraph.Viewer           viewer (HTML page generation)
 unity/com.unitygraph.bridge     the Unity editor package
@@ -378,7 +381,7 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
 - **Integration:** index the fixture projects end to end; freshness (an edit, then a query that
   sees it).
 - **Bridge:** EditMode tests in `fixtures/BridgeHost`, run in batch mode.
-- **Replay:** guards and interception hooks are replayed against the tool calls recorded in
+- **Replay:** guard hooks are replayed against the tool calls recorded in
   purge-squad's transcripts. They must not block anything that was legitimate.
 - **Performance**, on a purge-squad-sized project (~530 KB of own C#, 185 YAML assets, the
   largest 740 KB): cold index ≤ 60 s; reindex of one edited file ≤ 1 s; query p95 ≤ 500 ms;
@@ -419,8 +422,8 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
 None blocking. Decided 2026-09-29 (see Decisions). Left for the spikes to settle:
 
 - ~~S1: can `ug` run on the .NET runtime bundled with Unity 2022.3 and Unity 6?~~ No (bundled
-  runtime is 6.0.21), see Decisions #2. Launcher strategy to decide.
+  runtime is 6.0.21), see Decisions #2. `ug` requires an installed .NET 8 or newer.
 - ~~S2: the exact plugin marketplace and install commands for a local dev install.~~ Answered
   2026-09-29, see Commands.
 - ~~S3: does PreToolUse deny + graph answer stop Claude from re-running the grep?~~ No (9 of 10
-  runs retried, +27% context tokens), see Decisions #4. Interception is off by default.
+  runs retried, +27% context tokens), see Decisions #4. Interception is dropped from v1.
