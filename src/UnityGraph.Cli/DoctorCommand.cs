@@ -87,6 +87,11 @@ internal static class DoctorCommand
                 detail.Append(config.IsEnabled(module) ? "; on: " : "; off: ").Append(module);
             }
 
+            if (!config.VendoredIsDefault)
+            {
+                detail.Append("; vendored: ").Append(string.Join(", ", config.Vendored.Prefixes));
+            }
+
             return new(Status.Ok, "config", detail.ToString());
         }
         catch (Exception e) when (e is FormatException or IOException or UnauthorizedAccessException)

@@ -171,16 +171,19 @@ Notes:
 ```csharp
 public sealed class GraphStore : IDisposable
 {
-    public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null);
-    public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null); // full index
+    // graphDirectory: default <root>/Library/unitygraph; elsewhere only to measure a project read-only.
+    public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null, string? graphDirectory = null);
+    public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null, string? graphDirectory = null); // full index
     public void Publish();                                                // staged graph becomes the graph
     public bool Created { get; }                                          // this open made a new database
-    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current);
+    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current, Indexer? indexer = null); // only that indexer's files
     public void UpdateStats(IReadOnlyList<FileStat> stats);               // record touched-only files
     public IReadOnlyList<string> TakeDirty();                             // and clear dirty.txt
     public void ReplaceFile(FileRecord file, IReadOnlyList<Node> nodes, IReadOnlyList<Edge> edges);
     public void RemoveFile(string path);
     public BulkWriter BeginBulk();                                        // cold index
+    public IReadOnlyList<string> KeysInFile(string path);                 // node keys a file owns
+    public IReadOnlyList<string> FilesWithEdgesTo(IEnumerable<string> keys, EdgeKindSet kinds); // sorted
     public Node? GetNode(string key);
     public Page<Node> FindByName(string query, NodeKindSet kinds, int limit);
     public Page<EdgeHit> EdgesFrom(string key, EdgeKindSet kinds, int limit);

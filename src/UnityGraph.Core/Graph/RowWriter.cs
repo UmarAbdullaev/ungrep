@@ -51,7 +51,7 @@ internal sealed class RowWriter : IDisposable
         Remove(file.Path, updateNames);
 
         long fileId = (long)Scalar(_insertFile, file.Path, file.Size, file.MtimeNs, Convert.FromHexString(file.Hash),
-            file.Indexer == Indexer.Code ? "code" : "asset", file.Status.ToString().ToLowerInvariant())!;
+            GraphStore.IndexerName(file.Indexer), file.Status.ToString().ToLowerInvariant())!;
 
         foreach (Node node in nodes)
         {

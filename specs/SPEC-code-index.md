@@ -20,7 +20,9 @@ In:
 - Reading Unity's generated legacy `.csproj` files: `Compile`, `Reference`/`HintPath`,
   `ProjectReference`, `DefineConstants`, `LangVersion`, `AllowUnsafeBlocks`.
 - One `CSharpCompilation` per project, project references as compilation references (compiled
-  from source, never from `Library/ScriptAssemblies`, which can be stale).
+  from source, never from `Library/ScriptAssemblies`, which can be stale). The exception is a
+  package project whose `Compile` items are all under `Library/` (PackageCache code can't
+  change): its `Library/ScriptAssemblies/<Assembly>.dll` is used when it exists.
 - Nodes for types, methods, fields, properties, events declared in indexed files.
 - Edges `contains`, `inherits`, `implements`, `overrides`, `calls`, `uses_type`, `dispatches`,
   `script_defines`.
@@ -38,7 +40,9 @@ answers (`query`); source generators and analyzers (not run); a project without 
 
 - Projects: every `*.csproj` in the project root. A project is **loaded** when an indexed file
   is in it or it is referenced (directly or not) by one that is.
-- Files: a project's `Compile` items under `Assets/` or `Packages/` (embedded packages). Items
+- Files: a project's `Compile` items under `Assets/` or `Packages/` (embedded packages), plus
+  `.cs` files on disk under `Assets/` and `Packages/*/` that no project lists yet (folders
+  starting with `.` or ending in `~` are skipped, as Unity skips them). Items
   under `Library/` (PackageCache) are compiled for binding but not indexed: their symbols have
   no nodes, and edges to them are dropped (see `calls` scope).
 - **Vendored** files (third-party code checked into `Assets/`) get declarations only: nodes and
@@ -74,6 +78,9 @@ is a config error that `ug doctor` names.
   `DefineConstants`, `DocumentationMode.None`. Compilation: `OutputKind.DynamicallyLinkedLibrary`,
   `AllowUnsafe` from the project, concurrent build on.
 - Metadata references are shared between projects (one `MetadataReference` per file path).
+- A compilation references the transitive closure of its `ProjectReference`s (Unity compiles
+  against referenced assemblies' references too; `Assembly-CSharp-Editor` sees types that
+  `Assembly-CSharp` exposes from an asmdef it references).
 - Projects form a DAG in `ProjectReference`; a cycle is an error for the projects in it (their
   files are indexed without the cyclic reference).
 
@@ -91,12 +98,17 @@ is a config error that `ug doctor` names.
 - Keys: `NodeKeys.Symbol(symbol.GetDocumentationCommentId())` on the original definition.
   Symbols without a doc ID (local functions, lambdas, anonymous types) are not nodes; code
   inside them belongs to the enclosing member.
-- Partial types: the type node is owned by the part in the ordinally first file path; every
-  part's file owns the members it declares and their `contains` edges. The rule only needs the
-  compilation, so a single-file reindex gets the same owner.
+- Partial types: the type node is owned by the part in the file named like the type
+  (`LabStage.cs` over `LabStage.Debug.cs`), else by the part in the ordinally first file path;
+  every part's file owns the members it declares and their `contains` edges. The rule only
+  needs the compilation, so a single-file reindex gets the same owner.
+- Partial methods: the implementing declaration is the node.
+- Explicit interface implementations are named by the member name (`Dispose`, not
+  `System.IDisposable.Dispose`); the key keeps the full doc ID.
 - Nested types: `contains` from the outer type.
 - Lines are 1-based, from the declaration's full span (attributes included, leading trivia
-  excluded).
+  excluded). A field or event field spans its whole declaration statement, so `int a, b;` gives
+  both the same lines.
 - `unity` on a type: `mono_behaviour`, `scriptable_object`, `editor`, `editor_window`,
   `property_drawer` or `object` (another `UnityEngine.Object`), from the base type chain;
   `serializable` for `[Serializable]` classes and structs. Absent otherwise.
@@ -136,7 +148,7 @@ serialization table test (SPEC Testing strategy).
 | Edge | Source → target | Owned by | Line |
 | --- | --- | --- | --- |
 | `contains` | type → member or nested type | the member's file | member's first line |
-| `inherits` | type → base class (not `object`, `ValueType`, `Enum`) | type's owner file | base list |
+| `inherits` | type → base class (not `object`); interface → interface it extends | file of that base list | base list |
 | `implements` | type → each interface in its own base list | file of that base list | base list |
 | `overrides` | method/property/event → overridden member, and explicit or implicit interface implementations of it | member's file | member's first line |
 | `calls` | enclosing member → invoked method, constructor, property accessor (as the property), event add/remove (as the event) | call site's file | call site |
@@ -148,6 +160,8 @@ serialization table test (SPEC Testing strategy).
   `uses_type` edges. Calls into `UnityEngine`, the BCL and package code are dropped. This
   settles SPEC-graph-core open point 2 by measurement (see Measured): edges into engine and BCL
   outnumber project edges several times, and no v1 query asks "who calls `Debug.Log`".
+- Implicit (compiler-generated) constructors have no node and get no `calls` edge; `new T()`
+  still gives `uses_type T`.
 - Generic targets point at the original definition (`List<int>.Add` → `List`1.Add`), so edges
   land on nodes.
 - One edge per (src, kind, dst) per file, at the first line it occurs: the graph answers "who
@@ -155,19 +169,22 @@ serialization table test (SPEC Testing strategy).
 - A member's own type (return type, field type) is a `uses_type` from the member.
 - **Dispatch (heuristic unless noted):** a string literal or `const` string argument to
   `SendMessage`, `SendMessageUpwards`, `BroadcastMessage`, `Invoke`, `InvokeRepeating`,
-  `CancelInvoke`, `IsInvoking`, `StartCoroutine`, `StopCoroutine`. For `Invoke*` and
-  `*Coroutine` the receiver's static type (or `this`) and its base types are searched, and a
+  `CancelInvoke`, `IsInvoking`, `StartCoroutine`, `StopCoroutine` declared on `Component`,
+  `MonoBehaviour` or `GameObject`. For `Invoke*` and `*Coroutine` the receiver's static type (or
+  `this`) and its base types are searched (an override hides the method it overrides), and a
   single match is `exact`; `nameof(M)` is always exact. `SendMessage` family: every method with
-  that name on an indexed `MonoBehaviour` subclass, `heuristic`, at most 20 targets (props
-  `truncated: true` beyond that). No match → no edge.
+  that name on an indexed `MonoBehaviour` subclass in the caller's compilation or one it
+  references (a message can't reach a type the caller's assembly can't see), `heuristic`, at
+  most 20 targets in key order (props `truncated: true` on each when capped). No match → no
+  edge.
 - **`script_defines`:** only when the `.meta` exists, has a `guid:` line, and the file declares
   a top-level (non-nested) class whose name equals the file name; the asset node itself comes
   from `asset-index` (the edge is unresolved until then).
 
 ## Incremental reindex
 
-Tracked files: the indexed `.cs` files and every `*.csproj` in the root (as files with no nodes,
-so their changes show up in `CheckFreshness`).
+Tracked files: the indexed `.cs` files. `.csproj` files are not tracked: Unity rewrites them on
+every refresh, and each `Update` re-reads them anyway (loading is cheap next to compiling).
 
 - `.cs` changed or added → reindex it. `.cs` removed → `RemoveFile`.
 - A reindexed file whose declared keys lost some (removed or renamed members): the files with
@@ -175,11 +192,11 @@ so their changes show up in `CheckFreshness`).
   keys are reindexed too, so their edges don't keep pointing at the old names. Added keys do
   not trigger this (edges to a new key already exist as unresolved ones only if something
   named it).
-- A `.csproj` changed, added or removed → every loaded project is re-read; files that moved
-  between projects or appeared in or left the tracked set are reindexed or removed.
 - A new `.cs` file not yet in any `.csproj` (Unity regenerates them only on its next refresh) is
-  added to the project whose `Compile` items share the longest folder prefix with it, or
-  `Assembly-CSharp` when none does.
+  added to the project whose files share the longest folder below `Assets/` or
+  `Packages/<name>/` with it, or `Assembly-CSharp` when none does.
+- A file that moved between projects without changing is not reindexed; its edges are correct
+  again after its next edit or `ug index --full`.
 - Reindex builds the compilation of the file's project and its references from the files on
   disk; only the reindexed files are walked for edges.
 
@@ -189,29 +206,35 @@ so their changes show up in `CheckFreshness`).
 public sealed class CodeWorkspace                                   // the loaded projects
 {
     public static CodeWorkspace Load(string projectRoot, VendoredFolders vendored);
-    public IReadOnlyList<string> TrackedFiles { get; }               // .cs and .csproj, sorted
+    public bool HasProjects { get; }                                  // false: no .csproj in the root
+    public IReadOnlyList<string> TrackedFiles { get; }               // indexed .cs files, sorted
     public IReadOnlyList<string> Problems { get; }                    // missing references, cycles; sorted
+    public bool IsVendored(string path);
     public FileContribution Index(string path);                       // one tracked file
-    public IEnumerable<FileContribution> IndexAll();                  // parallel inside, yields in path order
+    public IReadOnlyList<FileContribution> IndexMany(IEnumerable<string>? paths = null); // all when null; parallel, path order
 }
 
 public sealed record FileContribution(FileRecord File, IReadOnlyList<Node> Nodes, IReadOnlyList<Edge> Edges);
-public sealed record VendoredFolders(IReadOnlyList<string> Prefixes) { public bool Contains(string path); public static VendoredFolders Default { get; } }
+
+// In UnityGraph.Core, shared with guards and config.
+public sealed class VendoredFolders { public IReadOnlyList<string> Prefixes { get; } public bool Contains(string path); public static VendoredFolders Default { get; } }
 
 public static class CodeIndex
 {
-    public static IndexSummary Full(string projectRoot, GraphStore staging, VendoredFolders vendored);
-    public static IndexSummary Update(string projectRoot, GraphStore store, VendoredFolders vendored, IEnumerable<string>? hint = null);
+    public static IndexSummary Full(CodeWorkspace workspace, BulkWriter writer);
+    public static IndexSummary Update(CodeWorkspace workspace, GraphStore store, IEnumerable<string>? extra = null);
 }
 
-public sealed record IndexSummary(int Files, int Nodes, int Edges, int Removed, TimeSpan Elapsed, IReadOnlyList<string> Problems);
+public sealed record IndexSummary(int Files, int Vendored, int Nodes, int Edges, int Removed, TimeSpan Elapsed, IReadOnlyList<string> Problems);
 ```
 
-- `Update` runs `CheckFreshness` over `TrackedFiles`, takes the dirty list, reindexes what
-  changed (plus `hint`, the files a hook just edited) and records touched files. A graph that
-  was just `Created` gets a full index instead.
-- Everything the indexer returns is sorted (nodes and edges by key, kind, destination, line), so
-  two runs on the same files produce identical rows.
+- `Full` writes every tracked file through a bulk writer on a staging store; the CLI opens the
+  staging store and publishes it.
+- `Update` runs `CheckFreshness(stats, Indexer.Code)` over `TrackedFiles`, takes the dirty list,
+  reindexes what changed (plus `extra`, the files a hook just edited, and the lost-key
+  dependents) and records touched files. A graph that was just `Created` gets a full index
+  instead.
+- Rows are deterministic: files in path order, each file's nodes and edges in source order.
 
 CLI:
 

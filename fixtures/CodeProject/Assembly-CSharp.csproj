@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Generated file, do not modify, your changes will be overwritten (use AssetPostprocessor.OnGeneratedCSProject) -->
+  <PropertyGroup>
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyName>Assembly-CSharp</AssemblyName>
+    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <NoWarn>0169;USG0001</NoWarn>
+    <DefineConstants>UNITY_6000_3_OR_NEWER;UNITY_EDITOR;GAME_DEBUG;DEBUG;TRACE</DefineConstants>
+    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup>
+    <NoStdLib>true</NoStdLib>
+  </PropertyGroup>
+  <ItemGroup>
+    <Analyzer Include="Library\Analyzers\Unity.SourceGenerators.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Assets\Scripts\Lab\LabStage.cs" />
+    <Compile Include="Assets\Scripts\Lab\LabStage.Debug.cs" />
+    <Compile Include="Assets\Scripts\Lab\Turntable.cs" />
+    <Compile Include="Assets\Scripts\Lab\Owner&apos;s Notes.cs" />
+    <Compile Include="Assets\Scripts\Broken.cs" />
+    <Compile Include="Assets\3rd Party\Tweens\Tween.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib">
+      <HintPath>Library\Bcl\mscorlib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Missing">
+      <HintPath>Library\ScriptAssemblies\Missing.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Game.Core.csproj">
+      <Project>{00000000-0000-0000-0000-000000000002}</Project>
+      <Name>Game.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="UnityEngine.csproj">
+      <Project>{00000000-0000-0000-0000-000000000001}</Project>
+      <Name>UnityEngine</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

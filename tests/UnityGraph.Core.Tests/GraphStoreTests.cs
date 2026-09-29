@@ -356,6 +356,49 @@ public sealed class GraphStoreTests : IDisposable
         Assert.True(store.Created);
     }
 
+    [Fact]
+    public void Keys_in_a_file_and_files_with_edges_to_keys()
+    {
+        using GraphStore store = Seeded();
+        var (damage, damageNodes, damageEdges) = DamageFile();
+        store.ReplaceFile(damage, damageNodes, damageEdges);
+
+        Assert.Equal([_maxHealth, _takeDamage, _typeHealth], store.KeysInFile(Health).Order(StringComparer.Ordinal));
+        Assert.Empty(store.KeysInFile("Assets/None.cs"));
+        Assert.Equal([Health], store.FilesWithEdgesTo([_apply, "cs:T:Nobody"], EdgeKindSet.Of(EdgeKind.Calls)));
+        Assert.Empty(store.FilesWithEdgesTo([_apply], EdgeKindSet.Of(EdgeKind.UsesType)));
+        Assert.Equal([Damage, Health], store.FilesWithEdgesTo([_apply, _takeDamage], EdgeKindSet.All));
+        Assert.Empty(store.FilesWithEdgesTo([], EdgeKindSet.All));
+    }
+
+    [Fact]
+    public void Freshness_can_be_limited_to_one_indexer()
+    {
+        using GraphStore store = Seeded();
+        store.ReplaceFile(File(Scene, Indexer.Asset), [], []);
+
+        FreshnessReport report = store.CheckFreshness([], Indexer.Code);
+
+        Assert.Equal([Health], report.Removed);
+        Assert.Equal(2, store.CheckFreshness([]).Removed.Count);
+    }
+
+    [Fact]
+    public void A_graph_directory_keeps_the_project_untouched()
+    {
+        string elsewhere = Path.Combine(_root, "elsewhere");
+        using (GraphStore store = GraphStore.Open(Path.Combine(_root, "project"), StoreMode.ReadWrite, graphDirectory: elsewhere))
+        {
+            var (file, nodes, edges) = HealthFile();
+            store.ReplaceFile(file, nodes, edges);
+        }
+
+        Assert.True(System.IO.File.Exists(Path.Combine(elsewhere, "graph.db")));
+        Assert.False(Directory.Exists(Path.Combine(_root, "project")));
+        using GraphStore read = GraphStore.Open(Path.Combine(_root, "project"), StoreMode.ReadOnly, graphDirectory: elsewhere);
+        Assert.NotNull(read.GetNode(_typeHealth));
+    }
+
     private void SetSchemaVersion(string version)
     {
         using var db = new SqliteConnection($"Data Source={DbPath};Pooling=False");

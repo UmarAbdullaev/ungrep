@@ -44,10 +44,42 @@ public sealed class UnityGraphConfigTests
     [InlineData("""{ "answerBudget": 100 }""", "answerBudget must be a whole number from 200 to 8000")]
     [InlineData("""{ "answerBudget": 9000 }""", "answerBudget must be")]
     [InlineData("""{ "answerBudget": 1.5 }""", "answerBudget must be")]
+    [InlineData("""{ "vendored": "Assets/Plugins/" }""", "vendored must be an array")]
+    [InlineData("""{ "vendored": [1] }""", "vendored: 1 is not a string")]
+    [InlineData("""{ "vendored": ["Assets/Plugins"] }""", "vendored: \"Assets/Plugins\" must end in '/'")]
+    [InlineData("""{ "vendored": ["Assets\\Plugins/"] }""", """vendored: "Assets\Plugins/" use forward slashes""")]
     public void Rejects_bad_files_naming_the_setting(string json, string message)
     {
         var e = Assert.Throws<FormatException>(() => UnityGraphConfig.Parse(json));
         Assert.StartsWith(message, e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Vendored_folders_default_or_come_from_the_file()
+    {
+        Assert.True(UnityGraphConfig.Default.VendoredIsDefault);
+        Assert.True(UnityGraphConfig.Default.Vendored.Contains("assets/plugins/DOTween/Tween.cs"));
+
+        UnityGraphConfig config = UnityGraphConfig.Parse("""{ "vendored": ["Assets/Ext/"] }""");
+
+        Assert.False(config.VendoredIsDefault);
+        Assert.Equal(["Assets/Ext/"], config.Vendored.Prefixes);
+        Assert.False(config.Vendored.Contains("Assets/Plugins/A.cs"));
+    }
+
+    [Theory]
+    [InlineData("", "empty")]
+    [InlineData("/Assets/", "must be project-relative")]
+    [InlineData("C:/Assets/", "must be project-relative")]
+    [InlineData("Assets/../x/", "no '.' or '..' parts")]
+    [InlineData("Assets/Plugins/", null)]
+    public void Vendored_prefixes_are_checked(string prefix, string? problem)
+    {
+        Assert.Equal(problem, VendoredFolders.Problem(prefix));
+        if (problem is not null)
+        {
+            Assert.Throws<ArgumentException>(() => new VendoredFolders([prefix]));
+        }
     }
 
     [Fact]

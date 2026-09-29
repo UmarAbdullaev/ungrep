@@ -51,9 +51,9 @@ Details and acceptance criteria: `plan.md`.
 # Todo: step 2 (query pulled forward, see plan.md)
 
 - [x] C1 code-index spec
-- [ ] C2 code-index: project loader
-- [ ] C3 code-index: nodes and Unity rules
-- [ ] C4 code-index: edges
+- [x] C2 code-index: project loader
+- [x] C3 code-index: nodes and Unity rules
+- [x] C4 code-index: edges
 - [ ] C5 code-index: incremental and `ug index`
 - [ ] C6 code-index: purge-squad measurement
 - [ ] Q query: spec, `ug find/refs/explain`, skill update

@@ -21,11 +21,16 @@ internal sealed class WriteLock : IDisposable
 
     private WriteLock(FileStream file) => _file = file;
 
-    /// <summary>Waits up to <paramref name="timeout"/>; null when the lock is still held elsewhere.</summary>
-    public static WriteLock? TryAcquire(string projectRoot, TimeSpan timeout)
+    private const string FileName = "write.lock";
+
+    /// <summary>
+    /// Locks `write.lock` in <paramref name="graphDirectory"/>, waiting up to
+    /// <paramref name="timeout"/>; null when the lock is still held elsewhere.
+    /// </summary>
+    public static WriteLock? TryAcquire(string graphDirectory, TimeSpan timeout)
     {
-        string path = Path.Combine(projectRoot, RelativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        string path = Path.Combine(graphDirectory, FileName);
+        Directory.CreateDirectory(graphDirectory);
         var clock = Stopwatch.StartNew();
         while (true)
         {
@@ -74,10 +79,10 @@ public static class DirtyFiles
         });
     }
 
-    // Called by GraphStore.TakeDirty, which holds the write lock.
-    internal static IReadOnlyList<string> Take(string projectRoot)
+    // Called by GraphStore.TakeDirty, which holds the write lock, with the graph's folder.
+    internal static IReadOnlyList<string> Take(string graphDirectory)
     {
-        string file = Path.Combine(projectRoot, RelativePath);
+        string file = Path.Combine(graphDirectory, Path.GetFileName(RelativePath));
         if (!File.Exists(file))
         {
             return [];

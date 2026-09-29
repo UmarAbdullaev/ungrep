@@ -74,17 +74,22 @@ public sealed class GraphStore : IDisposable
     /// <summary>How long <see cref="Open"/> waits for another writer by default.</summary>
     public static readonly TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(1);
 
+    private const string DatabaseName = "graph.db";
+    private const string StagingName = "graph.db.new";
+
     private readonly SqliteConnection _db;
     private readonly string _projectRoot;
+    private readonly string _directory;
     private readonly WriteLock? _lock;
     private readonly string? _publishTo;
     private SqliteTransaction? _bulk;
     private bool _disposed;
 
-    private GraphStore(SqliteConnection db, string projectRoot, StoreMode mode, bool created, WriteLock? writeLock, string? publishTo)
+    private GraphStore(SqliteConnection db, string projectRoot, string directory, StoreMode mode, bool created, WriteLock? writeLock, string? publishTo)
     {
         _db = db;
         _projectRoot = projectRoot;
+        _directory = directory;
         Mode = mode;
         Created = created;
         _lock = writeLock;
@@ -102,19 +107,20 @@ public sealed class GraphStore : IDisposable
     /// </summary>
     /// <exception cref="GraphRebuildRequiredException">Read-only, and there is no usable database.</exception>
     /// <exception cref="GraphLockedException">Read-write, and another writer kept the lock.</exception>
-    public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null)
+    public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null, string? graphDirectory = null)
     {
         string root = Path.GetFullPath(projectRoot);
-        string path = Path.Combine(root, RelativePath);
+        string dir = GraphDirectory(root, graphDirectory);
+        string path = Path.Combine(dir, DatabaseName);
         if (mode == StoreMode.ReadOnly)
         {
-            return OpenReadOnly(path, root);
+            return OpenReadOnly(path, root, dir);
         }
 
-        WriteLock writeLock = Lock(root, lockTimeout);
+        WriteLock writeLock = Lock(dir, lockTimeout);
         try
         {
-            return OpenFile(path, root, writeLock, publishTo: null);
+            return OpenFile(path, root, dir, writeLock, publishTo: null);
         }
         catch
         {
@@ -129,15 +135,16 @@ public sealed class GraphStore : IDisposable
     /// publishing throws the staged graph away.
     /// </summary>
     /// <exception cref="GraphLockedException">Another writer kept the lock.</exception>
-    public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null)
+    public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null, string? graphDirectory = null)
     {
         string root = Path.GetFullPath(projectRoot);
-        WriteLock writeLock = Lock(root, lockTimeout);
+        string dir = GraphDirectory(root, graphDirectory);
+        WriteLock writeLock = Lock(dir, lockTimeout);
         try
         {
-            string staging = Path.Combine(root, StagingRelativePath);
+            string staging = Path.Combine(dir, StagingName);
             Delete(staging);
-            return OpenFile(staging, root, writeLock, publishTo: Path.Combine(root, RelativePath));
+            return OpenFile(staging, root, dir, writeLock, publishTo: Path.Combine(dir, DatabaseName));
         }
         catch
         {
@@ -146,13 +153,18 @@ public sealed class GraphStore : IDisposable
         }
     }
 
-    private static WriteLock Lock(string root, TimeSpan? lockTimeout)
+    // `Library/unitygraph/` unless the caller keeps the graph elsewhere (measuring a project
+    // without writing into it).
+    private static string GraphDirectory(string root, string? graphDirectory) =>
+        graphDirectory is null ? Path.Combine(root, "Library", "unitygraph") : Path.GetFullPath(graphDirectory);
+
+    private static WriteLock Lock(string directory, TimeSpan? lockTimeout)
     {
         TimeSpan timeout = lockTimeout ?? DefaultLockTimeout;
-        return WriteLock.TryAcquire(root, timeout) ?? throw new GraphLockedException(timeout);
+        return WriteLock.TryAcquire(directory, timeout) ?? throw new GraphLockedException(timeout);
     }
 
-    private static GraphStore OpenReadOnly(string path, string root)
+    private static GraphStore OpenReadOnly(string path, string root, string directory)
     {
         if (!File.Exists(path))
         {
@@ -167,7 +179,7 @@ public sealed class GraphStore : IDisposable
             {
                 db.Dispose();
                 // Only when no writer is busy with it; otherwise the writer deals with it.
-                using (WriteLock? writeLock = WriteLock.TryAcquire(root, TimeSpan.Zero))
+                using (WriteLock? writeLock = WriteLock.TryAcquire(directory, TimeSpan.Zero))
                 {
                     if (writeLock is not null)
                     {
@@ -184,14 +196,14 @@ public sealed class GraphStore : IDisposable
             throw new GraphRebuildRequiredException("unreadable graph: " + e.Message);
         }
 
-        return new GraphStore(db, root, StoreMode.ReadOnly, created: false, writeLock: null, publishTo: null);
+        return new GraphStore(db, root, directory, StoreMode.ReadOnly, created: false, writeLock: null, publishTo: null);
     }
 
     // Read-write open of `path` under a lock the caller already holds.
-    private static GraphStore OpenFile(string path, string projectRoot, WriteLock writeLock, string? publishTo)
+    private static GraphStore OpenFile(string path, string projectRoot, string directory, WriteLock writeLock, string? publishTo)
     {
         StoreMode mode = StoreMode.ReadWrite;
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        Directory.CreateDirectory(directory);
         if (File.Exists(path))
         {
             SqliteConnection existing = Connect(path, SqliteOpenMode.ReadWrite);
@@ -199,7 +211,7 @@ public sealed class GraphStore : IDisposable
             {
                 if (ReadSchemaVersion(existing) == SchemaVersion.ToString(CultureInfo.InvariantCulture))
                 {
-                    return new GraphStore(existing, projectRoot, mode, created: false, writeLock, publishTo);
+                    return new GraphStore(existing, projectRoot, directory, mode, created: false, writeLock, publishTo);
                 }
             }
             catch (SqliteException)
@@ -233,7 +245,7 @@ public sealed class GraphStore : IDisposable
             tx.Commit();
         }
 
-        return new GraphStore(db2, projectRoot, mode, created: true, writeLock, publishTo);
+        return new GraphStore(db2, projectRoot, directory, mode, created: true, writeLock, publishTo);
     }
 
     public void Dispose()
@@ -249,7 +261,7 @@ public sealed class GraphStore : IDisposable
         if (_publishTo is not null)
         {
             // Never published: the staged graph goes.
-            Delete(Path.Combine(_projectRoot, StagingRelativePath));
+            Delete(Path.Combine(_directory, StagingName));
         }
 
         _lock?.Dispose();
@@ -292,13 +304,20 @@ public sealed class GraphStore : IDisposable
     /// Compares <paramref name="current"/> (every file the indexers track, as on disk now) with what
     /// was indexed. Size and mtime first; a file whose size is equal but mtime differs is hashed.
     /// </summary>
+    /// <param name="current">Every file the indexer tracks, as on disk now.</param>
+    /// <param name="indexer">Compare only the files this indexer owns; null compares all.</param>
     /// <exception cref="ArgumentException">A path appears twice.</exception>
-    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current)
+    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current, Indexer? indexer = null)
     {
         var indexed = new Dictionary<string, (long Size, long MtimeNs, byte[] Hash)>(StringComparer.Ordinal);
-        using (SqliteCommand command = ReadCommand("SELECT path, size, mtime_ns, hash FROM files"))
-        using (SqliteDataReader reader = command.ExecuteReader())
+        using (SqliteCommand command = ReadCommand("SELECT path, size, mtime_ns, hash FROM files" + (indexer is null ? "" : " WHERE indexer = $indexer")))
         {
+            if (indexer is { } only)
+            {
+                command.Parameters.AddWithValue("$indexer", IndexerName(only));
+            }
+
+            using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
             {
                 indexed[reader.GetString(0)] = (reader.GetInt64(1), reader.GetInt64(2), (byte[])reader.GetValue(3));
@@ -383,7 +402,7 @@ public sealed class GraphStore : IDisposable
     public IReadOnlyList<string> TakeDirty()
     {
         EnsureWritable();
-        return DirtyFiles.Take(_projectRoot);
+        return DirtyFiles.Take(_directory);
     }
 
     /// <summary>
@@ -424,6 +443,46 @@ public sealed class GraphStore : IDisposable
     }
 
     internal void EndBulk() => _bulk = null;
+
+    internal static string IndexerName(Indexer indexer) => indexer == Indexer.Code ? "code" : "asset";
+
+    /// <summary>Keys of the nodes <paramref name="path"/> owns, ordered.</summary>
+    public IReadOnlyList<string> KeysInFile(string path)
+    {
+        using SqliteCommand command = ReadCommand("SELECT n.key FROM nodes n JOIN files f ON f.id = n.file_id WHERE f.path = $path ORDER BY n.key");
+        command.Parameters.AddWithValue("$path", path);
+        return ReadStrings(command);
+    }
+
+    /// <summary>Files owning an edge of one of <paramref name="kinds"/> into any of <paramref name="keys"/>, ordered.</summary>
+    public IReadOnlyList<string> FilesWithEdgesTo(IEnumerable<string> keys, EdgeKindSet kinds)
+    {
+        var files = new SortedSet<string>(StringComparer.Ordinal);
+        using SqliteCommand command = ReadCommand($"""
+            SELECT DISTINCT f.path FROM edges e JOIN files f ON f.id = e.file_id
+            WHERE e.dst = $key{KindFilter("e.kind", kinds.IsAll, kinds.Names)}
+            """);
+        SqliteParameter key = command.Parameters.Add("$key", SqliteType.Text);
+        foreach (string k in keys)
+        {
+            key.Value = k;
+            files.UnionWith(ReadStrings(command));
+        }
+
+        return files.ToList();
+    }
+
+    private static List<string> ReadStrings(SqliteCommand command)
+    {
+        var items = new List<string>();
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(reader.GetString(0));
+        }
+
+        return items;
+    }
 
     public Node? GetNode(string key)
     {

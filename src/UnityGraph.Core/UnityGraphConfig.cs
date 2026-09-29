@@ -34,13 +34,20 @@ public sealed class UnityGraphConfig
 
     private readonly IReadOnlyDictionary<string, bool> _modules;
 
-    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget)
+    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget, VendoredFolders? vendored)
     {
         _modules = modules;
         AnswerBudget = answerBudget;
+        Vendored = vendored ?? VendoredFolders.Default;
+        VendoredIsDefault = vendored is null;
     }
 
-    public static UnityGraphConfig Default { get; } = new(ModuleDefaults, DefaultAnswerBudget);
+    public static UnityGraphConfig Default { get; } = new(ModuleDefaults, DefaultAnswerBudget, null);
+
+    /// <summary>Third-party folders: the `vendored` setting, or <see cref="VendoredFolders.Default"/>.</summary>
+    public VendoredFolders Vendored { get; }
+
+    public bool VendoredIsDefault { get; }
 
     /// <summary>Maximum tokens in one query answer (design rule 1).</summary>
     public int AnswerBudget { get; }
@@ -82,6 +89,7 @@ public sealed class UnityGraphConfig
 
             var modules = new SortedDictionary<string, bool>(ModuleDefaults.ToDictionary(), StringComparer.Ordinal);
             int budget = DefaultAnswerBudget;
+            VendoredFolders? vendored = null;
             foreach (JsonProperty setting in doc.RootElement.EnumerateObject())
             {
                 switch (setting.Name)
@@ -98,13 +106,43 @@ public sealed class UnityGraphConfig
                         }
 
                         break;
+                    case "vendored":
+                        vendored = ReadVendored(setting.Value);
+                        break;
                     default:
-                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget)");
+                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget, vendored)");
                 }
             }
 
-            return new UnityGraphConfig(modules, budget);
+            return new UnityGraphConfig(modules, budget, vendored);
         }
+    }
+
+    private static VendoredFolders ReadVendored(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            throw new FormatException("vendored must be an array of folder prefixes like \"Assets/Plugins/\"");
+        }
+
+        var prefixes = new List<string>();
+        foreach (JsonElement item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+            {
+                throw new FormatException($"vendored: {item.GetRawText()} is not a string");
+            }
+
+            string prefix = item.GetString()!;
+            if (VendoredFolders.Problem(prefix) is { } problem)
+            {
+                throw new FormatException($"vendored: \"{prefix}\" {problem}");
+            }
+
+            prefixes.Add(prefix);
+        }
+
+        return new VendoredFolders(prefixes);
     }
 
     private static void ReadModules(JsonElement value, SortedDictionary<string, bool> modules)
