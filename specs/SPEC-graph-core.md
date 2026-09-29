@@ -88,11 +88,11 @@ Direction reads left to right: `src kind dst`.
 | `uses_type` | method or field uses type | exact |
 | `dispatches` | method → method through `SendMessage`, `Invoke`, `StartCoroutine("name")`, `nameof`-free strings | heuristic |
 | `script_defines` | script asset defines type | exact |
-| `instance_of` | component instance_of type (MonoBehaviour through its script GUID); prefab_instance instance_of prefab asset | exact |
+| `instance_of` | component or ScriptableObject instance_of its script asset (the type is one `script_defines` hop away, so a class rename needs no asset reindex); prefab_instance instance_of prefab asset | exact |
 | `places` | scene or prefab asset places prefab_instance | exact |
 | `variant_of` | prefab asset variant_of prefab asset | exact |
 | `overrides_value` | prefab_instance overrides a field on an object in the source prefab; `props.property_path` | exact |
-| `references` | component or asset → asset or object, through a serialized field; `props.field` = field key | exact |
+| `references` | component or asset → asset or object, through a serialized field; `props.field` = the field path in the file (`_waves[2].prefab`) | exact |
 | `event_calls` | component → method through a persistent UnityEvent listener | exact when the target type has one method of that name, heuristic otherwise |
 | `anim_event_calls` | animation_clip → method named in an animation event | heuristic |
 | `in_assembly` | script asset in_assembly asmdef asset | exact |

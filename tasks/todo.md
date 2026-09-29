@@ -47,6 +47,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] Spike results recorded in SPEC.md
 - [ ] Step-2 module specs written (code-index, asset-index, editor-link)
   - [x] code-index (`specs/SPEC-code-index.md`)
+  - [x] asset-index (`specs/SPEC-asset-index.md`)
 
 # Todo: step 2 (query pulled forward, see plan.md)
 
@@ -57,3 +58,9 @@ Details and acceptance criteria: `plan.md`.
 - [x] C5 code-index: incremental and `ug index` (Code line coverage 92.8%)
 - [x] C6 code-index: purge-squad measurement (one-file update 1.21 s vs 1 s target: Roslyn cold start, see spec)
 - [x] Q query: spec, `ug find/refs/explain`, skill update (p95 345 ms on purge-squad; Query coverage 94.7%)
+- [x] A1 asset-index spec
+- [ ] A2 asset-index: YAML and meta readers
+- [ ] A3 asset-index: file indexer and fixture assets
+- [ ] A4 asset-index: workspace, incremental, `ug index`
+- [ ] A5 query: asset answers
+- [ ] A6 asset-index: purge-squad measurement

@@ -142,3 +142,36 @@ Acceptance: incremental tests pass; determinism test; ≥ 80% coverage on Code.
 ### C6. code-index: purge-squad measurement
 - Acceptance test (env-gated, graph outside purge-squad). Fill in the spec's Measured section.
 Acceptance: targets met, or the spec says why not.
+
+### C6. code-index: purge-squad measurement / Q. query
+Done; see `tasks/todo.md` and the specs' Measured sections.
+
+## Asset-index (spec: `specs/SPEC-asset-index.md`)
+
+```
+A1 spec ──> A2 YAML + meta reader ──> A3 file indexer + fixture ──> A4 workspace, incremental, ug index ──> A5 query answers ──> A6 purge-squad
+```
+
+### A1. asset-index spec
+`specs/SPEC-asset-index.md`; graph-core's `instance_of` row refined (script asset, not type).
+
+### A2. asset-index: readers
+- `UnityYaml` line reader and `MetaFile`; new project `src/UnityGraph.Assets`.
+Acceptance: reader table test passes, including the unsupported-construct rows.
+
+### A3. asset-index: file indexer
+- Node and edge rules per content file and per `.meta`; fixture assets in `fixtures/CodeProject`.
+Acceptance: golden asset rows for the fixture.
+
+### A4. asset-index: workspace, incremental, `ug index`
+- Directory walk, `AssetIndex.Full/Update`, shared `FileContribution`/`IndexSummary`, the
+  CLI `GraphUpdate` coordinator used by `ug index` and queries.
+Acceptance: incremental and determinism tests; ≥ 80% coverage on Assets.
+
+### A5. query: asset answers
+- Asset paths and GUIDs as symbols; `explain`/`refs` of assets; "on" and "unity event" lines
+  for types and methods; `find` includes assets and game objects; skill update.
+Acceptance: golden transcript extended; SPEC-query updated.
+
+### A6. asset-index: purge-squad measurement
+Acceptance: env-gated test passes; Measured section filled; targets met or explained.
