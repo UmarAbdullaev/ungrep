@@ -58,14 +58,27 @@ public sealed class GraphStore : IDisposable
         );
         """;
 
-    private readonly SqliteConnection _db;
-    private SqliteTransaction? _bulk;
+    /// <summary>Where a full index is built before <see cref="Publish"/> copies it over the graph.</summary>
+    public const string StagingRelativePath = "Library/unitygraph/graph.db.new";
 
-    private GraphStore(SqliteConnection db, StoreMode mode, bool created)
+    /// <summary>How long <see cref="Open"/> waits for another writer by default.</summary>
+    public static readonly TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(1);
+
+    private readonly SqliteConnection _db;
+    private readonly string _projectRoot;
+    private readonly WriteLock? _lock;
+    private readonly string? _publishTo;
+    private SqliteTransaction? _bulk;
+    private bool _disposed;
+
+    private GraphStore(SqliteConnection db, string projectRoot, StoreMode mode, bool created, WriteLock? writeLock, string? publishTo)
     {
         _db = db;
+        _projectRoot = projectRoot;
         Mode = mode;
         Created = created;
+        _lock = writeLock;
+        _publishTo = publishTo;
     }
 
     public StoreMode Mode { get; }
@@ -73,39 +86,101 @@ public sealed class GraphStore : IDisposable
     /// <summary>True when this open created the database (new, or rebuilt): it needs a full index.</summary>
     public bool Created { get; }
 
+    /// <summary>
+    /// Opens the graph. Read-only never waits. Read-write takes the write lock first and holds it
+    /// until the store is disposed; it waits up to <paramref name="lockTimeout"/> (default 1 s).
+    /// </summary>
     /// <exception cref="GraphRebuildRequiredException">Read-only, and there is no usable database.</exception>
-    public static GraphStore Open(string projectRoot, StoreMode mode) =>
-        OpenFile(Path.Combine(Path.GetFullPath(projectRoot), RelativePath), projectRoot, mode);
-
-    internal static GraphStore OpenFile(string path, string projectRoot, StoreMode mode)
+    /// <exception cref="GraphLockedException">Read-write, and another writer kept the lock.</exception>
+    public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null)
     {
+        string root = Path.GetFullPath(projectRoot);
+        string path = Path.Combine(root, RelativePath);
         if (mode == StoreMode.ReadOnly)
         {
-            if (!File.Exists(path))
-            {
-                throw new GraphRebuildRequiredException("no graph at " + path);
-            }
-
-            SqliteConnection db = Connect(path, SqliteOpenMode.ReadOnly);
-            try
-            {
-                string? version = ReadSchemaVersion(db);
-                if (version != SchemaVersion.ToString(CultureInfo.InvariantCulture))
-                {
-                    db.Dispose();
-                    Delete(path);
-                    throw new GraphRebuildRequiredException($"schema version {version ?? "missing"}, expected {SchemaVersion}");
-                }
-            }
-            catch (SqliteException e)
-            {
-                db.Dispose();
-                throw new GraphRebuildRequiredException("unreadable graph: " + e.Message);
-            }
-
-            return new GraphStore(db, mode, created: false);
+            return OpenReadOnly(path, root);
         }
 
+        WriteLock writeLock = Lock(root, lockTimeout);
+        try
+        {
+            return OpenFile(path, root, writeLock, publishTo: null);
+        }
+        catch
+        {
+            writeLock.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Starts a full index in `graph.db.new`, holding the write lock throughout, while readers keep
+    /// using the current graph. <see cref="Publish"/> makes it the graph; disposing without
+    /// publishing throws the staged graph away.
+    /// </summary>
+    /// <exception cref="GraphLockedException">Another writer kept the lock.</exception>
+    public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null)
+    {
+        string root = Path.GetFullPath(projectRoot);
+        WriteLock writeLock = Lock(root, lockTimeout);
+        try
+        {
+            string staging = Path.Combine(root, StagingRelativePath);
+            Delete(staging);
+            return OpenFile(staging, root, writeLock, publishTo: Path.Combine(root, RelativePath));
+        }
+        catch
+        {
+            writeLock.Dispose();
+            throw;
+        }
+    }
+
+    private static WriteLock Lock(string root, TimeSpan? lockTimeout)
+    {
+        TimeSpan timeout = lockTimeout ?? DefaultLockTimeout;
+        return WriteLock.TryAcquire(root, timeout) ?? throw new GraphLockedException(timeout);
+    }
+
+    private static GraphStore OpenReadOnly(string path, string root)
+    {
+        if (!File.Exists(path))
+        {
+            throw new GraphRebuildRequiredException("no graph at " + path);
+        }
+
+        SqliteConnection db = Connect(path, SqliteOpenMode.ReadOnly);
+        try
+        {
+            string? version = ReadSchemaVersion(db);
+            if (version != SchemaVersion.ToString(CultureInfo.InvariantCulture))
+            {
+                db.Dispose();
+                // Only when no writer is busy with it; otherwise the writer deals with it.
+                using (WriteLock? writeLock = WriteLock.TryAcquire(root, TimeSpan.Zero))
+                {
+                    if (writeLock is not null)
+                    {
+                        Delete(path);
+                    }
+                }
+
+                throw new GraphRebuildRequiredException($"schema version {version ?? "missing"}, expected {SchemaVersion}");
+            }
+        }
+        catch (SqliteException e)
+        {
+            db.Dispose();
+            throw new GraphRebuildRequiredException("unreadable graph: " + e.Message);
+        }
+
+        return new GraphStore(db, root, StoreMode.ReadOnly, created: false, writeLock: null, publishTo: null);
+    }
+
+    // Read-write open of `path` under a lock the caller already holds.
+    private static GraphStore OpenFile(string path, string projectRoot, WriteLock writeLock, string? publishTo)
+    {
+        StoreMode mode = StoreMode.ReadWrite;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         if (File.Exists(path))
         {
@@ -114,7 +189,7 @@ public sealed class GraphStore : IDisposable
             {
                 if (ReadSchemaVersion(existing) == SchemaVersion.ToString(CultureInfo.InvariantCulture))
                 {
-                    return new GraphStore(existing, mode, created: false);
+                    return new GraphStore(existing, projectRoot, mode, created: false, writeLock, publishTo);
                 }
             }
             catch (SqliteException)
@@ -148,13 +223,157 @@ public sealed class GraphStore : IDisposable
             tx.Commit();
         }
 
-        return new GraphStore(db2, mode, created: true);
+        return new GraphStore(db2, projectRoot, mode, created: true, writeLock, publishTo);
     }
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _bulk?.Dispose();
         _db.Dispose();
+        if (_publishTo is not null)
+        {
+            // Never published: the staged graph goes.
+            Delete(Path.Combine(_projectRoot, StagingRelativePath));
+        }
+
+        _lock?.Dispose();
+    }
+
+    /// <summary>
+    /// Makes a staged graph (<see cref="OpenStaging"/>) the graph, then closes this store. The copy
+    /// is one SQLite write transaction on `graph.db`, so a reader sees the old or the new graph.
+    /// </summary>
+    public void Publish()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_publishTo is null)
+        {
+            throw new InvalidOperationException("only a store from OpenStaging can be published");
+        }
+
+        EnsureWritable();
+        try
+        {
+            CopyTo(_publishTo);
+        }
+        catch (SqliteException)
+        {
+            // The current graph is corrupt (a mismatched version is simply overwritten).
+            Delete(_publishTo);
+            CopyTo(_publishTo);
+        }
+
+        Dispose();
+    }
+
+    private void CopyTo(string path)
+    {
+        using SqliteConnection target = Connect(path, SqliteOpenMode.ReadWriteCreate);
+        _db.BackupDatabase(target);
+    }
+
+    /// <summary>
+    /// Compares <paramref name="current"/> (every file the indexers track, as on disk now) with what
+    /// was indexed. Size and mtime first; a file whose size is equal but mtime differs is hashed.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears twice.</exception>
+    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current)
+    {
+        var indexed = new Dictionary<string, (long Size, long MtimeNs, byte[] Hash)>(StringComparer.Ordinal);
+        using (SqliteCommand command = ReadCommand("SELECT path, size, mtime_ns, hash FROM files"))
+        using (SqliteDataReader reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                indexed[reader.GetString(0)] = (reader.GetInt64(1), reader.GetInt64(2), (byte[])reader.GetValue(3));
+            }
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var changed = new List<string>();
+        var added = new List<string>();
+        var touched = new List<FileStat>();
+        foreach (FileStat stat in current)
+        {
+            if (!seen.Add(stat.Path))
+            {
+                throw new ArgumentException("duplicate path: " + stat.Path, nameof(current));
+            }
+
+            if (!indexed.TryGetValue(stat.Path, out var old))
+            {
+                added.Add(stat.Path);
+            }
+            else if (old.Size != stat.Size)
+            {
+                changed.Add(stat.Path);
+            }
+            else if (old.MtimeNs != stat.MtimeNs)
+            {
+                if (SameContent(stat.Path, old.Hash))
+                {
+                    touched.Add(stat);
+                }
+                else
+                {
+                    changed.Add(stat.Path);
+                }
+            }
+        }
+
+        List<string> removed = indexed.Keys.Where(p => !seen.Contains(p)).ToList();
+        changed.Sort(StringComparer.Ordinal);
+        added.Sort(StringComparer.Ordinal);
+        removed.Sort(StringComparer.Ordinal);
+        touched.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+        return new FreshnessReport(changed, added, removed, touched);
+    }
+
+    private bool SameContent(string path, byte[] hash)
+    {
+        try
+        {
+            return FileHash.Bytes(Path.Combine(_projectRoot, path)).AsSpan().SequenceEqual(hash);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Gone or unreadable since it was listed: let the indexer find out.
+            return false;
+        }
+    }
+
+    /// <summary>Records new sizes and mtimes for files whose content did not change.</summary>
+    public void UpdateStats(IReadOnlyList<FileStat> stats)
+    {
+        EnsureWritable();
+        using SqliteTransaction tx = _db.BeginTransaction();
+        using SqliteCommand update = Command(_db, tx, "UPDATE files SET size = $size, mtime_ns = $mtime WHERE path = $path");
+        SqliteParameter size = update.Parameters.Add("$size", SqliteType.Integer);
+        SqliteParameter mtime = update.Parameters.Add("$mtime", SqliteType.Integer);
+        SqliteParameter path = update.Parameters.Add("$path", SqliteType.Text);
+        foreach (FileStat stat in stats)
+        {
+            (size.Value, mtime.Value, path.Value) = (stat.Size, stat.MtimeNs, stat.Path);
+            update.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// Takes the files hooks marked dirty (<see cref="DirtyFiles.Mark"/>) while another writer held
+    /// the graph, and clears the list. The caller reindexes them.
+    /// </summary>
+    public IReadOnlyList<string> TakeDirty()
+    {
+        EnsureWritable();
+        return DirtyFiles.Take(_projectRoot);
     }
 
     /// <summary>

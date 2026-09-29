@@ -171,9 +171,13 @@ Notes:
 ```csharp
 public sealed class GraphStore : IDisposable
 {
-    public static GraphStore Open(string projectRoot, StoreMode mode);   // ReadOnly | ReadWrite
+    public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null);
+    public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null); // full index
+    public void Publish();                                                // staged graph becomes the graph
     public bool Created { get; }                                          // this open made a new database
-    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current); // T7
+    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current);
+    public void UpdateStats(IReadOnlyList<FileStat> stats);               // record touched-only files
+    public IReadOnlyList<string> TakeDirty();                             // and clear dirty.txt
     public void ReplaceFile(FileRecord file, IReadOnlyList<Node> nodes, IReadOnlyList<Edge> edges);
     public void RemoveFile(string path);
     public BulkWriter BeginBulk();                                        // cold index
@@ -185,6 +189,11 @@ public sealed class GraphStore : IDisposable
 
 public sealed record Page<T>(IReadOnlyList<T> Items, bool More);
 public sealed record EdgeHit(Edge Edge, bool Resolved);                 // Resolved: the far end has a node
+public sealed record FileStat(string Path, long Size, long MtimeNs);     // FileStat.Of(root, path)
+public sealed record FreshnessReport(IReadOnlyList<string> Changed, IReadOnlyList<string> Added,
+    IReadOnlyList<string> Removed, IReadOnlyList<FileStat> Touched);
+public static class DirtyFiles { public static bool Mark(string projectRoot, string path); }
+public static class FileHash { public static string Of(string fullPath); }  // SHA-256, lowercase hex
 ```
 
 - Kinds are enums (`NodeKind`, `EdgeKind`) stored by their snake_case names; `NodeKeys` builds
@@ -200,8 +209,11 @@ public sealed record EdgeHit(Edge Edge, bool Resolved);                 // Resol
 
 - `ReplaceFile` runs in one transaction: delete the file's nodes and edges, insert the new ones,
   update `files` and `names`. A reader sees the old or the new state, never a mix.
-- `CheckFreshness` compares size and mtime first and hashes only files whose size or mtime
-  changed. It returns `changed`, `added` and `removed` lists; the caller decides what to reindex.
+- `CheckFreshness` compares size and mtime first and hashes only files whose size is equal but
+  mtime changed (a size change is a change). It returns `changed`, `added` and `removed` lists;
+  the caller decides what to reindex. Files with a new mtime but the same content come back as
+  `touched`; a writer records them with `UpdateStats` so they aren't hashed again. A file that
+  can't be read while hashing counts as changed.
 - Every list is ordered deterministically (kind, then key, then line) and capped by `limit`; the
   result says whether more exist.
 - Values are immutable records. No static mutable state.
@@ -209,12 +221,21 @@ public sealed record EdgeHit(Edge Edge, bool Resolved);                 // Resol
 ## Concurrency
 
 - Readers never block: WAL lets `ug` queries read while a hook writes.
-- One writer at a time: writers take `Library/unitygraph/write.lock` (an OS file lock, released
-  if the process dies), then the SQLite write transaction. A hook that can't get the lock within
-  1 s gives up and marks the file dirty in `Library/unitygraph/dirty.txt`; the next query picks
-  it up (design rule 5).
-- A full index writes into `graph.db.new` and swaps it in atomically at the end, so queries keep
-  working on the old graph while a cold index runs.
+- One writer at a time: a read-write store holds `Library/unitygraph/write.lock` (a share-none
+  handle on Windows, flock on macOS/Linux, so it goes with the process) from open to dispose,
+  and each write is one SQLite transaction. `Open` waits up to `lockTimeout` (1 s) and then
+  throws `GraphLockedException`; a hook catches it and calls `DirtyFiles.Mark`, which appends
+  to `Library/unitygraph/dirty.txt`; the next writer calls `TakeDirty` and reindexes them
+  (design rule 5).
+- A full index writes into `graph.db.new` (`OpenStaging`, holding the write lock throughout),
+  so queries keep working on the old graph while a cold index runs. `Publish` copies it into
+  `graph.db` with SQLite's backup API: one write transaction, so a reader sees the old or the
+  new graph. A file rename was rejected: a leftover `graph.db-wal` of the old file would be
+  replayed into the new one, and on Windows SQLite holds `graph.db` open without share-delete,
+  so the rename fails while any query runs. Disposing an unpublished staging store deletes
+  `graph.db.new`.
+- A read-only open that finds another schema version deletes the file only if it can take the
+  write lock at once; otherwise a writer is busy and it only reports "rebuild required".
 
 ## Performance targets
 

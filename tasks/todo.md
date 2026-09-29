@@ -37,7 +37,9 @@ Details and acceptance criteria: `plan.md`.
 - [x] T6 graph-core: store (Microsoft.Data.Sqlite 10.0.12 + bundled e_sqlite3 with FTS5;
   `dist/ug` keeps win/osx/linux x64+arm64 natives, 10.9 MB total; 18 store tests)
   - [ ] ≥ 80% line coverage on Core: not measured yet (MTP CodeCoverage approved, deferred)
-- [ ] T7 graph-core: freshness + concurrency
+- [x] T7 graph-core: freshness + concurrency (23 tests, 10 repeated runs clean on Windows;
+  macOS not run yet: no Mac and no CI remote. Full index publishes via SQLite backup, not a
+  rename; see SPEC-graph-core Concurrency)
 - [ ] T8 graph-core: performance targets
 
 ## Checkpoint
