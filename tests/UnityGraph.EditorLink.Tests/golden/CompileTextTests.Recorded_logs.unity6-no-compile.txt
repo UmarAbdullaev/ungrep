@@ -1,0 +1,2 @@
+project: D:/Work/BridgeHost (this one: yes)
+no finished compile

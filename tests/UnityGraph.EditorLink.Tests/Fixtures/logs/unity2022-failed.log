@@ -1,0 +1,24 @@
+Built from '2022.3/staging' branch; Version is '2022.3.62f1 (4af31df58517) revision 4911901'; Using compiler version '192829333'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26200) 64bit Core' Language: 'en' Physical Memory: 32370 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1, IsPro: 0
+
+COMMAND LINE ARGUMENTS:
+D:\Program Files\Unity Editors\2022.3.62f1\Editor\Unity.exe
+-batchmode
+-nographics
+-quit
+-projectPath
+D:/Work/BridgeHost
+-logFile
+D:/Work/editor.log
+Successfully changed project path to: D:/Work/BridgeHost
+D:/Work/BridgeHost
+[ScriptCompilation] Requested script compilation because: Assembly Definition File(s) changed
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+DisplayProgressbar: Compiling Scripts
+Assets\Editor\Broken.cs(1,78): error CS0103: The name 'spd' does not exist in the current context
+*** Tundra build failed (7.76 seconds), 638 items updated, 641 evaluated
+## Script Compilation Error for: Csc Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp-Editor.dll (+2 others)
+Assets\Editor\Broken.cs(1,78): error CS0103: The name 'spd' does not exist in the current context
+Assets\Editor\Broken.cs(1,78): error CS0103: The name 'spd' does not exist in the current context
+AssetDatabase: script compilation time: 9.171386s

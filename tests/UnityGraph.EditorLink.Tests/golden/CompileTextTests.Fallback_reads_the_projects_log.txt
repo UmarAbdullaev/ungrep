@@ -1,0 +1,2 @@
+Unity not reachable (no bridge.json); from Editor.log of 2026-09-29 19:49:38: 1 error
+  Assets/Editor/Broken.cs:1:78  CS0103  The name 'spd' does not exist in the current context

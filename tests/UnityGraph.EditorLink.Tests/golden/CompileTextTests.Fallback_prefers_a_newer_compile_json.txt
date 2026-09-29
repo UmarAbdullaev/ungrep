@@ -1,0 +1,1 @@
+Unity not reachable (stale bridge.json: Unity (pid 48716) is not running); from compile.json of 2026-09-29 19:49:48: 0 errors

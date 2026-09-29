@@ -1,0 +1,3 @@
+project: D:/Work/BridgeHost (this one: yes)
+failed: 1 error
+  Assets/Editor/Broken.cs:1:78  CS0103  The name 'spd' does not exist in the current context

@@ -102,7 +102,10 @@ A failed compile does not reload the domain, so the bridge stays up and answers 
 a client or the reason there is none: `no bridge.json` (Unity closed or the bridge not
 installed), `stale bridge.json` (the process is gone), `refused` (reloading or starting),
 `bridge 0.1.0 is older than ug 0.2.0` (asks for `ug bridge install` again). `HttpClient` to
-`127.0.0.1` only, 2 s per request unless a wait needs longer; no proxy.
+`127.0.0.1` only, 2 s per request unless a wait needs longer; no proxy. The connect timeout is
+500 ms and counts as refused: the bridge's listener thread accepts at once even while the editor
+is busy, but Windows retries a refused loopback connect for about 2 s, which would slow every
+poll during a domain reload.
 
 ### `Editor.log` fallback
 
@@ -111,8 +114,14 @@ When no bridge answers, `ug compile` reads `Editor.log` (Windows
 
 - It belongs to this project when its command line (`-projectpath`) names the project root;
   otherwise the answer says the log is another project's and gives no errors.
-- Compile errors are the `<path>(<line>,<col>): error CSxxxx: <text>` lines after the last
-  compile-start marker (markers recorded from 2022.3 and Unity 6 logs in E3 and listed here).
+- Compile messages are the `<path>(<line>,<col>): error|warning CSxxxx: <text>` lines of the
+  last finished compile. Markers, recorded from BridgeHost batch runs on 2022.3.62f1 and
+  6000.3.14f1 and the same in both: a compile ends with `*** Tundra build success` or
+  `*** Tundra build failed` (`*** Tundra build requires additional run` is not an end); its
+  messages come before that line, and after a failure Unity repeats them under
+  `## Script Compilation Error for: Csc <assembly>.dll`. Repeats are shown once.
+- The project comes from `-projectPath <dir>` in the command line (Hub writes `-projectpath`
+  and backslashes), else from `Successfully changed project path to: <dir>`.
 - The answer starts `Unity not reachable (<reason>); from Editor.log of <time>:` so a stale log
   is never taken for a fresh compile.
 

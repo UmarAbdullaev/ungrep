@@ -1,0 +1,5 @@
+compiled in 4.1 s: 4 errors, 1 warning
+  (no file)  -  Assembly has reference to non-existent assembly 'Missing'
+  Assets/Scripts/Lab/LabStage.cs:30:2  CS1002  ; expected
+  Assets/Scripts/Lab/LabStage.cs:30:13  CS1061  'Turntable' does not contain a definition for 'Spin'
+  Assets/Scripts/Lab/Turntable.cs:17:9  CS0103  The name 'spd' does not exist in the current context

@@ -1,0 +1,39 @@
+Built from '6000.3/staging' branch; Version is '6000.3.14f1 (d68c3f99a318) revision 14060607'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26200) Core' Language: 'en' Physical Memory: 32370 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+System  architecture: x64
+Process architecture: x64
+Date: 2026-09-29T17:49:14Z
+
+COMMAND LINE ARGUMENTS:
+D:\Program Files\Unity Editors\6000.3.14f1\Editor\Unity.exe
+-batchmode
+-nographics
+-ugBridge
+-projectPath
+D:/Work/BridgeHost
+-logFile
+D:/Work/editor.log
+Successfully changed project path to: D:/Work/BridgeHost
+D:/Work/BridgeHost
+DisplayProgressbar: Compiling Scripts
+*** Tundra build success (0.03 seconds), 0 items updated, 195 evaluated
+AssetDatabase: script compilation time: 0.367977s
+Asset Pipeline Refresh (id=aaa51df4c0408b74cb4485c5021968a7): Total: 1.346 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+Asset Pipeline Refresh (id=85c9226ddaad97d408707f535be25548): Total: 0.008 seconds - Initiated by RefreshV2(ForceSynchronousImport)
+Asset Pipeline Refresh (id=82dddb8e41568314db276121efe73594): Total: 0.002 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+AssetDatabase: script compilation time: 0.000273s
+Asset Pipeline Refresh (id=397b2b81bb8f012428793072eb8c44e7): Total: 0.043 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+Assets\Editor\Broken.cs(1,78): error CS0103: The name 'spd' does not exist in the current context
+*** Tundra build failed (0.66 seconds), 2 items updated, 195 evaluated
+## Script Compilation Error for: Csc Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp-Editor.dll (+2 others)
+Assets\Editor\Broken.cs(1,78): error CS0103: The name 'spd' does not exist in the current context
+Assets\Editor\Broken.cs(1,78): error CS0103: The name 'spd' does not exist in the current context
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+AssetDatabase: script compilation time: 0.000058s
+Asset Pipeline Refresh (id=04afb341ea6d80043a78f9f2374d2263): Total: 0.009 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+*** Tundra build success (0.40 seconds), 3 items updated, 195 evaluated
+Reloading assemblies after finishing script compilation.
+Reloading assemblies after forced synchronous recompile.
+Asset Pipeline Refresh (id=8f69016344442fa4a991984299440f65): Total: 0.864 seconds - Initiated by StopAssetImportingV2(ForceSynchronousImport | ForceDomainReload)
