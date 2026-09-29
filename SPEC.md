@@ -162,6 +162,31 @@ under 10%.
    and the graph answer is returned as the reason. Spike S3 measures, on replayed purge-squad
    calls, how often Claude retries the original call anyway; above ~10%, interception is off by
    default and the skill alone points Claude at `ug`.
+
+   **Spike S3 result (2026-09-29): 90% retries, so interception is off by default.** Ten
+   navigation questions taken from purge-squad transcripts, each run twice as an Opus 5.5
+   subagent: once with no hook, once with a stub PreToolUse hook. When the question's symbol
+   appeared in a Grep pattern or a Bash `grep`/`rg` command, the hook denied the call and returned
+   a hand-written, complete graph answer (~1 KB) as the reason.
+
+   | | Hook off | Hook on | Change |
+   | --- | --- | --- | --- |
+   | Model turns | 45 | 51 | +13% |
+   | Tool calls (incl. hand-back) | 40 | 65 | +62% |
+   | Context tokens | 2,557,447 | 3,247,774 | +27% |
+   | Runs that retried the search after the deny | – | 9 / 10 | |
+   | Correct answers | 10 / 10 | 10 / 10 | |
+
+   - The retry pattern: Grep denied → next turn the same symbol with `grep` in Bash → denied
+     again → the answer is used. One run also searched with PowerShell `Get-ChildItem`, which the
+     hook did not match, so a real interceptor would have to cover the PowerShell tool too.
+   - After the answer, every run opened the listed files to verify it (2–7 Reads). Hook-off runs
+     read a similar amount. The answer replaces no reads; it only adds the deny turns.
+   - The reason is shown to the model in full (~1 KB tested); the size limit was not tested.
+   - Limits: subagents, not main-thread sessions; the model was not told about unitygraph (no
+     skill, no SessionStart note); n = 10 per arm. A skill telling Claude that denied greps carry
+     graph answers might lower retries. That is not measured and would need a rerun before
+     interception is turned back on.
 5. **Graph viewer for people.** `ug view <symbol|asset> [--depth N]` writes a self-contained,
    offline HTML page (Cytoscape.js bundled) to `Library/unitygraph/view.html` and opens it. Claude
    sees one line (the path): 0 tokens of graph. Built after the step-3 checkpoint.
@@ -397,4 +422,5 @@ None blocking. Decided 2026-09-29 (see Decisions). Left for the spikes to settle
   runtime is 6.0.21), see Decisions #2. Launcher strategy to decide.
 - ~~S2: the exact plugin marketplace and install commands for a local dev install.~~ Answered
   2026-09-29, see Commands.
-- S3: does PreToolUse deny + graph answer stop Claude from re-running the grep?
+- ~~S3: does PreToolUse deny + graph answer stop Claude from re-running the grep?~~ No (9 of 10
+  runs retried, +27% context tokens), see Decisions #4. Interception is off by default.

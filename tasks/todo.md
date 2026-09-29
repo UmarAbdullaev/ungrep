@@ -8,7 +8,8 @@ Details and acceptance criteria: `plan.md`.
 - [ ] S1 follow-up: launcher strategy decided (installed runtime vs self-contained)
 - [x] S2 local plugin install commands confirmed (SPEC.md Commands; skill load by the model not
   checked: CLI login expired, hook firing confirmed)
-- [ ] S3 hook interception: retry rate and token delta measured
+- [x] S3 hook interception: retry rate and token delta measured (9/10 retried, +27% context
+  tokens, +62% calls; no-go, off by default; subagents, model not told about unitygraph)
 
 ## Build
 - [ ] T1 solution skeleton + CI
@@ -21,5 +22,5 @@ Details and acceptance criteria: `plan.md`.
 - [ ] T8 graph-core: performance targets
 
 ## Checkpoint
-- [ ] Spike results recorded in SPEC.md
+- [x] Spike results recorded in SPEC.md
 - [ ] Step-2 module specs written (code-index, asset-index, editor-link)
