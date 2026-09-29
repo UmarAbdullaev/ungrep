@@ -29,7 +29,11 @@ Details and acceptance criteria: `plan.md`.
     The plugin adds only the skill listing line, 154 chars (~40 tokens, as `plugin details`
     says). With many skills installed the listing is capped: ours pushed two other skills'
     descriptions out, net +40 chars (~10 tokens). Re-measure with real usage once logged in.
-- [ ] T5 plugin-shell: hook dispatcher, fail-open
+- [x] T5 plugin-shell: hook dispatcher, fail-open (hooks.json wires PreToolUse/PostToolUse/Stop
+  with narrow matchers, not every event; no production handlers yet. Payload fixtures follow
+  the documented shape, not captured from a live session: re-record once `claude -p` can log
+  in. Cold `ug hook` ~115 ms on Windows, under the 150 ms target, after taking the subshells
+  out of `bin/ug`)
 - [ ] T6 graph-core: store
 - [ ] T7 graph-core: freshness + concurrency
 - [ ] T8 graph-core: performance targets

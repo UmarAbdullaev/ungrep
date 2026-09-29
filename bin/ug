@@ -2,8 +2,13 @@
 # Starts ug on an installed .NET 8+ runtime (SPEC Decisions #2). Hooks run this through Git Bash
 # on Windows, so it serves Windows and macOS. When ug can't start it prints one line to stderr
 # and exits 0: the Claude Code session carries on (design rule 9).
+# Hooks call it on every matched tool call, so the common path starts no subshells: each fork
+# costs ~15-20 ms under Git Bash.
 
-root=$(cd "$(dirname "$0")/.." && pwd)
+case $0 in
+    */*) root=${0%/*}/.. ;;
+    *) root=$(cd "$(dirname "$(command -v "$0")")/.." && pwd) ;;
+esac
 dll="$root/dist/ug/ug.dll"
 
 if [ ! -f "$dll" ]; then
@@ -38,15 +43,19 @@ path_root() {
     dirname "$p"
 }
 
-# DOTNET_ROOT may point at Unity's bundled 6.0 runtime; has_runtime skips it then.
+# DOTNET_ROOT may point at Unity's bundled 6.0 runtime; has_runtime skips it then. The default
+# install folders come before PATH because finding the PATH one needs subshells.
 dotnet_root=
-for candidate in "$DOTNET_ROOT" "$(path_root)" "/c/Program Files/dotnet" "$HOME/.dotnet" \
-    "/usr/local/share/dotnet" "/opt/homebrew/opt/dotnet/libexec" "/usr/share/dotnet" "/usr/lib/dotnet"; do
+for candidate in "$DOTNET_ROOT" "/c/Program Files/dotnet" "$HOME/.dotnet" "/usr/local/share/dotnet" \
+    "/opt/homebrew/opt/dotnet/libexec" "/usr/share/dotnet" "/usr/lib/dotnet"; do
     if has_runtime "$candidate"; then
         dotnet_root=$candidate
         break
     fi
 done
+if [ -z "$dotnet_root" ] && has_runtime "$(path_root)"; then
+    dotnet_root=$(path_root)
+fi
 
 if [ -z "$dotnet_root" ]; then
     echo "unitygraph: needs the .NET 8 runtime or newer: https://dotnet.microsoft.com/download/dotnet/8.0" >&2

@@ -1,0 +1,1 @@
+{"session_id":"3f2a9c1e-5b7d-4e8a-9c0f-1a2b3c4d5e6f","transcript_path":"<home>/.claude/projects/game/3f2a9c1e-5b7d-4e8a-9c0f-1a2b3c4d5e6f.jsonl","cwd":"<root>","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Grep","tool_input":{"pattern":"class PlayerHealth","path":"<root>/Assets/Scripts","output_mode":"files_with_matches"},"tool_use_id":"toolu_01Grep"}

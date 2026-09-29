@@ -1,0 +1,6 @@
+PreToolUse.Grep: PreToolUse tool=Grep pattern class PlayerHealth project=cwd
+PreToolUse.Read: PreToolUse tool=Read file <root>/Assets/Scenes/Main.unity project=cwd
+PreToolUse.Edit: PreToolUse tool=Edit file <root>/Assets/Scripts/PlayerHealth.cs project=cwd
+PreToolUse.Bash: PreToolUse tool=Bash command mv Assets/Art/Enemy.png Assets/Art/Enemies/Enemy.png project=cwd
+PostToolUse.Edit: PostToolUse tool=Edit file <root>/Assets/Scripts/PlayerHealth.cs project=cwd
+Stop: Stop tool=- - project=cwd

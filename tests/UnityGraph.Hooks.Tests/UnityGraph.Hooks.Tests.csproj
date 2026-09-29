@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UnityGraph.Hooks\UnityGraph.Hooks.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Payloads\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
