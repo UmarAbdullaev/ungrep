@@ -1,0 +1,7 @@
+# LF everywhere so `dotnet format --verify-no-changes` agrees with .editorconfig on Windows
+# checkouts (core.autocrlf would otherwise turn files into CRLF).
+* text=auto eol=lf
+
+# cmd.exe needs CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
