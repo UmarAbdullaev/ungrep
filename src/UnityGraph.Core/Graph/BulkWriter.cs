@@ -3,8 +3,9 @@ using Microsoft.Data.Sqlite;
 namespace UnityGraph.Core.Graph;
 
 /// <summary>
-/// A cold index in one transaction (<see cref="GraphStore.BeginBulk"/>). The name index is
-/// rebuilt once at <see cref="Commit"/>; disposing without committing rolls everything back.
+/// A cold index in one transaction (<see cref="GraphStore.BeginBulk"/>). The name index and the
+/// secondary indexes are rebuilt once at <see cref="Commit"/>; disposing without committing
+/// rolls everything back.
 /// </summary>
 public sealed class BulkWriter : IDisposable
 {
@@ -34,7 +35,7 @@ public sealed class BulkWriter : IDisposable
     public void Commit()
     {
         ObjectDisposedException.ThrowIf(_done, this);
-        GraphStore.Execute(_db, _tx, "DELETE FROM names; INSERT INTO names(name, key, kind) SELECT name, key, kind FROM nodes;");
+        GraphStore.Execute(_db, _tx, GraphStore.Indexes + "DELETE FROM names; INSERT INTO names(name, key, kind) SELECT name, key, kind FROM nodes;");
         _tx.Commit();
         End();
     }

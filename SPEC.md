@@ -264,6 +264,9 @@ building further.
 ```
 Build         dotnet build unitygraph.sln -c Release
 Test          dotnet test --solution unitygraph.sln
+Coverage      dotnet test --project tests/UnityGraph.Core.Tests --coverage --coverage-output-format cobertura --coverage-output core.cobertura.xml
+              (report lands in TestResults/)
+Performance   dotnet test --project tests/UnityGraph.Core.Tests -c Release --filter-class UnityGraph.Core.Tests.GraphPerformanceTests --output Detailed
 Format        dotnet format unitygraph.sln --verify-no-changes
 Publish CLI   dotnet publish src/UnityGraph.Cli -c Release -o dist/ug
 Doctor        ug doctor --project D:\Projects\Unity\purge-squad

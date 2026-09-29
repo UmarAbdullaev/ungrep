@@ -47,15 +47,25 @@ public sealed class GraphStore : IDisposable
           line       INTEGER NOT NULL DEFAULT 0,
           props      TEXT
         );
+        CREATE VIRTUAL TABLE names USING fts5(
+          name, key UNINDEXED, kind UNINDEXED,
+          tokenize = 'unicode61 separators ''._'''
+        );
+        """ + Indexes;
+
+    // Secondary indexes. A bulk write drops them and builds them again at commit: faster, and
+    // indexes built from sorted input pack their pages (~15% smaller graph).
+    internal const string Indexes = """
+
         CREATE INDEX edges_src  ON edges(src, kind);
         CREATE INDEX edges_dst  ON edges(dst, kind);
         CREATE INDEX edges_file ON edges(file_id);
         CREATE INDEX nodes_file ON nodes(file_id);
         CREATE INDEX nodes_kind ON nodes(kind, name);
-        CREATE VIRTUAL TABLE names USING fts5(
-          name, key UNINDEXED, kind UNINDEXED,
-          tokenize = 'unicode61 separators ''._'''
-        );
+        """;
+
+    internal const string DropIndexes = """
+        DROP INDEX edges_src; DROP INDEX edges_dst; DROP INDEX edges_file; DROP INDEX nodes_file; DROP INDEX nodes_kind;
         """;
 
     /// <summary>Where a full index is built before <see cref="Publish"/> copies it over the graph.</summary>
@@ -409,6 +419,7 @@ public sealed class GraphStore : IDisposable
     {
         EnsureWritable();
         _bulk = _db.BeginTransaction();
+        Execute(_db, _bulk, DropIndexes);
         return new BulkWriter(this, _db, _bulk);
     }
 
@@ -442,10 +453,12 @@ public sealed class GraphStore : IDisposable
         string match = string.Join(' ', words.Select(w => "\"" + w.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"*"));
         using SqliteCommand command = ReadCommand($"""
             SELECT n.key, n.kind, n.name, f.path, n.line_start, n.line_end, n.props
-            FROM names s JOIN nodes n ON n.key = s.key JOIN files f ON f.id = n.file_id
-            WHERE names MATCH $match{KindFilter("s.kind", kinds.IsAll, kinds.Names)}
+            FROM (SELECT key FROM names
+                  WHERE names MATCH $match{KindFilter("kind", kinds.IsAll, kinds.Names)}
+                  ORDER BY lower(name) = lower($exact) DESC, kind, key
+                  LIMIT $limit) s
+            JOIN nodes n ON n.key = s.key JOIN files f ON f.id = n.file_id
             ORDER BY lower(n.name) = lower($exact) DESC, n.kind, n.key
-            LIMIT $limit
             """);
         command.Parameters.AddWithValue("$match", match);
         command.Parameters.AddWithValue("$exact", query.Trim());

@@ -241,15 +241,23 @@ public static class FileHash { public static string Of(string fullPath); }  // S
 
 On a purge-squad-sized graph (estimate: ~40k nodes, ~200k edges):
 
-| Operation | Target |
-| --- | --- |
-| Open read-only + one `GetNode` | ≤ 30 ms |
-| `EdgesFrom` / `EdgesTo`, 100 results | ≤ 5 ms |
-| `FindByName`, prefix, 20 results | ≤ 10 ms |
-| `ReplaceFile`, one C# file (~300 nodes/edges) | ≤ 50 ms |
-| `CheckFreshness`, ~3,000 files, nothing changed | ≤ 100 ms |
-| Bulk insert of the whole graph | ≤ 5 s |
-| Database size | ≤ 50 MB |
+| Operation | Target | Measured (T8) |
+| --- | --- | --- |
+| Open read-only + one `GetNode` | ≤ 30 ms | 1–2 ms |
+| `EdgesFrom` / `EdgesTo`, 100 results | ≤ 5 ms | 0.1 / 0.4–0.7 ms |
+| `FindByName`, prefix, 20 results | ≤ 10 ms | 0.2–0.3 ms |
+| `ReplaceFile`, one C# file (~300 nodes/edges) | ≤ 50 ms | 16–18 ms |
+| `CheckFreshness`, ~3,000 files, nothing changed | ≤ 100 ms | 3–5 ms |
+| Bulk insert of the whole graph | ≤ 5 s | 1.3–1.7 s (+0.4 s publish) |
+| Database size | ≤ 50 MB | 49.3 MB |
+
+Measured 2026-09-29 on the dev machine (Windows 11, Release, median of 21 runs) with the
+generated graph in `tests/UnityGraph.Core.Tests/SyntheticGraph.cs`: 3,000 files, 39,800 nodes,
+203,400 edges, with hub types and methods. Also checked, not a target: a 4-letter prefix that
+matches 15,600 nodes takes ~9 ms (bound 25 ms). Size is the tightest: the bulk writer drops
+the secondary indexes and builds them at commit (packed pages, 52.0 → 49.3 MB, and bulk
+insert 3.0 → 1.5 s). If real purge-squad counts exceed the estimate, size is the target to
+revisit first (keys are stored as text in `edges` and in both edge indexes).
 
 ## Testing
 
