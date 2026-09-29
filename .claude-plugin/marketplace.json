@@ -1,5 +1,6 @@
 {
   "name": "unitygraph-dev",
+  "description": "Local development marketplace for the unitygraph plugin.",
   "owner": {
     "name": "Umar"
   },
