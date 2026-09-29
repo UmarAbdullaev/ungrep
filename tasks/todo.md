@@ -4,7 +4,8 @@ Details and acceptance criteria: `plan.md`.
 
 ## Spikes
 - [ ] S1 .NET runtime inside Unity 2022.3 / Unity 6 (Windows, macOS)
-- [ ] S2 local plugin install commands confirmed
+- [x] S2 local plugin install commands confirmed (SPEC.md Commands; skill load by the model not
+  checked: CLI login expired, hook firing confirmed)
 - [ ] S3 hook interception: retry rate and token delta measured
 
 ## Build

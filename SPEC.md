@@ -211,14 +211,40 @@ Test          dotnet test unitygraph.sln
 Format        dotnet format unitygraph.sln --verify-no-changes
 Publish CLI   dotnet publish src/UnityGraph.Cli -c Release -r win-x64 -o dist/win-x64
 Bridge tests  <Unity> -batchmode -projectPath fixtures/BridgeHost -runTests -testPlatform EditMode -testResults artifacts/bridge.xml
-Dogfood       /plugin marketplace add D:\Projects\unitygraph
-              /plugin install unitygraph@unitygraph-dev
+Dogfood       claude plugin marketplace add D:\Projects\unitygraph
+              claude plugin install unitygraph@unitygraph-dev --scope local
+One session   claude --plugin-dir D:\Projects\unitygraph
+Validate      claude plugin validate .claude-plugin/marketplace.json
 Stats         ug stats --project D:\Projects\Unity\purge-squad --since 2026-09-01
 Bench         ug bench run bench/suites/purge-squad.yaml --arm unitygraph
 ```
 
-`<Unity>` is the installed editor's executable. The plugin install commands are confirmed in
-the first spike.
+`<Unity>` is the installed editor's executable.
+
+Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 11):
+
+- The in-session forms are the same: `/plugin marketplace add <path>`, `/plugin install
+  unitygraph@unitygraph-dev`. `--scope` is `user` (default), `project` or `local` (written to
+  `<cwd>/.claude/settings.local.json`); dogfood uses `local` so other projects are untouched.
+- Layout: `.claude-plugin/plugin.json` (`name`, `version`, `description`, `author`) and
+  `.claude-plugin/marketplace.json` (`name: unitygraph-dev`, `owner`, `plugins: [{ name, source:
+  "./" }]`); `skills/<name>/SKILL.md`, `hooks/hooks.json` are picked up by convention.
+  `claude plugin details unitygraph@unitygraph-dev` prints the components and the always-on
+  token cost (the hello skill: ~20 tokens; hooks: 0).
+- A directory marketplace is registered as `"source": "directory"` in `~/.claude/settings.json`.
+  `CLAUDE_PLUGIN_ROOT` points at the **source folder** (`D:/Projects/unitygraph`, forward
+  slashes), not the install cache, so edits to hooks and `bin/` apply to the next session
+  without reinstalling. `--plugin-dir` behaves the same.
+- Install still copies the whole marketplace folder into `~/.claude/plugins/cache/`. Before
+  release the plugin moves to a subfolder (or the marketplace `source` narrows) so `src/`,
+  `research/` and `bench/` aren't shipped.
+- Hooks: `"command": "\"${CLAUDE_PLUGIN_ROOT}/bin/ug\" hook <Event>"`. On Windows the command
+  runs in Git Bash (`/bin/bash.exe`, MINGW64), so one POSIX `bin/ug` script serves Windows and
+  macOS; `bin/ug.cmd` is only needed for users calling `ug` from cmd/PowerShell. The payload
+  arrives as JSON on stdin (`session_id`, `transcript_path`, `cwd`, `hook_event_name`, ...);
+  `CLAUDE_PROJECT_DIR` is set. `bin/` is not on `PATH` inside hooks.
+- Desktop app: uses the same `~/.claude` settings, so a marketplace added from the CLI is
+  visible there; the `/plugin` UI flow itself was not exercised.
 
 ## Project structure
 
@@ -344,5 +370,6 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
 None blocking. Decided 2026-09-29 (see Decisions). Left for the spikes to settle:
 
 - S1: can `ug` run on the .NET runtime bundled with Unity 2022.3 and Unity 6?
-- S2: the exact plugin marketplace and install commands for a local dev install.
+- ~~S2: the exact plugin marketplace and install commands for a local dev install.~~ Answered
+  2026-09-29, see Commands.
 - S3: does PreToolUse deny + graph answer stop Claude from re-running the grep?
