@@ -34,7 +34,9 @@ Details and acceptance criteria: `plan.md`.
   the documented shape, not captured from a live session: re-record once `claude -p` can log
   in. Cold `ug hook` ~115 ms on Windows, under the 150 ms target, after taking the subshells
   out of `bin/ug`)
-- [ ] T6 graph-core: store
+- [x] T6 graph-core: store (Microsoft.Data.Sqlite 10.0.12 + bundled e_sqlite3 with FTS5;
+  `dist/ug` keeps win/osx/linux x64+arm64 natives, 10.9 MB total; 18 store tests)
+  - [ ] ≥ 80% line coverage on Core: not measured yet (MTP CodeCoverage approved, deferred)
 - [ ] T7 graph-core: freshness + concurrency
 - [ ] T8 graph-core: performance targets
 

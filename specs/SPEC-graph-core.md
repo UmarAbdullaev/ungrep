@@ -172,16 +172,31 @@ Notes:
 public sealed class GraphStore : IDisposable
 {
     public static GraphStore Open(string projectRoot, StoreMode mode);   // ReadOnly | ReadWrite
-    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current);
+    public bool Created { get; }                                          // this open made a new database
+    public FreshnessReport CheckFreshness(IEnumerable<FileStat> current); // T7
     public void ReplaceFile(FileRecord file, IReadOnlyList<Node> nodes, IReadOnlyList<Edge> edges);
     public void RemoveFile(string path);
     public BulkWriter BeginBulk();                                        // cold index
     public Node? GetNode(string key);
-    public IReadOnlyList<Node> FindByName(string query, NodeKindSet kinds, int limit);
-    public IReadOnlyList<Edge> EdgesFrom(string key, EdgeKindSet kinds, int limit);
-    public IReadOnlyList<Edge> EdgesTo(string key, EdgeKindSet kinds, int limit);
+    public Page<Node> FindByName(string query, NodeKindSet kinds, int limit);
+    public Page<EdgeHit> EdgesFrom(string key, EdgeKindSet kinds, int limit);
+    public Page<EdgeHit> EdgesTo(string key, EdgeKindSet kinds, int limit);
 }
+
+public sealed record Page<T>(IReadOnlyList<T> Items, bool More);
+public sealed record EdgeHit(Edge Edge, bool Resolved);                 // Resolved: the far end has a node
 ```
+
+- Kinds are enums (`NodeKind`, `EdgeKind`) stored by their snake_case names; `NodeKeys` builds
+  keys. Rows are validated before any write (relative forward-slash paths, 64-hex hashes, known
+  kinds, valid keys, nodes owned by the file, props a JSON object ≤ 1 KB); a bad row throws
+  `ArgumentException` and nothing is written.
+- A read-only open with no graph, a corrupt one or another schema version throws
+  `GraphRebuildRequiredException` (a mismatched file is deleted first); a read-write open
+  rebuilds it empty and sets `Created`.
+- `FindByName` splits the query on whitespace, `.` and `_`, matches every word as a prefix, and
+  puts exact name matches (case-insensitive) first, then kind, then key.
+- During a bulk write, other reads and writes on the same store throw.
 
 - `ReplaceFile` runs in one transaction: delete the file's nodes and edges, insert the new ones,
   update `files` and `names`. A reader sees the old or the new state, never a mix.
