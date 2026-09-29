@@ -1,0 +1,3 @@
+ok    runtime  .NET 8.0.0 (test)
+FAIL  unity    no Unity project at or above <root>/Assets/Scripts (looked for Assets/ and ProjectSettings/ProjectVersion.txt)
+doctor: 1 failure, 0 warnings

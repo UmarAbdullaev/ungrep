@@ -265,7 +265,8 @@ building further.
 Build         dotnet build unitygraph.sln -c Release
 Test          dotnet test --solution unitygraph.sln
 Format        dotnet format unitygraph.sln --verify-no-changes
-Publish CLI   dotnet publish src/UnityGraph.Cli -c Release -r win-x64 -o dist/win-x64
+Publish CLI   dotnet publish src/UnityGraph.Cli -c Release -o dist/ug
+Doctor        ug doctor --project D:\Projects\Unity\purge-squad
 Bridge tests  <Unity> -batchmode -projectPath fixtures/BridgeHost -runTests -testPlatform EditMode -testResults artifacts/bridge.xml
 Dogfood       claude plugin marketplace add D:\Projects\unitygraph
               claude plugin install unitygraph@unitygraph-dev --scope local
@@ -276,6 +277,25 @@ Bench         ug bench run bench/suites/purge-squad.yaml --arm unitygraph
 ```
 
 `<Unity>` is the installed editor's executable.
+
+`dist/ug` is framework-dependent and portable (no `-r`), so one build serves Windows and macOS.
+`bin/ug` (POSIX sh, used by hooks) and `bin/ug.cmd` (cmd/PowerShell) run `dist/ug/ug.dll` on the
+first `dotnet` root holding `Microsoft.NETCore.App` 8.0 or newer, skipping Unity's bundled 6.0.
+
+Config lives in the Unity project at `.claude/unitygraph.json`. It is optional and holds only
+what differs from the defaults in code (`UnityGraphConfig`); unitygraph reads it, never writes
+it. Comments and trailing commas are allowed; an unknown setting or module is an error that
+`ug doctor` names.
+
+```jsonc
+{
+  "answerBudget": 1200,           // tokens per query answer, 200 to 8000
+  "modules": {                    // defaults: all on except project-map (Decisions #7)
+    "asset-index": true, "code-index": true, "editor-link": true, "guards": true,
+    "project-map": false, "query": true, "unity-loop": true, "viewer": true, "worker-agent": true
+  }
+}
+```
 
 Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 11):
 

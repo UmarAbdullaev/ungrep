@@ -1,0 +1,59 @@
+#!/bin/sh
+# Starts ug on an installed .NET 8+ runtime (SPEC Decisions #2). Hooks run this through Git Bash
+# on Windows, so it serves Windows and macOS. When ug can't start it prints one line to stderr
+# and exits 0: the Claude Code session carries on (design rule 9).
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+dll="$root/dist/ug/ug.dll"
+
+if [ ! -f "$dll" ]; then
+    echo "unitygraph: ug is not built; run: dotnet publish \"$root/src/UnityGraph.Cli\" -c Release -o \"$root/dist/ug\"" >&2
+    exit 0
+fi
+
+# True when $1 is a dotnet root holding a Microsoft.NETCore.App runtime of major version 8 or newer.
+has_runtime() {
+    [ -n "$1" ] || return 1
+    [ -x "$1/dotnet" ] || [ -x "$1/dotnet.exe" ] || return 1
+    for dir in "$1"/shared/Microsoft.NETCore.App/*/; do
+        version=${dir%/}
+        version=${version##*/}
+        major=${version%%.*}
+        case $major in '' | *[!0-9]*) continue ;; esac
+        [ "$major" -ge 8 ] && return 0
+    done
+    return 1
+}
+
+# The folder of the dotnet on PATH, following symlinks (/usr/local/bin/dotnet on macOS).
+path_root() {
+    p=$(command -v dotnet 2>/dev/null) || return 1
+    while [ -L "$p" ]; do
+        target=$(readlink "$p")
+        case $target in
+            /*) p=$target ;;
+            *) p=$(dirname "$p")/$target ;;
+        esac
+    done
+    dirname "$p"
+}
+
+# DOTNET_ROOT may point at Unity's bundled 6.0 runtime; has_runtime skips it then.
+dotnet_root=
+for candidate in "$DOTNET_ROOT" "$(path_root)" "/c/Program Files/dotnet" "$HOME/.dotnet" \
+    "/usr/local/share/dotnet" "/opt/homebrew/opt/dotnet/libexec" "/usr/share/dotnet" "/usr/lib/dotnet"; do
+    if has_runtime "$candidate"; then
+        dotnet_root=$candidate
+        break
+    fi
+done
+
+if [ -z "$dotnet_root" ]; then
+    echo "unitygraph: needs the .NET 8 runtime or newer: https://dotnet.microsoft.com/download/dotnet/8.0" >&2
+    exit 0
+fi
+
+if [ -x "$dotnet_root/dotnet" ]; then
+    exec "$dotnet_root/dotnet" "$dll" "$@"
+fi
+exec "$dotnet_root/dotnet.exe" "$dll" "$@"

@@ -1,0 +1,6 @@
+ok    runtime  .NET 8.0.0 (test)
+ok    unity    <root> (Unity 6000.3.14f1)
+ok    assets   Force Text serialization
+ok    config   defaults (.claude/unitygraph.json not present)
+warn  graph    not built yet (Library/unitygraph/graph.db)
+doctor: 0 failures, 1 warning

@@ -20,6 +20,10 @@ Details and acceptance criteria: `plan.md`.
 - [x] T3 stats: report, JSON, baseline compare (golden files instead of Verify: Verify 33 needs
   a license declaration to build; baseline committed with the project name only)
 - [ ] T4 plugin-shell: plugin files, launcher, config, `ug doctor`
+  - [x] plugin files, `bin/ug` + `bin/ug.cmd`, config, `ug doctor` (passes on purge-squad:
+    Unity 6000.3.14f1, Force Text, default config, graph warning; launchers skip Unity's 6.0.21)
+  - [ ] local install per S2 (writes ~/.claude/settings.json; ask first)
+  - [ ] idle cost ≤ 300 tokens on a fresh session (needs a live session; ask first)
 - [ ] T5 plugin-shell: hook dispatcher, fail-open
 - [ ] T6 graph-core: store
 - [ ] T7 graph-core: freshness + concurrency

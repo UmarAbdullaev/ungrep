@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityGraph.Cli.Tests", "tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityGraph.Stats.Tests", "tests\UnityGraph.Stats.Tests\UnityGraph.Stats.Tests.csproj", "{4107D367-0DCC-427D-94D3-520A8DBAF6EA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnityGraph.Core.Tests", "tests\UnityGraph.Core.Tests\UnityGraph.Core.Tests.csproj", "{49C89028-E8E2-4E20-9146-EC9E7F317047}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -101,6 +103,18 @@ Global
 		{4107D367-0DCC-427D-94D3-520A8DBAF6EA}.Release|x64.Build.0 = Release|Any CPU
 		{4107D367-0DCC-427D-94D3-520A8DBAF6EA}.Release|x86.ActiveCfg = Release|Any CPU
 		{4107D367-0DCC-427D-94D3-520A8DBAF6EA}.Release|x86.Build.0 = Release|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Debug|x64.Build.0 = Debug|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Debug|x86.Build.0 = Debug|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Release|x64.ActiveCfg = Release|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Release|x64.Build.0 = Release|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Release|x86.ActiveCfg = Release|Any CPU
+		{49C89028-E8E2-4E20-9146-EC9E7F317047}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -112,5 +126,6 @@ Global
 		{26F5C76B-D625-49C1-A755-12440C99DF90} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C4369CB2-512A-4593-8CBB-B01F5E3D76D2} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{4107D367-0DCC-427D-94D3-520A8DBAF6EA} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{49C89028-E8E2-4E20-9146-EC9E7F317047} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

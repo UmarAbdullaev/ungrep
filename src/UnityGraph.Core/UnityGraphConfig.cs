@@ -1,0 +1,132 @@
+using System.Text.Json;
+
+namespace UnityGraph.Core;
+
+/// <summary>
+/// Per-project settings from `.claude/unitygraph.json` in the Unity project: one on/off switch
+/// per module and the answer budget. Every setting has a default in code, so the file is
+/// optional and holds only what differs.
+/// </summary>
+public sealed class UnityGraphConfig
+{
+    public const string RelativePath = ".claude/unitygraph.json";
+
+    public const int DefaultAnswerBudget = 1200;
+    public const int MinAnswerBudget = 200;
+    public const int MaxAnswerBudget = 8000;
+
+    /// <summary>
+    /// Modules with a switch, and their defaults. `project-map` writes into the project, so it
+    /// is opt-in (SPEC Decisions #7).
+    /// </summary>
+    public static IReadOnlyDictionary<string, bool> ModuleDefaults { get; } = new SortedDictionary<string, bool>(StringComparer.Ordinal)
+    {
+        ["asset-index"] = true,
+        ["code-index"] = true,
+        ["editor-link"] = true,
+        ["guards"] = true,
+        ["project-map"] = false,
+        ["query"] = true,
+        ["unity-loop"] = true,
+        ["viewer"] = true,
+        ["worker-agent"] = true,
+    };
+
+    private readonly IReadOnlyDictionary<string, bool> _modules;
+
+    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget)
+    {
+        _modules = modules;
+        AnswerBudget = answerBudget;
+    }
+
+    public static UnityGraphConfig Default { get; } = new(ModuleDefaults, DefaultAnswerBudget);
+
+    /// <summary>Maximum tokens in one query answer (design rule 1).</summary>
+    public int AnswerBudget { get; }
+
+    /// <summary>Modules switched away from their default.</summary>
+    public IEnumerable<string> Overrides => _modules.Where(m => m.Value != ModuleDefaults[m.Key]).Select(m => m.Key);
+
+    /// <exception cref="ArgumentException">Not a module with a switch.</exception>
+    public bool IsEnabled(string module) =>
+        _modules.TryGetValue(module, out bool enabled) ? enabled : throw new ArgumentException("unknown module: " + module, nameof(module));
+
+    /// <summary>Loads the project's config, or the defaults when the file doesn't exist.</summary>
+    /// <exception cref="FormatException">The file exists but isn't valid.</exception>
+    public static UnityGraphConfig Load(string projectRoot)
+    {
+        string path = Path.Combine(projectRoot, RelativePath);
+        return File.Exists(path) ? Parse(File.ReadAllText(path)) : Default;
+    }
+
+    /// <exception cref="FormatException">With a message that names the bad setting.</exception>
+    public static UnityGraphConfig Parse(string json)
+    {
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        }
+        catch (JsonException e)
+        {
+            throw new FormatException("not valid JSON: " + e.Message, e);
+        }
+
+        using (doc)
+        {
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new FormatException("expected a JSON object");
+            }
+
+            var modules = new SortedDictionary<string, bool>(ModuleDefaults.ToDictionary(), StringComparer.Ordinal);
+            int budget = DefaultAnswerBudget;
+            foreach (JsonProperty setting in doc.RootElement.EnumerateObject())
+            {
+                switch (setting.Name)
+                {
+                    case "$schema":
+                        break;
+                    case "modules":
+                        ReadModules(setting.Value, modules);
+                        break;
+                    case "answerBudget":
+                        if (!setting.Value.TryGetInt32(out budget) || budget < MinAnswerBudget || budget > MaxAnswerBudget)
+                        {
+                            throw new FormatException($"answerBudget must be a whole number from {MinAnswerBudget} to {MaxAnswerBudget}");
+                        }
+
+                        break;
+                    default:
+                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget)");
+                }
+            }
+
+            return new UnityGraphConfig(modules, budget);
+        }
+    }
+
+    private static void ReadModules(JsonElement value, SortedDictionary<string, bool> modules)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new FormatException("modules must be an object of module names to true/false");
+        }
+
+        foreach (JsonProperty module in value.EnumerateObject())
+        {
+            if (!ModuleDefaults.ContainsKey(module.Name))
+            {
+                throw new FormatException($"unknown module '{module.Name}' (known: {string.Join(", ", ModuleDefaults.Keys)})");
+            }
+
+            if (module.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                throw new FormatException($"modules.{module.Name} must be true or false");
+            }
+
+            modules[module.Name] = module.Value.GetBoolean();
+        }
+    }
+}

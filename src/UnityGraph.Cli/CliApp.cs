@@ -9,11 +9,13 @@ namespace UnityGraph.Cli;
 internal static class CliApp
 {
     // claudeConfigDir: Claude Code's config folder; null means CLAUDE_CONFIG_DIR, then ~/.claude.
-    // Tests point it at fixtures.
-    public static int Run(string[] args, TextWriter output, TextWriter error, string? claudeConfigDir = null)
+    // runtime: what `ug doctor` reports as the runtime; null means the one running ug.
+    // Both are set by tests only.
+    public static int Run(string[] args, TextWriter output, TextWriter error, string? claudeConfigDir = null, string? runtime = null)
     {
         var root = new RootCommand("unitygraph: Unity project graph for Claude Code.")
         {
+            DoctorCommand.Create(runtime),
             StatsCommand.Create(claudeConfigDir),
         };
 

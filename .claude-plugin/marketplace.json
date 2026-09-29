@@ -1,0 +1,13 @@
+{
+  "name": "unitygraph-dev",
+  "owner": {
+    "name": "Umar"
+  },
+  "plugins": [
+    {
+      "name": "unitygraph",
+      "source": "./",
+      "description": "Unity project graph for Claude Code (local development build)."
+    }
+  ]
+}
