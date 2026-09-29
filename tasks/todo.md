@@ -60,7 +60,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] Q query: spec, `ug find/refs/explain`, skill update (p95 345 ms on purge-squad; Query coverage 94.7%)
 - [x] A1 asset-index spec
 - [x] A2 asset-index: YAML and meta readers
-- [ ] A3 asset-index: file indexer and fixture assets
+- [x] A3 asset-index: file indexer and fixture assets
 - [ ] A4 asset-index: workspace, incremental, `ug index`
 - [ ] A5 query: asset answers
 - [ ] A6 asset-index: purge-squad measurement

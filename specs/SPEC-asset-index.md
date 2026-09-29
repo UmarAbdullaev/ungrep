@@ -140,7 +140,7 @@ per file, at the first line it occurs.
 
 | Edge | Source → target | Props |
 | --- | --- | --- |
-| `contains` | `a:G` → each game object, prefab instance, sub-asset; game object → each of its components (a component added to a nested prefab's object: from that object's source key) | |
+| `contains` | `a:G` → each game object and sub-asset (prefab instances get `places`); game object → each of its components (a component added to a nested prefab's object: from that object's source key) | |
 | `child_of` | game object → parent game object or prefab instance; prefab instance → the object at its `m_TransformParent` | |
 | `instance_of` | MonoBehaviour component or sub-asset → `a:<script guid>`; main object MonoBehaviour: `a:G` → `a:<script guid>`; prefab instance → `a:<source guid>` | |
 | `places` | `a:G` → prefab instance | |

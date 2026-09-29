@@ -8,3 +8,10 @@ compiled so symbols bind, never indexed. `Library/ScriptAssemblies/Missing.dll` 
 to the running runtime's assemblies for the second.
 
 Tests copy this folder to a temp directory before indexing it.
+
+The Unity YAML under `Assets/Prefabs`, `Assets/Scenes`, `Assets/Materials`, `Assets/Data` and
+`Assets/AddressableAssetsData` is hand-written for `asset-index` tests
+(`specs/SPEC-asset-index.md`, Testing): a prefab and its variant, a scene with nested prefab
+instances, overrides and UnityEvent calls, a material, ScriptableObjects and an Addressables
+group. GUIDs are readable patterns (`b1000…01`). `Data/Baked.asset` is binary on purpose,
+`Scenes/New.unity` has no `.meta` on purpose, and `Textures/Grid.png` is a text placeholder.
