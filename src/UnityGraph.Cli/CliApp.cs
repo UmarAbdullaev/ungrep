@@ -16,6 +16,7 @@ internal static class CliApp
         var root = new RootCommand("unitygraph: Unity project graph for Claude Code.")
         {
             DoctorCommand.Create(runtime),
+            IndexCommand.Create(),
             StatsCommand.Create(claudeConfigDir),
         };
 

@@ -49,6 +49,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
     private readonly List<Node> _nodes = [];
     private readonly List<Edge> _edges = [];
     private readonly HashSet<(string, EdgeKind, string)> _seen = [];
+    private readonly HashSet<string> _keys = new(StringComparer.Ordinal);
     private readonly Dictionary<INamedTypeSymbol, Dictionary<ISymbol, List<ISymbol>>> _interfaceMaps = new(SymbolEqualityComparer.Default);
 
     // The member whose code the walk is in, and the type it belongs to.
@@ -218,6 +219,12 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
             return;
         }
 
+        // Compile errors can declare a name twice; the first declaration is the node.
+        if (!_keys.Add(key))
+        {
+            return;
+        }
+
         (int start, int end) = Lines(declaration);
         _nodes.Add(new Node(key, NodeKindOf(symbol), NameOf(symbol), _path, start, end, PropsOf(symbol)));
         if (symbol.ContainingType is { } owner && KeyOf(owner) is { } ownerKey)
@@ -249,6 +256,11 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
 
     private void AddTypeNode(INamedTypeSymbol type, string key, SyntaxNode node)
     {
+        if (!_keys.Add(key))
+        {
+            return;
+        }
+
         (int start, int end) = Lines(node);
         _nodes.Add(new Node(key, NodeKind.Type, type.Name, _path, start, end, PropsOf(type)));
         if (type.ContainingType is { } outer && KeyOf(outer) is { } outerKey)
