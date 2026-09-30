@@ -57,7 +57,7 @@ public sealed class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.1.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.2.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);

@@ -27,7 +27,7 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal static class Bridge
     {
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
 
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";
@@ -87,6 +87,7 @@ namespace UnityGraph.Bridge
             WriteDiscovery(token, _server.Port);
 
             EditorApplication.update += Update;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
             AssemblyReloadEvents.beforeAssemblyReload += Stop;
             EditorApplication.quitting += Quit;
         }
@@ -94,6 +95,7 @@ namespace UnityGraph.Bridge
         private static void Stop()
         {
             EditorApplication.update -= Update;
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
             AssemblyReloadEvents.beforeAssemblyReload -= Stop;
             Application.logMessageReceivedThreaded -= OnLog;
             _compile?.Detach();
@@ -121,6 +123,8 @@ namespace UnityGraph.Bridge
             RefreshStatus();
             _server.Pump(Handle);
         }
+
+        private static void OnPlayModeChanged(PlayModeStateChange change) => SceneOps.OnPlayModeChanged(change, _console.LastId);
 
         private static void OnLog(string condition, string stackTrace, LogType type) =>
             _console.Add(ConsoleBuffer.TypeName(type), condition, StackFrames.OwnFrame(stackTrace, ProjectRoot));
@@ -166,6 +170,18 @@ namespace UnityGraph.Bridge
                     return Now(TestResult(request));
                 case "/run":
                     return Now(Run(request));
+                case "/scene":
+                    return Now(SceneOps.Scenes());
+                case "/scene/open":
+                    return Now(SceneOps.Busy() ?? SceneOps.Open(request));
+                case "/save":
+                    return Now(SceneOps.Busy() ?? SceneOps.Save(request));
+                case "/play":
+                    return Now(SceneOps.Busy() ?? SceneOps.Play());
+                case "/pause":
+                    return Now(SceneOps.Pause());
+                case "/stop":
+                    return Now(SceneOps.Stop(_console));
                 default:
                     return Now(Reply.Fail(404, "unknown request " + request.Path));
             }

@@ -71,7 +71,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] E4 editor-link: CLI and end to end
 - [x] E5 editor-link: purge-squad measurement (ask before installing the bridge there)
 - [x] O1 editor-ops spec
-- [ ] O2 editor-ops: addressing, scenes and play mode
+- [x] O2 editor-ops: addressing, scenes and play mode
 - [ ] O3 editor-ops: tree and inspect
 - [ ] O4 editor-ops: edits
 - [ ] O5 editor-ops: client, CLI, skill, end to end
