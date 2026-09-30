@@ -74,7 +74,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] O2 editor-ops: addressing, scenes and play mode
 - [x] O3 editor-ops: tree and inspect (38 EditMode tests)
 - [x] O4 editor-ops: edits (48 EditMode tests)
-- [ ] O5 editor-ops: client, CLI, skill, end to end
+- [x] O5 editor-ops: client, CLI, skill, end to end (fresh-process reads and edits ~125 ms, play 1.07 s)
 - [ ] O6 editor-ops: more scene ops, undo, selection, prefabs
 - [ ] O7 editor-ops: assets
 - [ ] O8 editor-ops: project, packages, menu

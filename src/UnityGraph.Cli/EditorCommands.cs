@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using UnityGraph.Core;
@@ -8,7 +9,9 @@ namespace UnityGraph.Cli;
 
 /// <summary>
 /// `ug status`, `ug compile`, `ug run` and `ug bridge install|remove` (SPEC-editor-link, Commands):
-/// the running editor through its bridge, or Editor.log when no bridge answers.
+/// the running editor through its bridge, or Editor.log when no bridge answers. Also the
+/// editor-ops commands (SPEC-editor-ops, Commands): scenes, play mode, reads and edits, answered
+/// with lines the bridge formats.
 /// </summary>
 internal static class EditorCommands
 {
@@ -41,6 +44,11 @@ internal static class EditorCommands
             Install(root, result.GetValue(copy), FindPackage())));
         bridge.Subcommands.Add(Command("remove", "Delete the copy made by `ug bridge install --copy`.", [], (root, _) => Remove(root)));
         yield return bridge;
+
+        foreach (Command command in OpsCommands())
+        {
+            yield return command;
+        }
     }
 
     public static (int ExitCode, string Text) Status(string root)
@@ -194,6 +202,230 @@ internal static class EditorCommands
         return (0, "removed " + CopyFolder.Replace('\\', '/') + "/\n");
     }
 
+    /// <summary>How long an editor-ops request may take; opening and saving scenes get longer.</summary>
+    public static readonly TimeSpan OpTimeout = TimeSpan.FromSeconds(10);
+
+    private static readonly TimeSpan _sceneTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// An editor-ops request: path and escaped query, the object addresses it edits (checked
+    /// against the vendored folders), and how long to wait for the answer and for a play-mode change.
+    /// </summary>
+    public sealed record OpRequest(string PathAndQuery, IReadOnlyList<string?> Edits, TimeSpan Timeout, TimeSpan WaitTimeout)
+    {
+        public OpRequest(string pathAndQuery, params string?[] edits)
+            : this(pathAndQuery, edits, OpTimeout, TimeSpan.FromSeconds(60))
+        {
+        }
+    }
+
+    /// <summary>`/path?name=value&amp;...` with the values escaped; null values are left out, empty ones kept.</summary>
+    public static string Query(string path, params (string Name, string? Value)[] parameters)
+    {
+        var text = new StringBuilder(path);
+        char separator = '?';
+        foreach ((string name, string? value) in parameters)
+        {
+            if (value != null)
+            {
+                text.Append(separator).Append(name).Append('=').Append(Uri.EscapeDataString(value));
+                separator = '&';
+            }
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Sends one editor-ops request and prints its lines, its refusal, or why Unity did not answer;
+    /// waits for play mode to change when the answer asks. <paramref name="command"/> is how the
+    /// user typed it (`scene open`), for the messages.
+    /// </summary>
+    public static (int ExitCode, string Text) Op(string root, VendoredFolders vendored, string command, OpRequest request)
+    {
+        foreach (string? address in request.Edits)
+        {
+            string? path = address?.Trim().Split(':')[0];
+            if (path != null && vendored.Prefixes.FirstOrDefault(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)) is { } prefix)
+            {
+                return (0, address!.Trim() + " is in the vendored folder " + prefix + ", which ug does not edit\n");
+            }
+        }
+
+        BridgeConnection connection = BridgeClient.Connect(root, ProcessCheck);
+        if (connection.Client == null)
+        {
+            return (0, "Unity not reachable (" + connection.Problem + "); ug " + command + " needs the bridge\n" + InstallHint(root));
+        }
+
+        using BridgeClient client = connection.Client;
+        if (!client.HasOps)
+        {
+            return (0, "bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
+        }
+
+        var clock = Stopwatch.StartNew();
+        OpAnswer answer;
+        try
+        {
+            answer = client.Op(request.PathAndQuery, request.Timeout);
+        }
+        catch (BridgeUnavailableException e)
+        {
+            return (0, "no answer from Unity (" + e.Message + ")\n");
+        }
+
+        if (answer.Error != null)
+        {
+            return (0, answer.Error + "\n");
+        }
+
+        var lines = answer.Lines!.ToList();
+        if (answer.Wait != null)
+        {
+            WaitOutcome waited = client.WaitFor(answer.Wait, request.WaitTimeout);
+            if (!waited.Reached)
+            {
+                return (0, waited.Problem + "\n");
+            }
+
+            if (answer.Wait == "playing" && lines.Count > 0)
+            {
+                lines[0] += " (entered in " + clock.Elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s)";
+            }
+        }
+
+        return (0, string.Concat(lines.Select(line => line + "\n")));
+    }
+
+    /// <summary>`ug find --live`: the loaded scenes' objects by name part, tag, layer and component.</summary>
+    public static (int ExitCode, string Text) LiveFind(string start, string? name, string? tag, string? layer, string? component) =>
+        Start(start, (root, config) => Op(root, config.Vendored, "find --live", new OpRequest(
+            Query("/find", ("name", name), ("tag", tag), ("layer", layer), ("component", component)))));
+
+    private static IEnumerable<Command> OpsCommands()
+    {
+        const string Address = "Object address: Player/Gun, Enemy#2, Main:Player, Assets/X.prefab:Child, or an asset path.";
+
+        Command scene = Ops("scene", "scene", "Loaded scenes: active, modified, root count; and the play state.", [], _ => new OpRequest("/scene"));
+        Argument<string> openPath = Required("path", "Scene asset path, like Assets/Scenes/Main.unity.");
+        Option<bool> additive = Flag("--additive", "Keep the loaded scenes open.");
+        scene.Subcommands.Add(Ops("open", "scene open", "Open a scene; refused while a loaded scene has unsaved changes (unless --additive).", [openPath, additive], r =>
+            new OpRequest(Query("/scene/open", ("path", r.GetValue(openPath)), ("additive", True(r.GetValue(additive))))) { Timeout = _sceneTimeout }));
+        Argument<string> newPath = Required("path", "Where to save the new scene, like Assets/Scenes/Level2.unity.");
+        Option<bool> newAdditive = Flag("--additive", "Keep the loaded scenes open.");
+        scene.Subcommands.Add(Ops("new", "scene new", "Create a scene, saved at the path.", [newPath, newAdditive], r =>
+            new OpRequest(Query("/scene/new", ("path", r.GetValue(newPath)), ("additive", True(r.GetValue(newAdditive))))) { Timeout = _sceneTimeout }));
+        Argument<string> closePath = Required("path", "Loaded scene path.");
+        scene.Subcommands.Add(Ops("close", "scene close", "Close a loaded scene; refused when it has unsaved changes.", [closePath], r =>
+            new OpRequest(Query("/scene/close", ("path", r.GetValue(closePath))))));
+        Argument<string> activePath = Required("path", "Loaded scene path.");
+        scene.Subcommands.Add(Ops("active", "scene active", "Make a loaded scene the active one.", [activePath], r =>
+            new OpRequest(Query("/scene/active", ("path", r.GetValue(activePath))))));
+        yield return scene;
+
+        Argument<string?> savePath = Optional("path", "Only this loaded scene. Default: every modified scene.");
+        yield return Ops("save", "save", "Save modified scenes and dirty assets: the only command that writes them.", [savePath], r =>
+            new OpRequest(Query("/save", ("path", r.GetValue(savePath)))) { Timeout = _sceneTimeout });
+
+        Option<int> playTimeout = Seconds();
+        yield return Ops("play", "play", "Enter play mode (or resume from pause) and wait until playing.", [playTimeout], r =>
+            new OpRequest("/play") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(playTimeout))) });
+        Option<int> stopTimeout = Seconds();
+        yield return Ops("stop", "stop", "Leave play mode; says how long it played and what it logged.", [stopTimeout], r =>
+            new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(stopTimeout))) });
+        yield return Ops("pause", "pause", "Pause play mode; ug play resumes.", [], _ => new OpRequest("/pause"));
+
+        Argument<string?> treeObject = Optional("object", Address + " Default: the loaded scenes' roots.");
+        var depth = new Option<int?>("--depth") { Description = "Levels to show. Default: 2." };
+        yield return Ops("tree", "tree", "The live hierarchy under an object: names, components, active state.", [treeObject, depth], r =>
+            new OpRequest(Query("/tree", ("object", r.GetValue(treeObject)), ("depth", Number(r.GetValue(depth))))));
+
+        Argument<string> inspected = Required("object", Address);
+        Option<string?> inspectComponent = Text("--component", "Show this component's fields: its type name, #n for the n-th.");
+        Option<bool> inspectImporter = Flag("--importer", "Show an asset's import settings.");
+        yield return Ops("inspect", "inspect", "An object's components, or one component's serialized fields, live.", [inspected, inspectComponent, inspectImporter], r =>
+            new OpRequest(Query("/inspect", ("object", r.GetValue(inspected)), ("component", r.GetValue(inspectComponent)), ("importer", True(r.GetValue(inspectImporter))))));
+
+        var objects = new Command("object", "Create, delete, rename, move, toggle and duplicate game objects (unsaved until ug save).");
+        Argument<string?> createName = Optional("name", "Name of the new object.");
+        Option<string?> createParent = Text("--parent", "Create under this object. Default: the active scene's root.");
+        Option<string?> prefab = Text("--prefab", "Instantiate this prefab, kept linked.");
+        Option<string?> primitive = Text("--primitive", "Cube, Sphere, Capsule, Cylinder, Plane or Quad.");
+        Option<string?> createScene = Text("--scene", "At the root of this loaded scene (name without .unity).");
+        objects.Subcommands.Add(Ops("create", "object create", "Create an empty object, a primitive or a prefab instance.", [createName, createParent, prefab, primitive, createScene], r =>
+            new OpRequest(
+                Query("/object/create", ("name", r.GetValue(createName)), ("parent", r.GetValue(createParent)), ("prefab", r.GetValue(prefab)), ("primitive", r.GetValue(primitive)), ("scene", r.GetValue(createScene))),
+                r.GetValue(createParent))));
+        Argument<string> deleted = Required("object", Address);
+        objects.Subcommands.Add(Ops("delete", "object delete", "Delete an object and its children.", [deleted], r =>
+            new OpRequest(Query("/object/delete", ("object", r.GetValue(deleted))), r.GetValue(deleted))));
+        Argument<string> renamed = Required("object", Address);
+        Argument<string> newName = Required("name", "The new name.");
+        objects.Subcommands.Add(Ops("rename", "object rename", "Rename an object.", [renamed, newName], r =>
+            new OpRequest(Query("/object/rename", ("object", r.GetValue(renamed)), ("name", r.GetValue(newName))), r.GetValue(renamed))));
+        Argument<string> moved = Required("object", Address);
+        Option<string?> moveParent = Text("--parent", "The new parent.");
+        Option<bool> toRoot = Flag("--root", "Move to the root of its scene.");
+        var index = new Option<int?>("--index") { Description = "Sibling index, 0 first." };
+        Option<string?> moveScene = Text("--scene", "Move a root object to this loaded scene.");
+        objects.Subcommands.Add(Ops("move", "object move", "Reparent an object (keeping its world position), reorder it, or move it to another scene.", [moved, moveParent, toRoot, index, moveScene], r =>
+            new OpRequest(
+                Query("/object/move", ("object", r.GetValue(moved)), ("parent", r.GetValue(toRoot) ? "" : r.GetValue(moveParent)), ("index", Number(r.GetValue(index))), ("scene", r.GetValue(moveScene))),
+                r.GetValue(moved),
+                r.GetValue(moveParent))));
+        Argument<string> toggled = Required("object", Address);
+        Argument<string> active = Required("value", "true or false.");
+        objects.Subcommands.Add(Ops("active", "object active", "Activate or deactivate an object.", [toggled, active], r =>
+            new OpRequest(Query("/object/active", ("object", r.GetValue(toggled)), ("value", r.GetValue(active))), r.GetValue(toggled))));
+        Argument<string> duplicated = Required("object", Address);
+        Option<string?> copyName = Text("--name", "Name of the copy. Default: the original's.");
+        objects.Subcommands.Add(Ops("duplicate", "object duplicate", "Duplicate an object next to the original.", [duplicated, copyName], r =>
+            new OpRequest(Query("/object/duplicate", ("object", r.GetValue(duplicated)), ("name", r.GetValue(copyName))), r.GetValue(duplicated))));
+        yield return objects;
+
+        var components = new Command("component", "Add or remove components (unsaved until ug save).");
+        Argument<string> addTo = Required("object", Address);
+        Argument<string> type = Required("type", "Component type: Rigidbody, PlayerController, or a full name.");
+        components.Subcommands.Add(Ops("add", "component add", "Add a component.", [addTo, type], r =>
+            new OpRequest(Query("/component/add", ("object", r.GetValue(addTo)), ("type", r.GetValue(type))), r.GetValue(addTo))));
+        Argument<string> removeFrom = Required("object", Address);
+        Argument<string> component = Required("component", "Component type, #n for the n-th of that type.");
+        components.Subcommands.Add(Ops("remove", "component remove", "Remove a component; refused when another requires it.", [removeFrom, component], r =>
+            new OpRequest(Query("/component/remove", ("object", r.GetValue(removeFrom)), ("component", r.GetValue(component))), r.GetValue(removeFrom))));
+        yield return components;
+
+        Argument<string> target = Required("object", Address);
+        Argument<string> field = Required("field", "Serialized or display name: speed, m_LocalPosition, waves[2].count, list.size.");
+        Argument<string> value = Required("value", "Number, true/false, text, enum name, 1,2,3, #ff8800, an object address, an asset path, or null.");
+        Option<string?> setComponent = Text("--component", "The component with the field. Default: the object, then the one component that has it.");
+        Option<bool> setImporter = Flag("--importer", "Set an asset's import setting, then reimport.");
+        yield return Ops("set", "set", "Set one serialized field through Undo (unsaved until ug save).", [target, field, value, setComponent, setImporter], r =>
+            new OpRequest(
+                Query("/set", ("object", r.GetValue(target)), ("component", r.GetValue(setComponent)), ("field", r.GetValue(field)), ("value", r.GetValue(value)), ("importer", True(r.GetValue(setImporter)))),
+                r.GetValue(target)));
+
+        yield return Ops("undo", "undo", "Undo the editor's last change, like Ctrl+Z.", [], _ => new OpRequest("/undo"));
+        yield return Ops("redo", "redo", "Redo the last undone change.", [], _ => new OpRequest("/redo"));
+
+        Argument<string?> selected = Optional("object", Address + " Default: list the selection.");
+        Option<bool> clear = Flag("--clear", "Clear the selection.");
+        yield return Ops("select", "select", "Show, set or clear the editor's selection.", [selected, clear], r =>
+            new OpRequest(Query("/select", ("object", r.GetValue(selected)), ("clear", True(r.GetValue(clear))))));
+
+        static Argument<string> Required(string name, string description) => new(name) { Description = description };
+        static Argument<string?> Optional(string name, string description) => new(name) { Description = description, Arity = ArgumentArity.ZeroOrOne };
+        static Option<string?> Text(string name, string description) => new(name) { Description = description };
+        static Option<bool> Flag(string name, string description) => new(name) { Description = description };
+        static Option<int> Seconds() => new("--timeout") { Description = "Seconds to wait for play mode to change. Default: 60.", DefaultValueFactory = _ => 60 };
+        static string? True(bool flag) => flag ? "true" : null;
+        static string? Number(int? number) => number?.ToString(CultureInfo.InvariantCulture);
+    }
+
+    // An editor-ops command: `command` is how the user types it, for the messages.
+    private static Command Ops(string name, string command, string description, Symbol[] symbols, Func<ParseResult, OpRequest> request) =>
+        Command(name, description, symbols, (root, config, result) => Op(root, config.Vendored, command, request(result)));
+
     /// <summary>The package folder shipped with the plugin: `unity/com.unitygraph.bridge` above ug's own folder.</summary>
     public static string? FindPackage()
     {
@@ -248,7 +480,10 @@ internal static class EditorCommands
         return count;
     }
 
-    private static Command Command(string name, string description, Symbol[] symbols, Func<string, ParseResult, (int, string)> run)
+    private static Command Command(string name, string description, Symbol[] symbols, Func<string, ParseResult, (int, string)> run) =>
+        Command(name, description, symbols, (root, _, result) => run(root, result));
+
+    private static Command Command(string name, string description, Symbol[] symbols, Func<string, UnityGraphConfig, ParseResult, (int, string)> run)
     {
         var project = new Option<string>("--project") { Description = "Folder inside the Unity project. Default: current folder." };
         var command = new Command(name, description);
@@ -267,14 +502,14 @@ internal static class EditorCommands
         command.Options.Add(project);
         command.SetAction(result =>
         {
-            (int exitCode, string text) = Start(result.GetValue(project) ?? Directory.GetCurrentDirectory(), root => run(root, result));
+            (int exitCode, string text) = Start(result.GetValue(project) ?? Directory.GetCurrentDirectory(), (root, config) => run(root, config, result));
             result.InvocationConfiguration.Output.Write(text.ReplaceLineEndings());
             return exitCode;
         });
         return command;
     }
 
-    private static (int, string) Start(string start, Func<string, (int, string)> run)
+    private static (int, string) Start(string start, Func<string, UnityGraphConfig, (int, string)> run)
     {
         UnityProject? unity = UnityProject.Find(start);
         if (unity is null)
@@ -293,7 +528,7 @@ internal static class EditorCommands
         }
 
         return config.IsEnabled("editor-link")
-            ? run(unity.Root)
+            ? run(unity.Root, config)
             : (0, "editor-link is off in " + UnityGraphConfig.RelativePath + "\n");
     }
 }

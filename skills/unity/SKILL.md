@@ -1,6 +1,6 @@
 ---
 name: unity
-description: Unity project questions (scripts, scenes, prefabs, assets, serialized fields, compile and console). Use the ug CLI before grep or reading YAML.
+description: Unity project questions and editor work (scripts, scenes, prefabs, assets, serialized fields, compile, play mode, scene edits). Use the ug CLI before grep or reading YAML.
 ---
 
 # unitygraph
@@ -46,3 +46,26 @@ Editor commands:
   package through Package Manager. `ug bridge remove` undoes `--copy`.
 - `ug run` executes code in the user's editor: run only what the user asked for or what the
   task clearly needs.
+
+Editor ops (the open editor, through the bridge; `ug <command> --help` for options):
+
+| Command | Does |
+| --- | --- |
+| `ug scene` / `ug scene open\|new\|close\|active <path>` | Loaded scenes and play state; open (`--additive`), create, close, set active. |
+| `ug save [path]` | Save modified scenes and dirty assets. Nothing else writes them. |
+| `ug play` / `ug stop` / `ug pause` | Enter play mode and wait for it; stop reports time played and errors logged. |
+| `ug tree [object] [--depth n]` | Live hierarchy with components. |
+| `ug inspect <object> [--component T] [--importer]` | Live components or one component's serialized values. |
+| `ug find --live <name>` | Live objects by name, `--tag`, `--layer`, `--component`, as addresses. |
+| `ug object create\|delete\|rename\|move\|active\|duplicate` | Scene objects: `create Spawn --parent Level --prefab Assets/X.prefab`, `move A --parent B` or `--root`. |
+| `ug component add\|remove <object> <type>` | Components. |
+| `ug set <object> <field> <value> [--component T] [--importer]` | One serialized field (`speed 7.5`, `m_LocalPosition 1,2,3`, references by address or asset path). |
+| `ug undo` / `ug redo` / `ug select [object]` | Unity's Undo and Redo; the editor's selection. |
+
+- `<object>`: `Level/Enemy`, `Enemy#2` for the second of that name, `Main:Level/Enemy` for one
+  scene, `Assets/Prefabs/Turret.prefab:Barrel` inside a prefab asset.
+- Closed scenes and prefabs: ask the graph (`ug explain`, `ug refs`, `ug find`), not the editor.
+  Use the editor for live state (unsaved or play-mode values) and for edits.
+- Edits go through Undo and stay unsaved (`(Main.unity modified, not saved)`) until `ug save`;
+  run `ug save` only when the task needs files written. Prefab-asset edits are written at once.
+- Edits in play mode are lost on stop. Vendored folders and `Packages/` are refused.

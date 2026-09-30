@@ -1,13 +1,15 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using UnityGraph.EditorLink;
 
 namespace UnityGraph.Cli.Tests;
 
 /// <summary>
-/// `ug status/compile/run` against a real editor: a copy of fixtures/BridgeHost opened in batch mode
-/// with `-ugBridge`, then killed to check the fallbacks. Runs only when UG_UNITY names a Unity 6000.3
-/// executable, and prints the times SPEC-editor-link records.
+/// `ug status/compile/run` and the editor-ops commands against a real editor: a copy of
+/// fixtures/BridgeHost opened in batch mode with `-ugBridge`, then killed to check the fallbacks.
+/// Runs only when UG_UNITY names a Unity 6000.3 executable, and prints the times SPEC-editor-link
+/// and SPEC-editor-ops record.
 /// </summary>
 [Collection(nameof(EditorCommandTests))]
 public sealed class EditorEndToEndTests : IDisposable
@@ -83,22 +85,75 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Contains("threw after", Ug(log, "run", "BridgeHost.FixtureMethods.Throws"), StringComparison.Ordinal);
         Assert.StartsWith("did not run UnityEditor.EditorApplication.Exit", Ug(log, "run", "UnityEditor.EditorApplication.Exit"), StringComparison.Ordinal);
 
+        // editor-ops (SPEC-editor-ops, Testing): open, read, edit, save and read back, play and stop.
+        clock.Restart();
+        string opened = Ug(log, "scene", "open", "Assets/Scenes/Main.unity");
+        Report("ug scene open", clock.Elapsed);
+        Assert.StartsWith("opened Assets/Scenes/Main.unity\nAssets/Scenes/Main.unity  active  2 roots\nedit mode\n", opened, StringComparison.Ordinal);
+
+        clock.Restart();
+        string tree = Ug(log, "tree");
+        Report("ug tree", clock.Elapsed);
+        Assert.Contains("Level", tree, StringComparison.Ordinal);
+        Assert.Contains("  Enemy  Rigidbody", tree, StringComparison.Ordinal);
+
+        clock.Restart();
+        string inspected = Ug(log, "inspect", "Level/Enemy");
+        Report("ug inspect", clock.Elapsed);
+        Assert.StartsWith("Level/Enemy", inspected, StringComparison.Ordinal);
+        Assert.Contains("Rigidbody", inspected, StringComparison.Ordinal);
+
+        clock.Restart();
+        string created = Ug(log, "object", "create", "Spawn", "--parent", "Level", "--prefab", "Assets/Prefabs/Turret.prefab");
+        Report("ug object create (prefab instance)", clock.Elapsed);
+        Assert.Equal("created Level/Spawn (Turret prefab instance)  (Main.unity modified, not saved)\n", created);
+
+        clock.Restart();
+        string set = Ug(log, "set", "Level/Spawn", "speed", "7.5", "--component", "Turret");
+        Report("ug set", clock.Elapsed);
+        Assert.Equal("Level/Spawn  Turret.speed  5 -> 7.5  (Main.unity modified, not saved)\n", set);
+
+        Assert.Equal("moved Level/Crate -> Crate  (Main.unity modified, not saved)\n", Ug(log, "object", "move", "Level/Crate", "--root"));
+        Assert.Equal("deleted Level/Enemy  (Main.unity modified, not saved)\n", Ug(log, "object", "delete", "Level/Enemy"));
+        Assert.Contains("Assets/Scenes/Main.unity  active  modified  3 roots\n", Ug(log, "scene"), StringComparison.Ordinal);
+
+        clock.Restart();
+        string saved = Ug(log, "save");
+        Report("ug save", clock.Elapsed);
+        Assert.StartsWith("saved Assets/Scenes/Main.unity\n", saved, StringComparison.Ordinal);
+
+        // The saved YAML, read back through the graph (Unity makes no .csproj files in batch mode).
+        WriteProject("Assembly-CSharp", "Assets\\Scripts\\Turret.cs");
+        // Scene objects resolve by key, o:<scene guid>:<file id> (SPEC-query, Resolving).
+        string scene = File.ReadAllText(Path.Combine(_root, "Assets", "Scenes", "Main.unity"));
+        string sceneGuid = Regex.Match(File.ReadAllText(Path.Combine(_root, "Assets", "Scenes", "Main.unity.meta")), "guid: ([0-9a-f]{32})").Groups[1].Value;
+        string instanceId = Regex.Match(scene, @"--- !u!1001 &(\d+)").Groups[1].Value;
+        string spawn = Ug(log, "explain", "o:" + sceneGuid + ":" + instanceId);
+        Assert.Contains("\nSpawn  prefab_instance  Assets/Scenes/Main.unity:", spawn, StringComparison.Ordinal);
+        Assert.Contains("instance of  Assets/Prefabs/Turret.prefab", spawn, StringComparison.Ordinal);
+        Assert.Contains("speed = 7.5", spawn, StringComparison.Ordinal);
+        Assert.DoesNotContain("m_Name: Enemy", scene, StringComparison.Ordinal);
+
+        clock.Restart();
+        string play = Ug(log, "play");
+        Report("ug play until playing", clock.Elapsed);
+        Assert.Matches(@"^playing \(entered in \d+\.\d s\)\n$", play);
+        Assert.EndsWith("\nplaying\n", Ug(log, "scene"), StringComparison.Ordinal);
+        Assert.Contains("Spawn", Ug(log, "find", "--live", "--component", "Turret"), StringComparison.Ordinal);
+
+        clock.Restart();
+        string stop = Ug(log, "stop");
+        Report("ug stop until edit mode", clock.Elapsed);
+        Assert.Matches(@"^stopped after \d+\.\d s: 0 errors, 0 warnings\n$", stop);
+        Assert.EndsWith("\nedit mode\n", Ug(log, "scene"), StringComparison.Ordinal);
+
         string ug = Path.Combine(repo, "artifacts", "bin", "UnityGraph.Cli", "release", OperatingSystem.IsWindows() ? "ug.exe" : "ug");
         if (File.Exists(ug))
         {
-            var times = new List<double>();
-            for (int i = 0; i < 5; i++)
-            {
-                clock.Restart();
-                using Process status = Process.Start(new ProcessStartInfo(ug) { ArgumentList = { "status", "--project", _root }, RedirectStandardOutput = true, UseShellExecute = false })!;
-                string text = status.StandardOutput.ReadToEnd();
-                status.WaitForExit();
-                times.Add(clock.Elapsed.TotalMilliseconds);
-                Assert.StartsWith("Unity 6000.3.14f1  idle", text, StringComparison.Ordinal);
-            }
-
-            times.Sort();
-            Report("fresh-process ug status, median of 5", TimeSpan.FromMilliseconds(times[2]));
+            Report("fresh-process ug status, median of 5", Median(ug, 5, _ => ["status"]));
+            Report("fresh-process ug tree, median of 5", Median(ug, 5, _ => ["tree"]));
+            Report("fresh-process ug inspect, median of 5", Median(ug, 5, _ => ["inspect", "Level/Spawn", "--component", "Turret"]));
+            Report("fresh-process ug object active (an edit), median of 5", Median(ug, 5, i => ["object", "active", "Crate", i % 2 == 0 ? "false" : "true"]));
         }
 
         int pid = _unity.Id;
@@ -110,6 +165,40 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.StartsWith("Unity not reachable (stale bridge.json: Unity (pid ", fallback, StringComparison.Ordinal);
         Assert.Matches(@"; from (compile\.json|Editor\.log) of [-\d: ]+: 0 errors\n$", fallback);
     }
+
+    // The median time of `count` runs of the release ug in its own process; every run must answer.
+    private TimeSpan Median(string ug, int count, Func<int, string[]> args)
+    {
+        var times = new List<double>();
+        for (int i = 0; i < count; i++)
+        {
+            var info = new ProcessStartInfo(ug) { RedirectStandardOutput = true, UseShellExecute = false };
+            foreach (string arg in args(i).Concat(["--project", _root]))
+            {
+                info.ArgumentList.Add(arg);
+            }
+
+            var clock = Stopwatch.StartNew();
+            using Process process = Process.Start(info)!;
+            string text = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            times.Add(clock.Elapsed.TotalMilliseconds);
+            Assert.Equal(0, process.ExitCode);
+            Assert.DoesNotContain("not reachable", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("no answer", text, StringComparison.Ordinal);
+        }
+
+        times.Sort();
+        return TimeSpan.FromMilliseconds(times[count / 2]);
+    }
+
+    // A minimal Unity-style project file, so the graph indexes the copy.
+    private void WriteProject(string assembly, params string[] files) =>
+        File.WriteAllText(Path.Combine(_root, assembly + ".csproj"),
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<Project ToolsVersion=\"4.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n"
+            + "  <PropertyGroup>\n    <LangVersion>9.0</LangVersion>\n    <AssemblyName>" + assembly + "</AssemblyName>\n  </PropertyGroup>\n  <ItemGroup>\n"
+            + string.Concat(files.Select(f => "    <Compile Include=\"" + f + "\" />\n"))
+            + "  </ItemGroup>\n</Project>\n");
 
     private void WaitForIdle(TimeSpan limit)
     {
@@ -137,6 +226,7 @@ public sealed class EditorEndToEndTests : IDisposable
         var output = new StringWriter();
         var error = new StringWriter();
         int exitCode = CliApp.Run([.. args, "--project", _root], output, error, editorLog: editorLog);
+        TestContext.Current.TestOutputHelper?.WriteLine("$ ug " + string.Join(' ', args) + "\n" + output.ToString().TrimEnd());
         Assert.Equal("", error.ToString());
         Assert.Equal(0, exitCode);
         return output.ToString().ReplaceLineEndings("\n");

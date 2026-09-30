@@ -38,6 +38,18 @@ public sealed record TestRunResult(string State, int Passed, int Failed, int Ski
     public bool IsRunning => State == "running";
 }
 
+/// <summary>
+/// An editor-ops answer (SPEC-editor-ops, Endpoints): lines to print as they are, or a refusal;
+/// <see cref="Wait"/> names the editor state (`playing`, `idle`) to wait for before printing.
+/// </summary>
+public sealed record OpAnswer(IReadOnlyList<string>? Lines, string? Error, string? Wait);
+
+/// <summary>How a wait for an editor state ended; <see cref="Problem"/> is null when it was reached.</summary>
+public sealed record WaitOutcome(string? Problem, TimeSpan Elapsed)
+{
+    public bool Reached => Problem == null;
+}
+
 internal static class BridgeJson
 {
     private static readonly JsonSerializerOptions _options = new() { PropertyNameCaseInsensitive = true };

@@ -8,17 +8,43 @@ namespace UnityGraph.Cli;
 
 /// <summary>
 /// `ug find`, `ug refs`, `ug explain` (SPEC-query): bring the code graph up to date, then answer
-/// from it within the budget.
+/// from it within the budget. `ug find --live` asks the open editor instead (SPEC-editor-ops).
 /// </summary>
 internal static class QueryCommands
 {
     public static IEnumerable<Command> Create()
     {
-        var text = new Argument<string>("text") { Description = "Name or words of a name." };
+        var text = new Argument<string?>("text") { Description = "Name or words of a name.", Arity = ArgumentArity.ZeroOrOne };
         var kind = new Option<string>("--kind") { Description = "Only this kind: type, method, field, property, event, asset, game_object, prefab_instance." };
         kind.AcceptOnlyFromAmong("type", "method", "field", "property", "event", "asset", "game_object", "prefab_instance");
-        yield return Command("find", "Find types, members, assets and game objects by name.", [text, kind], (result, engine, budget) =>
-            engine.Find(result.GetValue(text)!, result.GetValue(kind) is { } k ? KindNames.ParseNode(k) : null, budget));
+        var live = new Option<bool>("--live") { Description = "Search the open editor's loaded scenes (unsaved and play-mode state) instead of the graph." };
+        var tag = new Option<string?>("--tag") { Description = "With --live: only objects with this tag." };
+        var layer = new Option<string?>("--layer") { Description = "With --live: only objects on this layer (name or number)." };
+        var component = new Option<string?>("--component") { Description = "With --live: only objects with this component type." };
+        Command find = Command("find", "Find types, members, assets and game objects by name.", [text, kind, live, tag, layer, component], (result, engine, budget) =>
+            engine.Find(result.GetValue(text)!, result.GetValue(kind) is { } k ? KindNames.ParseNode(k) : null, budget),
+            (result, start) => result.GetValue(live)
+                ? EditorCommands.LiveFind(start, result.GetValue(text), result.GetValue(tag), result.GetValue(layer), result.GetValue(component))
+                : null);
+        find.Validators.Add(result =>
+        {
+            if (result.GetValue(live))
+            {
+                if (result.GetValue(kind) != null)
+                {
+                    result.AddError("--kind is for the graph; --live finds game objects only");
+                }
+            }
+            else if (result.GetValue(tag) != null || result.GetValue(layer) != null || result.GetValue(component) != null)
+            {
+                result.AddError("--tag, --layer and --component need --live");
+            }
+            else if (string.IsNullOrWhiteSpace(result.GetValue(text)))
+            {
+                result.AddError("give a name to find");
+            }
+        });
+        yield return find;
 
         var symbol = new Argument<string>("symbol") { Description = "Type or member: Name, Type.Member, Namespace.Type.Member(args), or a cs: key." };
         yield return Command("refs", "Everything that points at a symbol: callers, overrides, subclasses, users.", [symbol], (result, engine, budget) =>
@@ -30,7 +56,8 @@ internal static class QueryCommands
             engine.Explain(result.GetValue(explained)!, result.GetValue(members), budget));
     }
 
-    private static Command Command(string name, string description, Symbol[] symbols, Func<ParseResult, QueryEngine, int, string> ask)
+    // instead: answers without the graph when it returns an answer (`find --live`); gets the start folder.
+    private static Command Command(string name, string description, Symbol[] symbols, Func<ParseResult, QueryEngine, int, string> ask, Func<ParseResult, string, (int, string)?>? instead = null)
     {
         var project = new Option<string>("--project") { Description = "Folder inside the Unity project. Default: current folder." };
         var budget = new Option<int?>("--budget") { Description = $"Answer budget in tokens, {Answer.MinBudget} to {Answer.MaxBudget}. Default: answerBudget in .claude/unitygraph.json." };
@@ -54,6 +81,12 @@ internal static class QueryCommands
         command.SetAction(result =>
         {
             string start = result.GetValue(project) ?? Directory.GetCurrentDirectory();
+            if (instead?.Invoke(result, start) is (int code, string answer))
+            {
+                result.InvocationConfiguration.Output.Write(answer.ReplaceLineEndings());
+                return code;
+            }
+
             int exitCode = Run(start, result.GetValue(budget), result.GetValue(graphDir), (engine, b) => ask(result, engine, b), out string text);
             result.InvocationConfiguration.Output.Write(text.ReplaceLineEndings());
             return exitCode;

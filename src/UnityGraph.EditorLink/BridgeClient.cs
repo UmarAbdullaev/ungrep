@@ -17,6 +17,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge this client understands.</summary>
     public const string MinimumBridge = "0.1.0";
 
+    /// <summary>The oldest bridge with the editor-ops requests (SPEC-editor-ops).</summary>
+    public const string MinimumOpsBridge = "0.2.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -41,7 +44,10 @@ public sealed class BridgeClient : IDisposable
 
     public BridgeInfo Info => _info;
 
-    /// <summary>How long the compile wait sleeps between status polls.</summary>
+    /// <summary>Whether the bridge answers editor-ops requests.</summary>
+    public bool HasOps => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumOpsBridge);
+
+    /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 
     public static string DiscoveryPath(string projectRoot) => Path.Combine(projectRoot, "Library", "unitygraph", "bridge.json");
@@ -121,6 +127,58 @@ public sealed class BridgeClient : IDisposable
         BridgeJson.Parse<TestRunResult>(Get("/tests/result?id=" + Uri.EscapeDataString(id), RequestTimeout));
 
     /// <summary>
+    /// Sends an editor-ops request (path and query, values escaped by the caller) and reads its
+    /// answer: lines, a refusal, and maybe a state to wait for (<see cref="WaitFor"/>).
+    /// </summary>
+    public OpAnswer Op(string pathAndQuery, TimeSpan timeout)
+    {
+        OpAnswer answer = BridgeJson.Parse<OpAnswer>(Get(pathAndQuery, timeout));
+        return answer.Lines == null && answer.Error == null
+            ? throw new BridgeUnavailableException("the bridge answered neither lines nor an error")
+            : answer;
+    }
+
+    /// <summary>
+    /// Polls the status until the editor is in <paramref name="state"/> (`playing` counts `paused`
+    /// too), riding out the domain reload play mode starts with, as the compile wait does.
+    /// </summary>
+    public WaitOutcome WaitFor(string state, TimeSpan timeout)
+    {
+        var clock = Stopwatch.StartNew();
+        string last = "unknown";
+        string doing = state == "playing" ? "entering play mode" : "leaving play mode";
+        while (true)
+        {
+            try
+            {
+                last = Status().State;
+                if (last == state || (state == "playing" && last == "paused"))
+                {
+                    return new WaitOutcome(null, clock.Elapsed);
+                }
+            }
+            catch (BridgeUnavailableException)
+            {
+                if (!Reconnect("while " + doing, out string? gone))
+                {
+                    return new WaitOutcome(gone, clock.Elapsed);
+                }
+
+                last = "reloading";
+            }
+
+            if (clock.Elapsed >= timeout)
+            {
+                return new WaitOutcome(
+                    "Unity was still " + last + " after " + timeout.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture) + " s (" + doing + ")",
+                    clock.Elapsed);
+            }
+
+            Thread.Sleep(PollInterval);
+        }
+    }
+
+    /// <summary>
     /// Refreshes and waits for the compile it starts (see Compile flow in the spec). Never throws
     /// for a bridge that goes away mid-wait: the outcome says what is known.
     /// </summary>
@@ -153,7 +211,7 @@ public sealed class BridgeClient : IDisposable
             }
             catch (BridgeUnavailableException)
             {
-                if (!Reconnect(out string? gone))
+                if (!Reconnect("during the compile", out string? gone))
                 {
                     return CompileOutcome.Failed(gone!, clock.Elapsed);
                 }
@@ -238,12 +296,13 @@ public sealed class BridgeClient : IDisposable
     }
 
     // After a refused request: still waiting while the editor lives; picks up a new port or token.
-    private bool Reconnect(out string? problem)
+    // during: when it happened, for the message if the editor is gone ("during the compile").
+    private bool Reconnect(string during, out string? problem)
     {
         problem = null;
         if (!_isAlive(_info.Pid))
         {
-            problem = "Unity (pid " + _info.Pid.ToString(CultureInfo.InvariantCulture) + ") exited during the compile";
+            problem = "Unity (pid " + _info.Pid.ToString(CultureInfo.InvariantCulture) + ") exited " + during;
             return false;
         }
 

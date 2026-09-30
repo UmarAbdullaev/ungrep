@@ -332,6 +332,111 @@ public sealed class BridgeClientTests : IDisposable
             BridgeClient.IsUnityRunning(Environment.ProcessId));
     }
 
+    [Theory]
+    [InlineData("0.1.0", false)]
+    [InlineData("0.2.0", true)]
+    [InlineData("0.10.1", true)]
+    public void Ops_need_bridge_0_2_0(string version, bool hasOps)
+    {
+        FakeBridge bridge = Bridge();
+        bridge.Handle = _ => (200, FakeBridge.Status("idle", 0));
+        bridge.Publish(_root, bridge: version);
+        using BridgeClient client = BridgeClient.Connect(_root, _ => true).Client!;
+
+        Assert.Equal(hasOps, client.HasOps);
+    }
+
+    [Fact]
+    public void Op_reads_lines_errors_and_waits()
+    {
+        using BridgeClient client = Connected(path => path switch
+        {
+            "/scene" => (200, "{\"lines\":[\"Assets/Main.unity  active  2 roots\",\"edit mode\"]}"),
+            "/play" => (200, "{\"lines\":[\"playing\"],\"wait\":\"playing\"}"),
+            _ => (200, "{\"error\":\"not found: Playr\"}"),
+        });
+
+        OpAnswer scenes = client.Op("/scene", TimeSpan.FromSeconds(2));
+        Assert.Equal(["Assets/Main.unity  active  2 roots", "edit mode"], scenes.Lines);
+        Assert.Null(scenes.Error);
+        Assert.Null(scenes.Wait);
+
+        Assert.Equal("playing", client.Op("/play", TimeSpan.FromSeconds(2)).Wait);
+
+        OpAnswer refused = client.Op("/inspect?object=Playr", TimeSpan.FromSeconds(2));
+        Assert.Null(refused.Lines);
+        Assert.Equal("not found: Playr", refused.Error);
+    }
+
+    [Fact]
+    public void Op_rejects_an_answer_without_lines_or_error()
+    {
+        using BridgeClient client = Connected(path => path == "/scene" ? (200, "{\"state\":\"idle\"}") : (200, FakeBridge.Status("idle", 0)));
+
+        Assert.Equal("the bridge answered neither lines nor an error", Assert.Throws<BridgeUnavailableException>(() => client.Op("/scene", TimeSpan.FromSeconds(2))).Message);
+    }
+
+    [Fact]
+    public void Wait_for_play_mode_rides_out_the_domain_reload_on_a_new_port()
+    {
+        FakeBridge first = Bridge();
+        FakeBridge second = Bridge();
+        second.Handle = _ => (200, FakeBridge.Status("playing", 3));
+        int polls = 0;
+        using BridgeClient client = Connected(first, _ =>
+        {
+            if (Interlocked.Increment(ref polls) == 3)
+            {
+                // Entering play mode reloads the domain: the bridge comes back on another port.
+                second.Publish(_root);
+                ThreadPool.QueueUserWorkItem(_ => first.Dispose());
+            }
+
+            return (200, FakeBridge.Status("idle", 3));
+        });
+
+        WaitOutcome outcome = client.WaitFor("playing", TimeSpan.FromSeconds(10));
+
+        Assert.True(outcome.Reached, outcome.Problem);
+        Assert.Equal(second.Port, client.Info.Port);
+    }
+
+    [Fact]
+    public void Wait_for_play_mode_accepts_paused()
+    {
+        using BridgeClient client = Connected(_ => (200, FakeBridge.Status("paused", 3)));
+
+        Assert.True(client.WaitFor("playing", TimeSpan.FromSeconds(5)).Reached);
+    }
+
+    [Fact]
+    public void Wait_for_a_state_gives_up_at_the_deadline()
+    {
+        using BridgeClient client = Connected(_ => (200, FakeBridge.Status("playing", 3)));
+
+        WaitOutcome outcome = client.WaitFor("idle", TimeSpan.FromMilliseconds(300));
+
+        Assert.False(outcome.Reached);
+        Assert.Equal("Unity was still playing after 0.3 s (leaving play mode)", outcome.Problem);
+    }
+
+    [Fact]
+    public void Wait_for_a_state_stops_when_the_editor_exits()
+    {
+        bool alive = true;
+        FakeBridge bridge = Bridge();
+        bridge.Publish(_root, pid: 9);
+        bridge.Handle = _ => (200, FakeBridge.Status("idle", 3));
+        using BridgeClient client = BridgeClient.Connect(_root, _ => alive).Client!;
+        client.PollInterval = TimeSpan.FromMilliseconds(20);
+        alive = false;
+        bridge.Dispose();
+
+        WaitOutcome outcome = client.WaitFor("playing", TimeSpan.FromSeconds(10));
+
+        Assert.Equal("Unity (pid 9) exited while entering play mode", outcome.Problem);
+    }
+
     private FakeBridge Bridge()
     {
         var bridge = new FakeBridge();

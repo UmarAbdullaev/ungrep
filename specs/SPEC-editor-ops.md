@@ -22,7 +22,7 @@ In:
 
 - Bridge endpoints (package version 0.2.0 and up) for scenes, play mode, reading objects and
   editing, prefabs, assets, project data, screenshots and API lookup.
-- CLI: `ug scene`, `ug scene open|save|new|close|active`, `ug play|stop|pause`, `ug tree`,
+- CLI: `ug scene`, `ug scene open|new|close|active`, `ug save`, `ug play|stop|pause`, `ug tree`,
   `ug inspect`, `ug find --live`, `ug object create|delete|rename|move|active|duplicate`,
   `ug component add|remove`, `ug set`, `ug undo|redo`, `ug select`, `ug prefab ...`,
   `ug asset ...`, `ug project`, `ug package list|add|remove`, `ug shot`, `ug api`, `ug docs`,
@@ -98,7 +98,7 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/object/create?name=&parent=&prefab=&primitive=` | New empty object, primitive, or a prefab instance kept linked to its prefab. |
 | `/object/delete?object=` | Deletes an object and its children. |
 | `/object/rename?object=&name=` | |
-| `/object/move?object=&parent=&index=` | Reparents (empty `parent`: scene root), keeping the world position. |
+| `/object/move?object=&parent=&index=` | Reparents (empty `parent`: scene root, `ug object move --root`), keeping the world position. |
 | `/object/active?object=&value=` | `SetActive`. |
 | `/component/add?object=&type=` | Refused for types that are not components or not found. |
 | `/component/remove?object=&component=` | Refused when another component requires it. |
@@ -195,6 +195,13 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
 - Without the bridge: `Unity not reachable (...); ug <command> needs the bridge` plus the
   install hint. A 0.1.0 bridge: `bridge 0.1.0 is too old for ug <command>: run ug bridge
   install again`.
+- Edits are checked against the vendored folders in the client too, before any request:
+  `Assets/Plugins/X is in the vendored folder Assets/Plugins/, which ug does not edit`.
+- `ug play` and `ug stop` wait up to `--timeout` seconds (default 60) for the state, riding out
+  the domain reload; past it: `Unity was still idle after 60 s (entering play mode)`. An editor
+  that exits meanwhile: `Unity (pid N) exited while entering play mode`.
+- `ug save` is a top-level command (it saves scenes and assets alike), and `ug object move
+  --root` stands for the endpoint's empty `parent`.
 - `ug tree`/`ug inspect` on scenes that are not open: the graph (`ug explain`) already answers
   from the YAML; the skill says to use it and keep the editor for live state and edits.
 
@@ -206,6 +213,12 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
 | One edit on an idle editor, fresh process | ≤ 300 ms |
 | `ug play` until playing, BridgeHost | ≤ 5 s |
 
+Measured by the `UG_UNITY` end to end (O5, 2026-09-30, Unity 6000.3.14f1 in batch mode,
+Windows 11): fresh-process `ug status` 128 ms, `ug tree` 125 ms, `ug inspect` 124 ms and
+`ug object active` (an edit) 125 ms, medians of 5; `ug play` until playing 1.07 s, `ug stop`
+until edit mode 0.26 s. In process, reads and edits take 8–37 ms (`ug save` 37 ms); the rest of
+a fresh process's time is .NET start-up.
+
 ## Testing
 
 - EditMode tests in the package (BridgeHost, batch mode): addressing (paths, `#n`, scene prefix,
@@ -213,9 +226,10 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
   modified scene blocks `open`, refused while compiling is covered by the handler check), value
   parsing per field type.
 - Client and CLI tests against the fake bridge: answer formatting and refusals.
-- `UG_UNITY` end to end on a copy of BridgeHost: open a scene, tree, inspect, create a prefab
-  instance, set a field, move, delete, save and read the saved YAML back through the graph, play
-  and stop.
+- `UG_UNITY` end to end on a copy of BridgeHost (`Assets/Scenes/Main.unity`,
+  `Assets/Prefabs/Turret.prefab`, `Assets/Scripts/Turret.cs`): open a scene, tree, inspect,
+  create a prefab instance, set a field, move, delete, save and read the saved YAML back through
+  the graph (`ug explain o:<scene guid>:<file id>`), play, `find --live`, and stop.
 
 ## Boundaries
 
