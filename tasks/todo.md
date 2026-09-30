@@ -68,5 +68,5 @@ Details and acceptance criteria: `plan.md`.
 - [x] E1 editor-link spec
 - [x] E2 editor-link: bridge package and BridgeHost (19 EditMode tests green in batch mode; live smoke run)
 - [x] E3 editor-link: client and Editor.log (41 tests, EditorLink coverage 88%)
-- [ ] E4 editor-link: CLI and end to end
+- [x] E4 editor-link: CLI and end to end
 - [ ] E5 editor-link: purge-squad measurement (ask before installing the bridge there)

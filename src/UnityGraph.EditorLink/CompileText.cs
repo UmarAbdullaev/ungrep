@@ -75,7 +75,8 @@ public static class CompileText
         return head + "; from Editor.log of " + Time(logTime.Value) + ": " + Counts(log.LastCompile.Messages) + "\n" + Lines(log.LastCompile.Messages, warnings);
     }
 
-    internal static string Counts(IReadOnlyList<CompileMessage> messages)
+    /// <summary>`2 errors, 1 warning`: each message once, warnings only when there are some.</summary>
+    public static string Counts(IReadOnlyList<CompileMessage> messages)
     {
         List<CompileMessage> distinct = Distinct(messages);
         int errors = distinct.Count(m => m.IsError);

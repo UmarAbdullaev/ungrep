@@ -99,6 +99,32 @@ public sealed class CompileTextTests : IDisposable
     }
 
     [Fact]
+    public void The_repeat_after_a_failed_build_stays_with_that_build()
+    {
+        // As recorded by the UG_UNITY end-to-end test: the repeat block has a command line, an
+        // output header and blank lines before its last copy of the error, then the fix compiles.
+        string log = """
+            Successfully changed project path to: D:/Work/BridgeHost
+            Assets\Editor\Broken.cs(1,74): error CS0103: The name 'spd' does not exist in the current context
+            *** Tundra build failed (0.17 seconds), 2 items updated, 195 evaluated
+            ## Script Compilation Error for: Csc Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp-Editor.dll (+2 others)
+            ## CmdLine: "dotnet.exe" exec "csc.dll" /nostdlib /noconfig
+            ## Output:
+            Assets\Editor\Broken.cs(1,74): error CS0103: The name 'spd' does not exist in the current context
+
+            Assets\Editor\Broken.cs(1,74): error CS0103: The name 'spd' does not exist in the current context
+            Starting new worker id: 0
+            [192/195    0s] Csc Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp-Editor.dll (+2 others)
+            *** Tundra build success (0.32 seconds), 3 items updated, 195 evaluated
+            """;
+
+        EditorLogAnswer answer = EditorLog.Read(log, Recorded);
+
+        Assert.False(answer.LastCompile!.Failed);
+        Assert.Empty(answer.LastCompile.Messages);
+    }
+
+    [Fact]
     public void A_log_without_a_project_line()
     {
         EditorLogAnswer answer = EditorLog.Read("*** Tundra build failed (0.66 seconds)\n", Recorded);

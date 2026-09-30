@@ -18,6 +18,7 @@
     <ProjectReference Include="..\UnityGraph.Assets\UnityGraph.Assets.csproj" />
     <ProjectReference Include="..\UnityGraph.Code\UnityGraph.Code.csproj" />
     <ProjectReference Include="..\UnityGraph.Core\UnityGraph.Core.csproj" />
+    <ProjectReference Include="..\UnityGraph.EditorLink\UnityGraph.EditorLink.csproj" />
     <ProjectReference Include="..\UnityGraph.Stats\UnityGraph.Stats.csproj" />
     <ProjectReference Include="..\UnityGraph.Hooks\UnityGraph.Hooks.csproj" />
     <ProjectReference Include="..\UnityGraph.Query\UnityGraph.Query.csproj" />

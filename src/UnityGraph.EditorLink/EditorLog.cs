@@ -72,7 +72,9 @@ public static partial class EditorLog
         {
             if (TundraEnd().Match(line) is { Success: true } end)
             {
-                last = new LogCompile(end.Groups["result"].Value == "failed", Distinct(current));
+                bool failed = end.Groups["result"].Value == "failed";
+                // A build that succeeded had no errors, whatever stray lines the log holds.
+                last = new LogCompile(failed, Distinct(failed ? current : current.Where(m => !m.IsError)));
                 current = [];
                 trailing = last.Failed;
                 continue;
@@ -87,7 +89,8 @@ public static partial class EditorLog
                     continue;
                 }
 
-                if (line.StartsWith("## Script Compilation Error", StringComparison.Ordinal))
+                // `## Script Compilation Error for: ...`, `## CmdLine: ...`, `## Output:` and blank lines.
+                if (line.StartsWith("##", StringComparison.Ordinal) || line.Trim().Length == 0)
                 {
                     continue;
                 }

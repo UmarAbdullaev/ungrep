@@ -119,7 +119,9 @@ When no bridge answers, `ug compile` reads `Editor.log` (Windows
   6000.3.14f1 and the same in both: a compile ends with `*** Tundra build success` or
   `*** Tundra build failed` (`*** Tundra build requires additional run` is not an end); its
   messages come before that line, and after a failure Unity repeats them under
-  `## Script Compilation Error for: Csc <assembly>.dll`. Repeats are shown once.
+  `## Script Compilation Error for: Csc <assembly>.dll`, `## CmdLine:` and `## Output:`, with
+  blank lines between the copies. The whole repeat block belongs to the failed build, and a
+  build that succeeded keeps no errors. Repeats are shown once.
 - The project comes from `-projectPath <dir>` in the command line (Hub writes `-projectpath`
   and backslashes), else from `Successfully changed project path to: <dir>`.
 - The answer starts `Unity not reachable (<reason>); from Editor.log of <time>:` so a stale log
@@ -202,7 +204,7 @@ E2 smoke run (2026-09-29), BridgeHost in batch mode on Unity 6000.3.14f1 (`-batc
 -nographics -ugBridge`, no `-quit`), requests with curl over loopback:
 
 - `EditorApplication.update` ticks in batch mode, so queued requests are answered: `/refresh`
-  5�45 ms, `/compile`, `/console`, `/run`, `/tests` 1�40 ms; `/status` 2�24 ms.
+  5–45 ms, `/compile`, `/console`, `/run`, `/tests` 1–40 ms; `/status` 2–24 ms.
 - A file with an error: `/refresh` said `compiling`, `/status` reached `compile: 1` in 1.3 s,
   and `/compile` gave `Assets/Editor/Broken.cs`, line 1, column 78, `CS0103` and its text.
 - Fixing it: the successful compile reloaded the domain; the bridge came back on the same port
@@ -214,7 +216,25 @@ E2 smoke run (2026-09-29), BridgeHost in batch mode on Unity 6000.3.14f1 (`-batc
 - Mono's traces name frames without symbols `in <41d29b35...>:0`; the first EditMode run caught
   `Path.IsPathRooted` throwing on them, fixed in `StackFrames.Relative`.
 
-Client and CLI numbers: E4 and E5.
+E4 end-to-end test (2026-09-30, `UG_UNITY` set), a copy of BridgeHost with its Library opened
+in batch mode on Unity 6000.3.14f1, commands run in process, three runs:
+
+| Step | Time |
+| --- | --- |
+| Editor start to bridge `idle` | 7.3–8.3 s |
+| `ug compile`, no script changes | 25–56 ms |
+| `ug compile`, a new file with an error | 0.8–1.2 s |
+| `ug compile` after the fix, with the domain reload | 2.1–2.2 s |
+| `ug status`, fresh `ug.exe` process, median of 5 | 164–173 ms |
+
+The compile times match the E2 curl run, so the client adds no measurable wait. Killing the
+editor gave `stale bridge.json: Unity (pid N) is not running` for `status`, and `compile` fell
+back to the project's Editor.log. That fallback first reported the fixed error again: the
+repeat block after a failed build (above) had ended at its `## CmdLine:` line, so the last copy
+of the error was counted in the next, successful build. Fixed in `EditorLog` with a regression
+test.
+
+purge-squad numbers: E5.
 
 ## Open points
 

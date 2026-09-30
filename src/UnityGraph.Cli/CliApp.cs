@@ -10,8 +10,9 @@ internal static class CliApp
 {
     // claudeConfigDir: Claude Code's config folder; null means CLAUDE_CONFIG_DIR, then ~/.claude.
     // runtime: what `ug doctor` reports as the runtime; null means the one running ug.
-    // Both are set by tests only.
-    public static int Run(string[] args, TextWriter output, TextWriter error, string? claudeConfigDir = null, string? runtime = null)
+    // editorLog: the Editor.log `ug compile` falls back on; null means Unity's default place.
+    // All three are set by tests only.
+    public static int Run(string[] args, TextWriter output, TextWriter error, string? claudeConfigDir = null, string? runtime = null, string? editorLog = null)
     {
         var root = new RootCommand("unitygraph: Unity project graph for Claude Code.")
         {
@@ -19,7 +20,7 @@ internal static class CliApp
             IndexCommand.Create(),
             StatsCommand.Create(claudeConfigDir),
         };
-        foreach (Command command in QueryCommands.Create())
+        foreach (Command command in QueryCommands.Create().Concat(EditorCommands.Create(editorLog)))
         {
             root.Subcommands.Add(command);
         }

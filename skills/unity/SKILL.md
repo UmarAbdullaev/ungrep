@@ -19,6 +19,10 @@ anchors; read only the lines you need after that.
 | `ug index` | Build or update the code and asset graph (queries do this themselves). |
 | `ug doctor` | Is the plugin working here: runtime, Unity project, config, graph. |
 | `ug stats` | Where this project's context tokens went, by tool category. |
+| `ug status` | The open editor: Unity version, idle or compiling, last compile's error count. |
+| `ug compile` | Refresh, wait for the script compile, list errors as `file:line:col CODE text` (`--warnings` adds warnings). Without the editor it reads Editor.log and says how old that answer is. |
+| `ug run <target>` | Run a static editor method without parameters (`Namespace.Type.Method`) or a menu item (`Tools/Build`) in the open editor; prints its result or exception. |
+| `ug bridge install` | Print how to add the editor bridge that `status`, `compile` and `run` talk to. |
 
 `<symbol>`: `LabStage`, `LabStage.Open`, `Game.Lab.LabStage.Open(int)`, an asset path
 (`Assets/Prefabs/Turntable.prefab`), file name (`Turntable.prefab`) or GUID, or a `cs:`, `a:` or
@@ -32,3 +36,13 @@ Reading answers:
 - Scenes, prefabs, ScriptableObjects and materials are in the graph: ask it before reading YAML.
 - A `unity event` matched only by method name (no parameter types in the YAML) is `[heuristic]`.
 - Calls into UnityEngine or packages are not in the graph; `refs MonoBehaviour` finds nothing.
+
+Editor commands:
+- After editing scripts, run `ug compile` instead of reading Editor.log or asking the user to
+  paste errors. `no script changes` means Unity saw nothing new to compile.
+- `Unity not reachable (...)` answers come from Editor.log or `compile.json`; check the time in
+  the header before trusting them.
+- The bridge writes into the user's project: ask before `ug bridge install --copy` or adding the
+  package through Package Manager. `ug bridge remove` undoes `--copy`.
+- `ug run` executes code in the user's editor: run only what the user asked for or what the
+  task clearly needs.
