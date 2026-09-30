@@ -70,3 +70,9 @@ Details and acceptance criteria: `plan.md`.
 - [x] E3 editor-link: client and Editor.log (41 tests, EditorLink coverage 88%)
 - [x] E4 editor-link: CLI and end to end
 - [x] E5 editor-link: purge-squad measurement (ask before installing the bridge there)
+- [x] O1 editor-ops spec
+- [ ] O2 editor-ops: addressing, scenes and play mode
+- [ ] O3 editor-ops: tree and inspect
+- [ ] O4 editor-ops: edits
+- [ ] O5 editor-ops: client, CLI, skill, end to end
+- [ ] O6 editor-ops: purge-squad measurement (ask before editing purge-squad scenes)

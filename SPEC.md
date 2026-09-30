@@ -224,6 +224,7 @@ Standing assumptions:
 | `asset-index` | `.meta` GUID table and Unity YAML (scenes, prefabs with nesting, variants and overrides, ScriptableObjects, materials, animators, animations, input actions, asmdefs, Addressables): objects, components, references, UnityEvent calls. | `graph-core` |
 | `query` | `ug find / explain / refs / impact / outline / batch`; answer budgets, `file:line` anchors, confidence tags; reindex on edit. | `code-index`, `asset-index`, `plugin-shell` |
 | `editor-link` | Bridge package and client: status, refresh and compile, compile errors, console, tests, run a static method; `Editor.log` fallback when Unity is unreachable. | `plugin-shell` |
+| `editor-ops` | Work in the open editor through the bridge: open and save scenes, play mode, live hierarchy and component values, create/delete/move objects, add/remove components, set serialized fields; Undo for every edit, nothing saved unasked. | `editor-link` |
 | `unity-loop` | Compile gate (edit tracking + Stop hook, silent when clean); compact `ug console`, `ug test`, `ug log` (digest of the last play session). | `editor-link` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
 | `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract. | `query`, `unity-loop`, `editor-link` |
@@ -234,7 +235,7 @@ Standing assumptions:
 **Build order** (measure first, biggest lever first, each step dogfooded on purge-squad):
 
 1. Spikes S1–S3, then `stats`, `plugin-shell`, `graph-core`
-2. `code-index`, `asset-index`, `editor-link`
+2. `code-index`, `asset-index`, `editor-link`, `editor-ops` (added 2026-09-30, user)
 3. `query`, `unity-loop`
 4. `worker-agent`, `guards`
 5. `project-map`, `viewer`
@@ -429,7 +430,8 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
 
 - **Always:** tests green before a commit; deterministic output; answers within budget and
   tagged with confidence; fail open; update the relevant spec when a decision changes; measure
-  before claiming a saving.
+  before claiming a saving. Editor edits (`editor-ops`) only on an explicit `ug` command,
+  through Undo, saved only by `ug save`.
 - **Ask first:** new dependencies; graph schema changes after v1; new hook events; anything that
   writes into a user's Unity project (installing the bridge package, generating `CLAUDE.md`
   files); any network access; widening the supported Unity versions.

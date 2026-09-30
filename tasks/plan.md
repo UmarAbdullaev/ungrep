@@ -200,3 +200,36 @@ Acceptance: `UG_UNITY` end-to-end test passes against BridgeHost in batch mode; 
 ### E5. editor-link: purge-squad measurement
 Needs the bridge installed in purge-squad: ask the user first. Otherwise measured on BridgeHost
 only and the open point stays open.
+
+## Editor-ops (spec: `specs/SPEC-editor-ops.md`)
+
+Added 2026-09-30 by the user: `ug` should cover what people use a Unity MCP server for, so
+unitygraph is the one plugin a Unity developer needs. Built before `unity-loop`.
+
+```
+O1 spec ──> O2 addressing, scenes, play ──> O3 tree + inspect ──> O4 edits ──> O5 CLI + end to end ──> O6 purge-squad
+```
+
+### O1. editor-ops spec
+`specs/SPEC-editor-ops.md`; SPEC.md module table, build order and Boundaries.
+
+### O2. editor-ops: addressing, scenes and play mode
+- Bridge 0.2.0: object addresses, `/scene`, `/scene/open`, `/save`, `/play`, `/stop`, `/pause`.
+Acceptance: EditMode tests in batch mode (addressing cases, modified scene blocks `open`).
+
+### O3. editor-ops: tree and inspect
+- `/tree`, `/inspect` with line caps; values of every serialized property type BridgeHost holds.
+Acceptance: EditMode tests on BridgeHost's scene, prefab and ScriptableObject.
+
+### O4. editor-ops: edits
+- `/object/*`, `/component/*`, `/set`; Undo groups; prefab-content writes; refusals.
+Acceptance: EditMode tests per endpoint, including undo reverting each edit and nothing saved.
+
+### O5. editor-ops: client, CLI, skill, end to end
+- Client requests, `ug` commands, answer lines, version check, skill section.
+Acceptance: fake-bridge CLI tests; `UG_UNITY` end to end passes; times recorded.
+
+### O6. editor-ops: purge-squad measurement
+- Reads on purge-squad's open editor; edits only with the user's go-ahead (or on a scratch scene
+  they approve). Idle and per-task token cost against the Unity MCP server the user runs.
+Acceptance: Measured section filled; targets met or explained.

@@ -28,8 +28,8 @@ In:
   EditMode tests run in batch mode.
 
 Out: the compile gate hook, compact `ug console`, `ug test` and `ug log` (all `unity-loop`,
-which uses this client); entering or leaving play mode; scene or asset edits through the
-bridge; Unity's official CLI adapter (after v1, Decisions #3); Linux.
+which uses this client); entering or leaving play mode and scene or asset edits (added later
+as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, Decisions #3); Linux.
 
 ## The bridge
 
