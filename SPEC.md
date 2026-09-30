@@ -209,7 +209,9 @@ under 10%.
 
 Standing assumptions:
 
-- Local only: no telemetry, no network calls. Transcripts are read on the user's machine.
+- Local only: no telemetry, no network calls. Transcripts are read on the user's machine. One
+  exception (user, 2026-09-30): `ug api`/`ug docs` fall back to docs.unity3d.com when the local
+  answers run out, sending only a type, member or page name (SPEC-editor-ops rule 11).
 - Windows and macOS first; Linux after v1.
 - Development dogfoods on purge-squad; each module is measured there before it's called done.
 
@@ -434,7 +436,7 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
   through Undo, saved only by `ug save`.
 - **Ask first:** new dependencies; graph schema changes after v1; new hook events; anything that
   writes into a user's Unity project (installing the bridge package, generating `CLAUDE.md`
-  files); any network access; widening the supported Unity versions.
+  files); any network access beyond the docs fallback; widening the supported Unity versions.
 - **Never:** send code, transcripts or usage data off the machine; edit vendored folders or
   `Packages/` in a user's project (except `ug package add|remove` on an explicit command,
   through Unity's Package Manager; user, 2026-09-30); change scenes or prefabs from a hook; add an MCP server

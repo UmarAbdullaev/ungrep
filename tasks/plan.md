@@ -250,7 +250,8 @@ has it.
 Acceptance: EditMode tests; package add/remove on a BridgeHost copy only (`UG_UNITY`).
 
 ### O9. editor-ops: screenshots, API lookup, stats, batch
-- `/shot`, `/api` (reflection, then the offline Scripting Reference), `/stats`, editor commands in
+- `/shot`, `/api` (reflection, offline Scripting Reference, then the docs.unity3d.com fallback,
+  trimmed and cached; `ug docs` for Manual and package pages), `/stats`, editor commands in
   `ug batch`.
 Acceptance: EditMode tests; PNG written and readable; `ug api` answers under 300 tokens for
 common types.

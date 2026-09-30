@@ -54,7 +54,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
 | `manage_graphics`, `manage_physics`, `manage_profiler` | `ug stats` (render, memory, profiler counters); settings through `ug set` on `ProjectSettings/*.asset` |
-| `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`: reflection, then the offline Scripting Reference |
+| `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |
 | `batch_execute` | `ug batch` with editor commands, one process and one connection |
 | `set_active_instance`, `execute_custom_tool` | One editor per project root; `ug run` for project editor methods |
 
@@ -145,9 +145,13 @@ object address, asset path or `null`, array size via `field.size`.
    `AssetDatabase` so `.meta` files and GUIDs follow; deletes go to the OS trash, never gone.
 10. **Packages.** `ug package add|remove` only on an explicit command, through Unity's Package
     Manager (Unity writes `Packages/manifest.json`, not ug). Added 2026-09-30 by the user.
-11. **API lookup is offline.** `ug api` answers from reflection (signatures), then the local
-    Scripting Reference when the Hub's Documentation module is installed (summary and
-    parameters, trimmed). No network: see open point 3.
+11. **API lookup, online last.** `ug api` answers from reflection (signatures), then the local
+    Scripting Reference when the Hub's Documentation module is installed, then docs.unity3d.com
+    (Scripting Reference, Manual, package docs) when neither answers. The request carries only
+    the type, member or page name, never code or project data; pages are trimmed to signature,
+    summary, parameters and one example and cached under `%LOCALAPPDATA%/unitygraph/docs`
+    (`~/Library/Caches/unitygraph/docs` on macOS); config `docs.online: false` turns the network
+    step off, and a failed fetch says so and fails open. Approved by the user 2026-09-30.
 
 ## Commands
 
@@ -214,7 +218,7 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
   explicit `ug prefab`, `ug asset` and `ug package` commands.
 - Never from a hook; never edits package contents or vendored folders; never discards unsaved
   work.
-- No network access (rule 11).
+- The only network access is rule 11's docs fallback, to docs.unity3d.com only.
 - Changing the user's scenes on purge-squad (O10) needs the user's go-ahead first; reads do not.
 
 ## Open points
@@ -223,7 +227,3 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
    `ug refs` answer can feed `ug inspect` directly.
 2. Whether `ug play --for <s>` (play, wait, stop, digest) belongs here or in unity-loop's
    `ug log`.
-3. An online fallback for `ug api` (docs.unity3d.com, name-only request, trimmed and cached)
-   when the offline reference is not installed. Saves tokens only against Claude's own WebFetch
-   of the same page (~300 vs ~1000); reflection is cheaper still. Needs the user's decision
-   (SPEC Boundaries: network access).
