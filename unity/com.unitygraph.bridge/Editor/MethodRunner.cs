@@ -34,6 +34,12 @@ namespace UnityGraph.Bridge
             var clock = Stopwatch.StartNew();
             if (target.Contains("/"))
             {
+                string refused = RefusedMenu(target);
+                if (refused != null)
+                {
+                    return new Outcome { Error = refused };
+                }
+
                 bool ran = EditorApplication.ExecuteMenuItem(target);
                 return new Outcome { Ran = ran, Error = ran ? null : "no menu item " + target, Milliseconds = clock.Elapsed.TotalMilliseconds };
             }
@@ -67,6 +73,20 @@ namespace UnityGraph.Bridge
                     Milliseconds = clock.Elapsed.TotalMilliseconds,
                 };
             }
+        }
+
+        /// <summary>Why a menu item is never run (it quits the editor or builds a player), or null.</summary>
+        public static string RefusedMenu(string menuPath)
+        {
+            string path = string.Join("/", menuPath.Split('/').Select(part => part.Trim()));
+            if (path.Equals("File/Quit", StringComparison.OrdinalIgnoreCase) || path.Equals("File/Exit", StringComparison.OrdinalIgnoreCase))
+            {
+                return "refused, it would close the editor (ug does not quit Unity)";
+            }
+
+            return path.StartsWith("File/Build", StringComparison.OrdinalIgnoreCase) || path.StartsWith("Build/", StringComparison.OrdinalIgnoreCase)
+                ? "refused, it builds a player (ug does not build; use Unity's Build Profiles window)"
+                : null;
         }
 
         /// <summary>Finds `Type.Method` (full or short type name); the error says why nothing was found.</summary>

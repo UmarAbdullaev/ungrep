@@ -21,7 +21,7 @@ anchors; read only the lines you need after that.
 | `ug stats` | Where this project's context tokens went, by tool category. |
 | `ug status` | The open editor: Unity version, idle or compiling, last compile's error count. |
 | `ug compile` | Refresh, wait for the script compile, list errors as `file:line:col CODE text` (`--warnings` adds warnings). Without the editor it reads Editor.log and says how old that answer is. |
-| `ug run <target>` | Run a static editor method without parameters (`Namespace.Type.Method`) or a menu item (`Tools/Build`) in the open editor; prints its result or exception. |
+| `ug run <target>` | Run a static editor method without parameters (`Namespace.Type.Method`) or a menu item (`Tools/Build`) in the open editor; prints its result or exception. Menu items that quit the editor (`File/Quit`, `File/Exit`) or build a player (`File/Build...`) are refused. |
 | `ug bridge install` | Print how to add the editor bridge that `status`, `compile` and `run` talk to. |
 
 `<symbol>`: `LabStage`, `LabStage.Open`, `Game.Lab.LabStage.Open(int)`, an asset path
@@ -65,6 +65,8 @@ Editor ops (the open editor, through the bridge; `ug <command> --help` for optio
 | `ug undo` / `ug redo` / `ug select [object]` | Unity's Undo and Redo; the editor's selection. |
 | `ug prefab create <object> <Assets/X.prefab>` / `apply` / `revert` / `unpack [--completely]` | Save an object as a prefab and keep it linked; write an instance's overrides into its prefab (`apply` writes the asset at once); throw them away; cut the link. `apply`, `revert` and `unpack` take the instance root. A new instance is `ug object create --prefab`. |
 | `ug asset folder <path>` / `create <path> <type> [--shader S]` / `move <from> <to>` / `rename <path> <name>` / `duplicate <path> [to]` / `delete <path>` / `reimport <path>` | Asset-database edits: folders, materials and ScriptableObjects (by type name), GUID-keeping move and rename, copies, delete to the OS trash, reimport. They write at once and are **not undoable**; existing targets, `Packages/`, vendored folders, `Assets/` itself and open scenes are refused. Material properties and importer settings go through `ug set` (`--importer`). |
+| `ug project` | Unity version, render pipeline, tags, layers, sorting layers and build scenes (read-only; change them with `ug set` on `ProjectSettings/*.asset`). |
+| `ug package list` / `add <id>` / `remove <name>` | Unity's Package Manager: direct dependencies with resolved versions; add a package by name, `name@version`, git URL or `file:` path; remove one. **Only when the user asked**: Unity writes `Packages/manifest.json`, an add from a registry or git downloads, and both may recompile (`ug compile` waits). Not undoable. `--timeout` seconds (default 300). The bridge package itself is refused. |
 
 - `<object>`: `Level/Enemy`, `Enemy#2` for the second of that name, `Main:Level/Enemy` for one
   scene, `Assets/Prefabs/Turret.prefab:Barrel` inside a prefab asset.

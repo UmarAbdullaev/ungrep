@@ -207,6 +207,9 @@ internal static class EditorCommands
 
     private static readonly TimeSpan _sceneTimeout = TimeSpan.FromSeconds(60);
 
+    // The Package Manager lists from its local cache; add and remove get --timeout (default 300 s).
+    private static readonly TimeSpan _packageListTimeout = TimeSpan.FromSeconds(60);
+
     /// <summary>
     /// An editor-ops request: path and escaped query, the object addresses it edits (checked
     /// against the vendored folders), and how long to wait for the answer and for a play-mode change.
@@ -463,6 +466,21 @@ internal static class EditorCommands
             new OpRequest(Query("/asset/reimport", ("path", r.GetValue(reimportPath)), ("vendored", VendoredPrefixes(config))), r.GetValue(reimportPath))));
         yield return assets;
 
+        yield return Ops("project", "project", "Unity version, render pipeline, tags, layers, sorting layers and build scenes.", [], _ => new OpRequest("/project"));
+
+        var packages = new Command("package", "List, add and remove packages through Unity's Package Manager. Unity writes Packages/manifest.json; add may download.");
+        packages.Subcommands.Add(Ops("list", "package list", "The manifest's direct dependencies with their resolved versions (from the local cache, no download).", [], _ =>
+            new OpRequest("/package/list") { Timeout = _packageListTimeout }));
+        Argument<string> packageId = Required("id", "Package name (com.unity.cinemachine), name@version, a git URL or file:path.");
+        Option<int> addTimeout = PackageSeconds();
+        packages.Subcommands.Add(Ops("add", "package add", "Add a package; Unity resolves it (a registry or git package downloads) and updates the manifest.", [packageId, addTimeout], r =>
+            new OpRequest(Query("/package/add", ("id", r.GetValue(packageId)))) { Timeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(addTimeout))) }));
+        Argument<string> packageName = Required("name", "Package name, like com.unity.cinemachine.");
+        Option<int> removeTimeout = PackageSeconds();
+        packages.Subcommands.Add(Ops("remove", "package remove", "Remove a package from the manifest.", [packageName, removeTimeout], r =>
+            new OpRequest(Query("/package/remove", ("name", r.GetValue(packageName)))) { Timeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(removeTimeout))) }));
+        yield return packages;
+
         yield return Ops("undo", "undo", "Undo the editor's last change, like Ctrl+Z.", [], _ => new OpRequest("/undo"));
         yield return Ops("redo", "redo", "Redo the last undone change.", [], _ => new OpRequest("/redo"));
 
@@ -476,6 +494,7 @@ internal static class EditorCommands
         static Option<string?> Text(string name, string description) => new(name) { Description = description };
         static Option<bool> Flag(string name, string description) => new(name) { Description = description };
         static Option<int> Seconds() => new("--timeout") { Description = "Seconds to wait for play mode to change. Default: 60.", DefaultValueFactory = _ => 60 };
+        static Option<int> PackageSeconds() => new("--timeout") { Description = "Seconds to wait for the Package Manager. Default: 300.", DefaultValueFactory = _ => 300 };
         static string? True(bool flag) => flag ? "true" : null;
 
         // The vendored folders joined with |, for requests whose target the bridge learns or checks itself.

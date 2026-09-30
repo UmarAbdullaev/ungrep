@@ -260,6 +260,54 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Equal("Assets/Plugins/Dye.mat is in the vendored folder Assets/Plugins/, which ug does not edit\n", Ug(log, "asset", "move", "Assets/Art/Icons/Dye.mat", "Assets/Plugins/Dye.mat"));
         Assert.Equal("Assets/Art/Icons/Dye.mat already exists: ug does not overwrite it\n", Ug(log, "asset", "duplicate", "Assets/Art/Icons/Dye.mat", "Assets/Art/Icons/Dye.mat"));
 
+        // Project data, menu items and packages (O8). The package is a local one made in the copy, so nothing is downloaded.
+        clock.Restart();
+        string project = Ug(log, "project");
+        Report("ug project", clock.Elapsed);
+        Assert.StartsWith("Unity 6000.3.14f1  render pipeline: Built-in\ntags  Untagged, Respawn, Finish, EditorOnly, MainCamera, Player, GameController\nlayers  0 Default, ", project, StringComparison.Ordinal);
+        Assert.Contains("\nsorting layers  Default\nbuild scenes  ", project, StringComparison.Ordinal);
+
+        Assert.Equal("did not run File/Quit: refused, it would close the editor (ug does not quit Unity)\n", Ug(log, "run", "File/Quit"));
+        Assert.Equal("did not run File/Build And Run: refused, it builds a player (ug does not build; use Unity's Build Profiles window)\n", Ug(log, "run", "File/Build And Run"));
+        Assert.StartsWith("Unity 6000.3.14f1  idle", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.Equal("did not run Tools/BridgeHost/Nope: no menu item Tools/BridgeHost/Nope\n", Ug(log, "run", "Tools/BridgeHost/Nope"));
+        Assert.Matches(@"^ran Tools/BridgeHost/Log Hello in \d+ ms\n$", Ug(log, "run", "Tools/BridgeHost/Log Hello"));
+        Assert.Contains("hello from the menu", EditorLogText(log), StringComparison.Ordinal);
+
+        string packageFolder = Path.Combine(_root, "LocalPackages", "com.ug.e2e");
+        Directory.CreateDirectory(packageFolder);
+        File.WriteAllText(Path.Combine(packageFolder, "package.json"), "{\"name\":\"com.ug.e2e\",\"version\":\"1.2.3\",\"displayName\":\"ug e2e\",\"unity\":\"2022.3\"}\n");
+
+        clock.Restart();
+        string listed = Ug(log, "package", "list");
+        Report("ug package list", clock.Elapsed);
+        Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.2.0  local  ", listed, StringComparison.Ordinal);
+        Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
+
+        Assert.Equal(
+            "removing com.unitygraph.bridge would end this connection: remove it in Package Manager (Window > Package Manager)\n",
+            Ug(log, "package", "remove", "com.unitygraph.bridge"));
+        Assert.Equal("no package id given: a name, name@version, a git URL or file:path\n", Ug(log, "package", "add", " "));
+
+        clock.Restart();
+        string added = Ug(log, "package", "add", "file:" + packageFolder.Replace('\\', '/'));
+        Report("ug package add (local package)", clock.Elapsed);
+        Assert.StartsWith("added com.ug.e2e  1.2.3  local  ", added, StringComparison.Ordinal);
+        Assert.EndsWith("  (Unity updated Packages/manifest.json; scripts may recompile, ug compile waits; not undoable)\n", added, StringComparison.Ordinal);
+        Assert.Contains("\"com.ug.e2e\"", File.ReadAllText(manifest), StringComparison.Ordinal);
+        WaitForIdle(TimeSpan.FromMinutes(2));
+        Assert.Contains("com.ug.e2e  1.2.3  local  ", Ug(log, "package", "list"), StringComparison.Ordinal);
+
+        clock.Restart();
+        string removed = Ug(log, "package", "remove", "com.ug.e2e");
+        Report("ug package remove", clock.Elapsed);
+        Assert.Equal("removed com.ug.e2e  (Unity updated Packages/manifest.json; scripts may recompile, ug compile waits; not undoable)\n", removed);
+        Assert.DoesNotContain("com.ug.e2e", File.ReadAllText(manifest), StringComparison.Ordinal);
+        WaitForIdle(TimeSpan.FromMinutes(2));
+        Assert.DoesNotContain("com.ug.e2e", Ug(log, "package", "list"), StringComparison.Ordinal);
+        Assert.StartsWith("could not remove com.ug.e2e: ", Ug(log, "package", "remove", "com.ug.e2e"), StringComparison.Ordinal);
+
         clock.Restart();
         string play = Ug(log, "play");
         Report("ug play until playing", clock.Elapsed);
@@ -316,6 +364,14 @@ public sealed class EditorEndToEndTests : IDisposable
 
         times.Sort();
         return TimeSpan.FromMilliseconds(times[count / 2]);
+    }
+
+    // The editor's log so far; Unity keeps the file open while it runs.
+    private static string EditorLogText(string log)
+    {
+        using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     // The guid Unity wrote into an asset's .meta file.

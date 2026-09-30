@@ -57,6 +57,12 @@ namespace UnityGraph.Bridge
                 { "/asset/duplicate", (r, c) => Checked(() => AssetOps.Duplicate(r)) },
                 { "/asset/delete", (r, c) => Checked(() => AssetOps.Delete(r)) },
                 { "/asset/reimport", (r, c) => Checked(() => AssetOps.Reimport(r)) },
+
+                // Project settings and packages.
+                { "/project", (r, c) => Checked(ProjectOps.Project) },
+                { "/package/list", (r, c) => Deferred(PackageOps.List) },
+                { "/package/add", (r, c) => Deferred(() => PackageOps.Add(r)) },
+                { "/package/remove", (r, c) => Deferred(() => PackageOps.Remove(r)) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>
@@ -82,6 +88,26 @@ namespace UnityGraph.Bridge
             }
 
             return () => reply;
+        }
+
+        // A request that finishes on a later update: refused at once while busy, else the poll it starts.
+        private static Func<Reply> Deferred(Func<Func<Reply>> start)
+        {
+            Reply busy = SceneOps.Busy();
+            if (busy != null)
+            {
+                return () => busy;
+            }
+
+            try
+            {
+                return start();
+            }
+            catch (Exception e) when (!(e is OutOfMemoryException))
+            {
+                Reply failed = Answer.Error("Unity threw " + e.GetType().Name + ": " + e.Message);
+                return () => failed;
+            }
         }
     }
 }

@@ -51,7 +51,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `execute_menu_item` | `ug run <menu path>` (editor-link's runner already calls `ExecuteMenuItem`) |
 | `manage_prefabs` | `ug prefab create|apply|revert|unpack`, prefab-content addresses; `instantiate` is `ug object create --prefab`, no second command |
 | `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
-| `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API |
+| `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API (no `search`/`resolve`: `add` resolves, and browsing a registry is a network use rule 10 does not cover) |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
 | `manage_graphics`, `manage_physics`, `manage_profiler` | `ug perf` (render, memory, profiler counters; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
 | `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |
@@ -115,9 +115,9 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/prefab/create?object=&path=`, `/prefab/apply?object=`, `/prefab/revert?object=`, `/prefab/unpack?object=&completely=` | Save an object as a prefab (kept linked; a prefab instance becomes a variant); apply or revert an instance's overrides; unpack (`completely=true` unpacks nested prefabs too). Each is one undo group `ug prefab <sub>`. `create` refuses an existing path, a path outside `Assets/` or without `.prefab`, a missing folder, and objects inside a prefab asset or inside an instance (give the root). `apply` and `revert` answer the overrides they applied or reverted, one line per object (`Crate  Turret.speed`, `added Turret`, `removed object Barrel`); `apply` writes the asset at once and says so, `create` too. The client sends `vendored=<prefixes joined by '|'>` on `apply`, whose asset is unknown until the bridge resolves the instance; the bridge refuses Packages/ and those folders. |
 | `/asset/folder`, `/asset/create?path=&type=`, `/asset/move?from=&to=`, `/asset/rename?path=&name=`, `/asset/duplicate?path=&to=`, `/asset/delete?path=`, `/asset/reimport?path=` | Through `AssetDatabase`, so `.meta` files and GUIDs stay right. `create` makes folders, materials (`type=Material&shader=`) and ScriptableObjects. `delete` moves to the OS trash (`MoveAssetToTrash`). |
 | `/set?object=Assets/X.png&importer=true&...` | Importer settings (texture, model, audio) through the importer's `SerializedObject`, then reimport. Material properties by name (`_BaseColor`, `_MainTex`). |
-| `/project` | Tags, sorting and physics layers, build scenes, Unity version, render pipeline. |
-| `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`; waits for the request; answers the resolved version. |
-| `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit and Build menu items. |
+| `/project` | Unity version and render pipeline, tags, layers (Unity's physics layers, as `index name`), sorting layers, build scenes (enabled ones with their build index). Read-only. |
+| `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`. The answer waits for the request across editor updates (the route returns a poll that gives null until the request has finished; the connection stays open) and gives the resolved `name  version  source` (`local`, `git`, `registry`; the location for local and git). `list` reads the local cache (offline) and shows the manifest's direct dependencies, counting `com.unity.modules.*` in one line. `id` is a name, `name@version`, a git URL or `file:` path. Refused while compiling or importing and in play mode (a package change reloads scripts); `remove` refuses `com.unitygraph.bridge` (removing it would end the connection). Failures answer `could not add <id>: <Unity's message>`. |
+| `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit, `File/Build...` and `Build/...` menu items (matched case-insensitively, spaces around `/` ignored): `did not run File/Quit: refused, it would close the editor (ug does not quit Unity)`. The refusal is in the bridge's runner, so nothing is executed. |
 | `/shot?view=game|scene|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/<name>.png`; answers the path and size. |
 | `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies. |
 | `/stats` (`ug perf`) | Render stats (in play mode), memory, object and asset counts. |
@@ -150,7 +150,10 @@ object address, asset path or `null`, array size via `field.size`.
    Asset edits are not on the Undo stack: they write at once and answer `not undoable`. They are
    refused for `Packages/`, vendored folders, existing targets, `Assets/` itself and open scenes.
 10. **Packages.** `ug package add|remove` only on an explicit command, through Unity's Package
-    Manager (Unity writes `Packages/manifest.json`, not ug). Added 2026-09-30 by the user.
+    Manager (Unity writes `Packages/manifest.json`, not ug). Added 2026-09-30 by the user. `add`
+    of a registry or git package downloads it through the Package Manager: the one network use
+    besides rule 11, done by Unity and only for the id the user gave; `list` and `remove` use
+    the local cache. A `file:` id is local. Never in play mode, never for the bridge itself.
 11. **API lookup, online last.** `ug api` answers from reflection (signatures), then the local
     Scripting Reference when the Hub's Documentation module is installed, then docs.unity3d.com
     (Scripting Reference, Manual, package docs) when neither answers. The request carries only
@@ -199,6 +202,10 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
   install again`.
 - Edits are checked against the vendored folders in the client too, before any request:
   `Assets/Plugins/X is in the vendored folder Assets/Plugins/, which ug does not edit`.
+- `ug package add|remove` wait up to `--timeout` seconds (default 300) for the Package Manager,
+  `ug package list` up to 60 s; past it: `no answer from Unity (no answer within 300 s: Unity is
+  busy)`. A package change that reloads scripts before Unity answers ends the connection
+  (`no answer from Unity (bridge answered 503: ...)`): `ug package list` says whether it applied.
 - `ug play` and `ug stop` wait up to `--timeout` seconds (default 60) for the state, riding out
   the domain reload; past it: `Unity was still idle after 60 s (entering play mode)`. An editor
   that exits meanwhile: `Unity (pid N) exited while entering play mode`.
@@ -236,7 +243,12 @@ a fresh process's time is .NET start-up.
   revert and unpack, object duplicate with undo and redo, select, scene new, active and close, play,
   `find --live`, and stop. Assets: folder, ScriptableObject create and `set`, material with a shader
   and a property set, a texture importer setting, move, rename, duplicate (`.meta` GUID kept or new),
-  delete to the trash, reimport, and the refusals.
+  delete to the trash, reimport, and the refusals. Project and packages (O8): `ug project`; `ug
+  package list`; add of a local `file:` package made in the copy (manifest read back, then `list`),
+  remove, and the refusals (the bridge itself, no id, a package that is not installed); menu run
+  of `Tools/BridgeHost/Log Hello` (the editor log carries its message), a missing item, and the
+  File/Quit and File/Build refusals with the editor still answering. Nothing is downloaded; a
+  registry or git add is never run by the tests.
 
 ## Boundaries
 
@@ -244,7 +256,8 @@ a fresh process's time is .NET start-up.
   explicit `ug prefab`, `ug asset` and `ug package` commands.
 - Never from a hook; never edits package contents or vendored folders; never discards unsaved
   work.
-- The only network access is rule 11's docs fallback, to docs.unity3d.com only.
+- The only network access is rule 11's docs fallback, to docs.unity3d.com only, and the
+  Package Manager's own downloads when the user runs `ug package add` (rule 10).
 - purge-squad is the testing ground: the user allowed edits there (2026-09-30; it is in git).
 
 ## Open points

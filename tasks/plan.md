@@ -246,7 +246,7 @@ Acceptance: EditMode tests: GUIDs kept across move and rename, `.meta` follows, 
 has it.
 
 ### O8. editor-ops: project, packages, menu
-- `/project`, `/package/list|add|remove` (Package Manager client), `/menu` with its refusals.
+- `/project`, `/package/list|add|remove` (Package Manager client), `/run` menu with its refusals.
 Acceptance: EditMode tests; package add/remove on a BridgeHost copy only (`UG_UNITY`).
 
 ### O9. editor-ops: screenshots, API lookup, stats, batch

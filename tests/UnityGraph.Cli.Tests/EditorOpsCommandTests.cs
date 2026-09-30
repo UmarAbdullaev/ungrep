@@ -77,6 +77,13 @@ public sealed class EditorOpsCommandTests : IDisposable
     [InlineData("/asset/duplicate?path=Packages%2Fcom.x%2FA.prefab", "asset", "duplicate", "Packages/com.x/A.prefab")]
     [InlineData("/asset/delete?path=Assets%2FOld&vendored=" + DefaultVendored, "asset", "delete", "Assets/Old")]
     [InlineData("/asset/reimport?path=Assets%2FA.png&vendored=" + DefaultVendored, "asset", "reimport", "Assets/A.png")]
+    [InlineData("/project", "project")]
+    [InlineData("/package/list", "package", "list")]
+    [InlineData("/package/add?id=com.unity.cinemachine", "package", "add", "com.unity.cinemachine")]
+    [InlineData("/package/add?id=com.unity.cinemachine%403.1.2", "package", "add", "com.unity.cinemachine@3.1.2")]
+    [InlineData("/package/add?id=file%3A..%2Fmy-pkg", "package", "add", "file:../my-pkg")]
+    [InlineData("/package/add?id=https%3A%2F%2Fgithub.com%2Fx%2Fy.git%23v1.0", "package", "add", "https://github.com/x/y.git#v1.0")]
+    [InlineData("/package/remove?name=com.unity.cinemachine", "package", "remove", "com.unity.cinemachine")]
     [InlineData("/undo", "undo")]
     [InlineData("/redo", "redo")]
     [InlineData("/select", "select")]
@@ -102,6 +109,61 @@ public sealed class EditorOpsCommandTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.Equal("ambiguous: Enemy (3 in Main): Main:Enemy#1, Main:Enemy#2, Main:Enemy#3\n", output);
+    }
+
+    [Fact]
+    public void A_package_refusal_prints_the_bridges_reason()
+    {
+        Answer(_ => (200, "{\"error\":\"removing com.unitygraph.bridge would end this connection: remove it in Package Manager (Window > Package Manager)\"}"));
+
+        Assert.Equal(
+            "removing com.unitygraph.bridge would end this connection: remove it in Package Manager (Window > Package Manager)\n",
+            Run("package", "remove", "com.unitygraph.bridge").Output);
+    }
+
+    [Fact]
+    public void Package_add_waits_as_long_as_asked_and_then_says_Unity_did_not_answer()
+    {
+        Serve(path => path == "/package/add?id=com.x"
+            ? Slow(1500, (200, "{\"lines\":[\"added com.x  1.0.0  registry\"]}"))
+            : (200, FakeBridge.Status("idle", 3)));
+
+        Assert.Equal("no answer from Unity (no answer within 1 s: Unity is busy)\n", Run("package", "add", "com.x", "--timeout", "1").Output);
+        Assert.Equal("added com.x  1.0.0  registry\n", Run("package", "add", "com.x", "--timeout", "30").Output);
+    }
+
+    [Fact]
+    public void Package_remove_waits_like_add()
+    {
+        Serve(path => path.StartsWith("/package/remove", StringComparison.Ordinal)
+            ? Slow(1500, (200, "{\"lines\":[\"removed com.x\"]}"))
+            : (200, FakeBridge.Status("idle", 3)));
+
+        Assert.Equal("no answer from Unity (no answer within 1 s: Unity is busy)\n", Run("package", "remove", "com.x", "--timeout", "1").Output);
+        Assert.Equal("removed com.x\n", Run("package", "remove", "com.x").Output);
+    }
+
+    [Fact]
+    public void A_bridge_that_reloads_during_a_package_change_is_reported_as_unavailable()
+    {
+        Answer(_ => (503, "{\"error\":\"the bridge is stopping (domain reload or quit)\"}"));
+
+        Assert.Equal(
+            "no answer from Unity (bridge answered 503: the bridge is stopping (domain reload or quit))\n",
+            Run("package", "add", "com.x").Output);
+    }
+
+    [Theory]
+    [InlineData("File/Quit", "did not run File/Quit: refused, it would close the editor (ug does not quit Unity)\n", "refused, it would close the editor (ug does not quit Unity)")]
+    [InlineData("File/Build And Run", "did not run File/Build And Run: refused, it builds a player (ug does not build; use Unity's Build Profiles window)\n", "refused, it builds a player (ug does not build; use Unity's Build Profiles window)")]
+    public void Menu_refusals_are_printed_with_the_menu_path(string target, string expected, string reason)
+    {
+        Answer(path => path.StartsWith("/run", StringComparison.Ordinal)
+            ? (200, "{\"ran\":false,\"result\":null,\"error\":\"" + reason + "\",\"frame\":null,\"ms\":0}")
+            : (200, FakeBridge.Status("idle", 3)));
+
+        Assert.Equal(expected, Run("run", target).Output);
+        Assert.Contains("/run?target=" + Uri.EscapeDataString(target), _bridge.Requests);
     }
 
     [Fact]
@@ -274,6 +336,12 @@ public sealed class EditorOpsCommandTests : IDisposable
 
         Assert.Equal("editor-link is off in .claude/unitygraph.json\n", Run("tree").Output);
         Assert.Equal("editor-link is off in .claude/unitygraph.json\n", Run("find", "--live", "--tag", "Player").Output);
+    }
+
+    private static (int, string) Slow(int milliseconds, (int, string) answer)
+    {
+        Thread.Sleep(milliseconds);
+        return answer;
     }
 
     // An idle 0.2.0 bridge answering the ops requests with handle.
