@@ -48,10 +48,23 @@ public sealed class UnityGraphConfigTests
     [InlineData("""{ "vendored": [1] }""", "vendored: 1 is not a string")]
     [InlineData("""{ "vendored": ["Assets/Plugins"] }""", "vendored: \"Assets/Plugins\" must end in '/'")]
     [InlineData("""{ "vendored": ["Assets\\Plugins/"] }""", """vendored: "Assets\Plugins/" use forward slashes""")]
+    [InlineData("""{ "docs": false }""", "docs must be an object")]
+    [InlineData("""{ "docs": { "offline": true } }""", "unknown setting 'docs.offline' (known: online)")]
+    [InlineData("""{ "docs": { "online": "no" } }""", "docs.online must be true or false")]
     public void Rejects_bad_files_naming_the_setting(string json, string message)
     {
         var e = Assert.Throws<FormatException>(() => UnityGraphConfig.Parse(json));
         Assert.StartsWith(message, e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Docs_may_be_fetched_online_unless_the_file_says_not()
+    {
+        Assert.True(UnityGraphConfig.Default.DocsOnline);
+        Assert.True(UnityGraphConfig.Parse("{}").DocsOnline);
+        Assert.True(UnityGraphConfig.Parse("""{ "docs": {} }""").DocsOnline);
+        Assert.True(UnityGraphConfig.Parse("""{ "docs": { "online": true } }""").DocsOnline);
+        Assert.False(UnityGraphConfig.Parse("""{ "docs": { "online": false } }""").DocsOnline);
     }
 
     [Fact]

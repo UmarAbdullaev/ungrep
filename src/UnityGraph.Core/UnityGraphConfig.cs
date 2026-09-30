@@ -34,10 +34,11 @@ public sealed class UnityGraphConfig
 
     private readonly IReadOnlyDictionary<string, bool> _modules;
 
-    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget, VendoredFolders? vendored)
+    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget, VendoredFolders? vendored, bool docsOnline = true)
     {
         _modules = modules;
         AnswerBudget = answerBudget;
+        DocsOnline = docsOnline;
         Vendored = vendored ?? VendoredFolders.Default;
         VendoredIsDefault = vendored is null;
     }
@@ -48,6 +49,9 @@ public sealed class UnityGraphConfig
     public VendoredFolders Vendored { get; }
 
     public bool VendoredIsDefault { get; }
+
+    /// <summary>Whether `ug api` and `ug docs` may fetch a page from docs.unity3d.com when nothing local answers (`docs.online`).</summary>
+    public bool DocsOnline { get; }
 
     /// <summary>Maximum tokens in one query answer (design rule 1).</summary>
     public int AnswerBudget { get; }
@@ -90,6 +94,7 @@ public sealed class UnityGraphConfig
             var modules = new SortedDictionary<string, bool>(ModuleDefaults.ToDictionary(), StringComparer.Ordinal);
             int budget = DefaultAnswerBudget;
             VendoredFolders? vendored = null;
+            bool docsOnline = true;
             foreach (JsonProperty setting in doc.RootElement.EnumerateObject())
             {
                 switch (setting.Name)
@@ -109,13 +114,42 @@ public sealed class UnityGraphConfig
                     case "vendored":
                         vendored = ReadVendored(setting.Value);
                         break;
+                    case "docs":
+                        docsOnline = ReadDocs(setting.Value);
+                        break;
                     default:
-                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget, vendored)");
+                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget, vendored, docs)");
                 }
             }
 
-            return new UnityGraphConfig(modules, budget, vendored);
+            return new UnityGraphConfig(modules, budget, vendored, docsOnline);
         }
+    }
+
+    private static bool ReadDocs(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new FormatException("docs must be an object like { \"online\": false }");
+        }
+
+        bool online = true;
+        foreach (JsonProperty setting in value.EnumerateObject())
+        {
+            if (setting.Name != "online")
+            {
+                throw new FormatException($"unknown setting 'docs.{setting.Name}' (known: online)");
+            }
+
+            if (setting.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                throw new FormatException("docs.online must be true or false");
+            }
+
+            online = setting.Value.GetBoolean();
+        }
+
+        return online;
     }
 
     private static VendoredFolders ReadVendored(JsonElement value)

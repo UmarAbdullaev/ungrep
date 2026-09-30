@@ -63,6 +63,11 @@ namespace UnityGraph.Bridge
                 { "/package/list", (r, c) => Deferred(PackageOps.List) },
                 { "/package/add", (r, c) => Deferred(() => PackageOps.Add(r)) },
                 { "/package/remove", (r, c) => Deferred(() => PackageOps.Remove(r)) },
+
+                // Screenshots, API lookup and stats.
+                { "/shot", (r, c) => Checked(() => ShotOps.Shot(r)) },
+                { "/api", (r, c) => Checked(() => ApiOps.Api(r)) },
+                { "/stats", (r, c) => Checked(StatsOps.Stats) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>

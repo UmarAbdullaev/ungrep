@@ -118,9 +118,10 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/project` | Unity version and render pipeline, tags, layers (Unity's physics layers, as `index name`), sorting layers, build scenes (enabled ones with their build index). Read-only. |
 | `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`. The answer waits for the request across editor updates (the route returns a poll that gives null until the request has finished; the connection stays open) and gives the resolved `name  version  source` (`local`, `git`, `registry`; the location for local and git). `list` reads the local cache (offline) and shows the manifest's direct dependencies, counting `com.unity.modules.*` in one line. `id` is a name, `name@version`, a git URL or `file:` path. Refused while compiling or importing and in play mode (a package change reloads scripts); `remove` refuses `com.unitygraph.bridge` (removing it would end the connection). Failures answer `could not add <id>: <Unity's message>`. |
 | `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit, `File/Build...` and `Build/...` menu items (matched case-insensitively, spaces around `/` ignored): `did not run File/Quit: refused, it would close the editor (ug does not quit Unity)`. The refusal is in the bridge's runner, so nothing is executed. |
-| `/shot?view=game|scene|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/<name>.png`; answers the path and size. |
-| `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies. |
-| `/stats` (`ug perf`) | Render stats (in play mode), memory, object and asset counts. |
+| `/shot?view=game\|scene\|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
+| `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies: `Transform`, `UnityEngine.Transform`, `Physics.Raycast` (split at the last dot when no type has that name); short names match case-sensitively first, Unity's namespaces win over System's, an ambiguous name lists its candidates. The type view is under 300 tokens for the common types (kind, base, assembly, constructors, then property, method, static and event names, longest lists cut with `+N more`); `member` lists overloads with parameter names, `out`/`ref`/`params` and default values. Members inherited from a base say `(from Object)`; obsolete ones are left out. When reflection finds nothing the answer is `{"error":..., "online":[page addresses]}`, or `{"local":"<file>"}` when the Hub's Documentation module has the page. |
+| `/api?page=Manual/<page>\|ScriptReference/<page>\|<package>[@version]/<path>` | Names a documentation page (same answer shape: `local` file, else `error` and `online`); `ug docs` uses it. Bare `<page>` means `Manual/<page>`. The package version is the installed one's major.minor. The bridge never opens a connection: fetching, trimming and caching are the client's (rule 11). |
+| `/stats` (`ug perf`) | Lines: play state; `render` (draw calls, batches, triangles, set-pass calls, render ms from `UnityStats`, which only counts in play mode, else `only counted in play mode (ug play, then ug perf)`); memory (allocated, reserved, scripts heap, graphics driver, MB); objects (game objects, active, components in the loaded scenes); assets (files under `Assets/` with the main kinds counted). Read-only. |
 
 `field` is the serialized name (`speed`, `m_LocalPosition`, `waves[2].count`); display names
 (`Speed`) also match. `value` by the field's type: numbers (invariant culture), `true`/`false`,
@@ -209,6 +210,30 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
 - `ug play` and `ug stop` wait up to `--timeout` seconds (default 60) for the state, riding out
   the domain reload; past it: `Unity was still idle after 60 s (entering play mode)`. An editor
   that exits meanwhile: `Unity (pid N) exited while entering play mode`.
+- `ug shot`, `ug api`, `ug docs` and `ug perf` (O9). `ug api` and `ug docs` print a documentation
+  page as trimmed text (headings, paragraphs, lists, code; navigation, scripts and markup dropped;
+  cut to the answer budget with a line naming the page) in the order rule 11 gives: local file,
+  the client's cache, then one fetch. The fetch is https to `docs.unity3d.com` only (redirects
+  stay on that host), 15 s timeout, 2 MB cap, no cookies or project data in the request. The
+  cache is one trimmed text file per page address under `%LOCALAPPDATA%/unitygraph/docs`
+  (`~/Library/Caches/unitygraph/docs` on macOS, `$XDG_CACHE_HOME` or `~/.cache` on Linux).
+  A page that cannot be fetched (`docs.online: false`, no network, HTTP error) prints the
+  bridge's error and the page address to read: `not fetched, read it at: <url> (<reason>)`.
+  `.claude/unitygraph.json`: `{ "docs": { "online": false } }`. An older 0.2.0 bridge without
+  these endpoints answers `unknown request`.
+- `ug batch "step" "step" ... [--file <path>|-]` runs editor-ops commands in one process over one
+  bridge connection (one `/status`, then one request per step). A step is a command as typed
+  after `ug` (a leading `ug` is allowed; quote words with spaces). Only the editor-ops commands
+  are steps (`scene`, `save`, `play`, `stop`, `pause`, `tree`, `inspect`, `object`, `component`,
+  `set`, `prefab`, `asset`, `project`, `package`, `shot`, `api`, `docs`, `perf`, `undo`, `redo`,
+  `select`); `find`, `run`, `compile`, `status`, `bridge` and `batch` are not. Every step is
+  parsed first: one that is unknown or malformed exits 1 with `step N (<step>): <why>` and
+  `nothing ran`. Steps then run in order; the first refusal, vendored refusal, timeout or lost
+  connection stops the rest (`stopped at step N: M steps not run. Earlier steps stay done; ug
+  undo reverts them one by one.`). Output is `i/n <step>` followed by the step's own lines.
+  Each step is its own undo group, so `ug undo` reverts one step; asset steps are not undoable.
+  `--file` reads one step per line, `#` starts a comment, `-` reads standard input. Exit code 0
+  as for other commands, 1 for a usage error.
 - `ug save` is a top-level command (it saves scenes and assets alike), and `ug object move
   --root` stands for the endpoint's empty `parent`.
 - `ug tree`/`ug inspect` on scenes that are not open: the graph (`ug explain`) already answers
@@ -249,6 +274,14 @@ a fresh process's time is .NET start-up.
   of `Tools/BridgeHost/Log Hello` (the editor log carries its message), a missing item, and the
   File/Quit and File/Build refusals with the editor still answering. Nothing is downloaded; a
   registry or git add is never run by the tests.
+  Screenshots, API, docs, stats and batch (O9): `ug shot` refused with the graphics-device message
+  in the `-nographics` editor (the PNG itself is written and read back by EditMode tests only where
+  a graphics device exists: 3 tests skip in batch mode); `ug api Transform` in under 300 tokens,
+  `Physics.Raycast`, a member, an unknown type (the fake fetch stands in for docs.unity3d.com: no
+  test uses the network); `ug perf` in edit and play mode; `ug batch` with a stop at a refusal and
+  `ug undo` reverting the steps. Token counts of `ug api <Type>` (bytes / 4, measured by the
+  EditMode tests): Transform 207, GameObject 190, Rigidbody 214, Rigidbody2D 212, Camera 246,
+  Collider 109, Vector3 164, Physics 257, Time 156, MonoBehaviour 88, Mathf 171, Input 227.
 
 ## Boundaries
 

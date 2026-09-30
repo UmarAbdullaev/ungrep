@@ -18,6 +18,8 @@ public sealed class EditorEndToEndTests : IDisposable
 
     public void Dispose()
     {
+        EditorCommands.DocsFetchOverride = null;
+        EditorCommands.DocsCacheOverride = null;
         if (_unity is { HasExited: false })
         {
             _unity.Kill(entireProcessTree: true);
@@ -308,12 +310,58 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.DoesNotContain("com.ug.e2e", Ug(log, "package", "list"), StringComparison.Ordinal);
         Assert.StartsWith("could not remove com.ug.e2e: ", Ug(log, "package", "remove", "com.ug.e2e"), StringComparison.Ordinal);
 
+        // Screenshots, API lookup, docs pages, perf and batch (O9). -nographics has no graphics device, so
+        // the picture is refused; the docs fallback is a fake here, nothing in the run touches the network.
+        var docFetches = new List<string>();
+        EditorCommands.DocsFetchOverride = url =>
+        {
+            docFetches.Add(url);
+            return new DocsFetchResult(null, "offline in tests");
+        };
+        EditorCommands.DocsCacheOverride = new DocsCache(Path.Combine(_root, "docs-cache"));
+        Assert.Equal(
+            "cannot take a screenshot: this Unity runs without a graphics device (started with -batchmode -nographics); open the editor normally\n",
+            Ug(log, "shot"));
+        Assert.StartsWith("width must be a whole number from 64 to 2048, not 10\n", Ug(log, "shot", "--width", "10"), StringComparison.Ordinal);
+
+        clock.Restart();
+        string api = Ug(log, "api", "Transform");
+        Report("ug api Transform", clock.Elapsed);
+        Assert.StartsWith("class UnityEngine.Transform : Component  (UnityEngine.CoreModule)\n", api, StringComparison.Ordinal);
+        Assert.True(api.Length / 4 <= 300, "api Transform is " + (api.Length / 4) + " tokens");
+        Assert.Contains("Raycast", Ug(log, "api", "Physics.Raycast"), StringComparison.Ordinal);
+        Assert.Contains("void Rotate(", Ug(log, "api", "Transform", "Rotate"), StringComparison.Ordinal);
+        Assert.Contains("BridgeHost.FixtureMethods", Ug(log, "api", "BridgeHost.FixtureMethods"), StringComparison.Ordinal);
+
+        string unknown = Ug(log, "api", "NoSuchThingAtAll");
+        Assert.StartsWith("no type NoSuchThingAtAll in the loaded assemblies\nnot fetched, read it at:\n  https://docs.unity3d.com/6000.3/Documentation/ScriptReference/NoSuchThingAtAll.html (offline in tests)\n", unknown, StringComparison.Ordinal);
+        Assert.Equal(["https://docs.unity3d.com/6000.3/Documentation/ScriptReference/NoSuchThingAtAll.html"], docFetches);
+        Assert.StartsWith("edit mode\nrender  only counted in play mode (ug play, then ug perf)\nmemory  ", Ug(log, "perf"), StringComparison.Ordinal);
+
+        string batch = Ug(log, "batch", "object create BatchOne", "object create BatchTwo --parent BatchOne", "object rename BatchOne/BatchTwo \"Batch Two\"");
+        Assert.StartsWith("1/3 object create BatchOne\ncreated BatchOne", batch, StringComparison.Ordinal);
+        Assert.EndsWith("3 steps done. Each step is its own undo group (ug undo reverts the last).\n", batch, StringComparison.Ordinal);
+        Assert.Contains("Batch Two", Ug(log, "tree", "BatchOne"), StringComparison.Ordinal);
+        Assert.StartsWith("undid ug object rename\n", Ug(log, "undo"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Batch Two", Ug(log, "tree", "BatchOne"), StringComparison.Ordinal);
+        string stopped = Ug(log, "batch", "object create BatchThree", "component add Ghost Rigidbody", "save");
+        Assert.Contains("2/3 component add Ghost Rigidbody\nnot found: Ghost", stopped, StringComparison.Ordinal);
+        Assert.EndsWith("stopped at step 2: 1 step not run. Earlier steps stay done; ug undo reverts them one by one.\n", stopped, StringComparison.Ordinal);
+        Assert.Contains("BatchThree", Ug(log, "tree"), StringComparison.Ordinal);
+        Ug(log, "undo");
+        Ug(log, "undo");
+        Ug(log, "undo");
+        Assert.DoesNotContain("BatchOne", Ug(log, "tree"), StringComparison.Ordinal);
+
         clock.Restart();
         string play = Ug(log, "play");
         Report("ug play until playing", clock.Elapsed);
         Assert.Matches(@"^playing \(entered in \d+\.\d s\)\n$", play);
         Assert.EndsWith("\nplaying\n", Ug(log, "scene"), StringComparison.Ordinal);
         Assert.Contains("Spawn", Ug(log, "find", "--live", "--component", "Turret"), StringComparison.Ordinal);
+        string perf = Ug(log, "perf");
+        Assert.StartsWith("playing\nrender  ", perf, StringComparison.Ordinal);
+        Assert.Contains(" draw calls  ", perf, StringComparison.Ordinal);
 
         clock.Restart();
         string stop = Ug(log, "stop");

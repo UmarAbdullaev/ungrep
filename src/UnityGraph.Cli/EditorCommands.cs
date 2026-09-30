@@ -13,7 +13,7 @@ namespace UnityGraph.Cli;
 /// editor-ops commands (SPEC-editor-ops, Commands): scenes, play mode, reads and edits, answered
 /// with lines the bridge formats.
 /// </summary>
-internal static class EditorCommands
+internal static partial class EditorCommands
 {
     public const string PackageName = "com.unitygraph.bridge";
 
@@ -22,6 +22,25 @@ internal static class EditorCommands
 
     /// <summary>Replaces the check that the editor process in `bridge.json` is alive; tests only.</summary>
     internal static Func<int, bool>? ProcessCheck { get; set; }
+
+    /// <summary>Replaces the fetch from docs.unity3d.com; tests only, they must not need the network.</summary>
+    internal static Func<string, DocsFetchResult>? DocsFetchOverride { get; set; }
+
+    /// <summary>Replaces the documentation cache folder; tests only.</summary>
+    internal static DocsCache? DocsCacheOverride { get; set; }
+
+    // Whether the last Op ended in a refusal or a failure: `ug batch` stops on it. Every ug run is
+    // one thread, so a plain static does.
+    private static bool _opFailed;
+
+    // The connection `ug batch` shares between its steps; null outside a batch.
+    private static BridgeClient? _session;
+
+    private static (int, string) Failed(string text)
+    {
+        _opFailed = true;
+        return (0, text);
+    }
 
     // editorLog: the Editor.log to fall back on; null means Unity's default place. Tests only.
     public static IEnumerable<Command> Create(string? editorLog)
@@ -49,6 +68,8 @@ internal static class EditorCommands
         {
             yield return command;
         }
+
+        yield return Batch();
     }
 
     public static (int ExitCode, string Text) Status(string root)
@@ -244,27 +265,39 @@ internal static class EditorCommands
     /// waits for play mode to change when the answer asks. <paramref name="command"/> is how the
     /// user typed it (`scene open`), for the messages.
     /// </summary>
-    public static (int ExitCode, string Text) Op(string root, VendoredFolders vendored, string command, OpRequest request)
+    public static (int ExitCode, string Text) Op(string root, UnityGraphConfig config, string command, OpRequest request)
     {
+        _opFailed = false;
         foreach (string? address in request.Edits)
         {
             string? path = address?.Trim().Split(':')[0];
-            if (path != null && vendored.Prefixes.FirstOrDefault(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)) is { } prefix)
+            if (path != null && config.Vendored.Prefixes.FirstOrDefault(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)) is { } prefix)
             {
-                return (0, address!.Trim() + " is in the vendored folder " + prefix + ", which ug does not edit\n");
+                return Failed(address!.Trim() + " is in the vendored folder " + prefix + ", which ug does not edit\n");
             }
+        }
+
+        if (_session != null)
+        {
+            return Ask(_session, config, command, request);
         }
 
         BridgeConnection connection = BridgeClient.Connect(root, ProcessCheck);
         if (connection.Client == null)
         {
-            return (0, "Unity not reachable (" + connection.Problem + "); ug " + command + " needs the bridge\n" + InstallHint(root));
+            return Failed("Unity not reachable (" + connection.Problem + "); ug " + command + " needs the bridge\n" + InstallHint(root));
         }
 
         using BridgeClient client = connection.Client;
+        return Ask(client, config, command, request);
+    }
+
+    // One request on a connected bridge; the connection is the caller's to dispose.
+    private static (int ExitCode, string Text) Ask(BridgeClient client, UnityGraphConfig config, string command, OpRequest request)
+    {
         if (!client.HasOps)
         {
-            return (0, "bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
+            return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
 
         var clock = Stopwatch.StartNew();
@@ -275,12 +308,19 @@ internal static class EditorCommands
         }
         catch (BridgeUnavailableException e)
         {
-            return (0, "no answer from Unity (" + e.Message + ")\n");
+            return Failed("no answer from Unity (" + e.Message + ")\n");
+        }
+
+        if (answer.Local != null || answer.Online != null)
+        {
+            string page = DocsPages.Text(answer, config.DocsOnline, config.AnswerBudget, DocsCacheOverride ?? new DocsCache(DocsCache.DefaultFolder()), DocsFetchOverride ?? DocsFetcher.Fetch, out bool found);
+            _opFailed = !found;
+            return (0, page);
         }
 
         if (answer.Error != null)
         {
-            return (0, answer.Error + "\n");
+            return Failed(answer.Error + "\n");
         }
 
         var lines = answer.Lines!.ToList();
@@ -289,7 +329,7 @@ internal static class EditorCommands
             WaitOutcome waited = client.WaitFor(answer.Wait, request.WaitTimeout);
             if (!waited.Reached)
             {
-                return (0, waited.Problem + "\n");
+                return Failed(waited.Problem + "\n");
             }
 
             if (answer.Wait == "playing" && lines.Count > 0)
@@ -303,7 +343,7 @@ internal static class EditorCommands
 
     /// <summary>`ug find --live`: the loaded scenes' objects by name part, tag, layer and component.</summary>
     public static (int ExitCode, string Text) LiveFind(string start, string? name, string? tag, string? layer, string? component) =>
-        Start(start, (root, config) => Op(root, config.Vendored, "find --live", new OpRequest(
+        Start(start, (root, config) => Op(root, config, "find --live", new OpRequest(
             Query("/find", ("name", name), ("tag", tag), ("layer", layer), ("component", component)))));
 
     private static IEnumerable<Command> OpsCommands()
@@ -481,6 +521,23 @@ internal static class EditorCommands
             new OpRequest(Query("/package/remove", ("name", r.GetValue(packageName)))) { Timeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(removeTimeout))) }));
         yield return packages;
 
+        Argument<string?> shotView = Optional("view", "game (default), scene, or a camera's object address.");
+        Option<int?> shotWidth = new("--width") { Description = "Pixels, 64 to 2048. Default: 960." };
+        Option<int?> shotHeight = new("--height") { Description = "Pixels, 64 to 2048. Default: 540." };
+        yield return Ops("shot", "shot", "Save a picture of the game view, the scene view or one camera to Library/unitygraph/shots/ and print its path.", [shotView, shotWidth, shotHeight], r =>
+            new OpRequest(Query("/shot", ("view", r.GetValue(shotView)), ("width", Number(r.GetValue(shotWidth))), ("height", Number(r.GetValue(shotHeight))))));
+
+        Argument<string> apiType = Required("type", "Type or Type.member: Transform, Physics.Raycast, UnityEngine.Rigidbody.");
+        Argument<string?> apiMember = Optional("member", "A member of the type: its signatures, overloads and defaults.");
+        yield return Ops("api", "api", "A Unity or .NET type from the loaded assemblies: members, or one member's signatures.", [apiType, apiMember], r =>
+            new OpRequest(Query("/api", ("type", r.GetValue(apiType)), ("member", r.GetValue(apiMember)))));
+
+        Argument<string> docsPage = Required("page", "Manual/Prefabs, ScriptReference/Physics.Raycast, or a package page like com.unity.cinemachine/manual/index.");
+        yield return Ops("docs", "docs", "A Unity documentation page as trimmed text: local copy, then the cache, then docs.unity3d.com (docs.online in .claude/unitygraph.json).", [docsPage], r =>
+            new OpRequest(Query("/api", ("page", r.GetValue(docsPage)))) { Timeout = TimeSpan.FromSeconds(20) });
+
+        yield return Ops("perf", "perf", "Play state, frame render stats (play mode), memory, object and asset counts.", [], _ => new OpRequest("/stats"));
+
         yield return Ops("undo", "undo", "Undo the editor's last change, like Ctrl+Z.", [], _ => new OpRequest("/undo"));
         yield return Ops("redo", "redo", "Redo the last undone change.", [], _ => new OpRequest("/redo"));
 
@@ -507,7 +564,7 @@ internal static class EditorCommands
         Ops(name, command, description, symbols, (result, _) => request(result));
 
     private static Command Ops(string name, string command, string description, Symbol[] symbols, Func<ParseResult, UnityGraphConfig, OpRequest> request) =>
-        Command(name, description, symbols, (root, config, result) => Op(root, config.Vendored, command, request(result, config)));
+        Command(name, description, symbols, (root, config, result) => Op(root, config, command, request(result, config)));
 
     /// <summary>The package folder shipped with the plugin: `unity/com.unitygraph.bridge` above ug's own folder.</summary>
     public static string? FindPackage()

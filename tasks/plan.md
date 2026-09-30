@@ -255,6 +255,9 @@ Acceptance: EditMode tests; package add/remove on a BridgeHost copy only (`UG_UN
   `ug batch`.
 Acceptance: EditMode tests; PNG written and readable; `ug api` answers under 300 tokens for
 common types.
+Done 2026-09-30: `/shot` refuses in `-nographics` (PNG tests run only with a graphics device);
+`/api` also names pages (`page=`), the client trims, caches and fetches (`docs.online`);
+`ug batch` did not exist before, it is new here (steps checked first, stop at first failure).
 
 ### O10. editor-ops: purge-squad measurement
 - Reads on purge-squad's open editor; edits only with the user's go-ahead (or on a scratch scene

@@ -65,6 +65,9 @@ Config addition (`.claude/unitygraph.json`, read by `UnityGraphConfig`):
 Entries are project-relative folder prefixes with forward slashes, ending in `/`; anything else
 is a config error that `ug doctor` names.
 
+`docs` (editor-link, SPEC-editor-ops rule 11): `{ "docs": { "online": false } }` stops `ug api` and
+`ug docs` from fetching pages from docs.unity3d.com; the default is `true`.
+
 ## Loading a project
 
 - Parse the XML directly. `Compile Include` paths use backslashes and may be XML-escaped

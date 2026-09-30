@@ -41,8 +41,10 @@ public sealed record TestRunResult(string State, int Passed, int Failed, int Ski
 /// <summary>
 /// An editor-ops answer (SPEC-editor-ops, Endpoints): lines to print as they are, or a refusal;
 /// <see cref="Wait"/> names the editor state (`playing`, `idle`) to wait for before printing.
+/// A documentation answer (`ug api`, `ug docs`) has <see cref="Local"/>, the offline page's file,
+/// or an <see cref="Error"/> with the <see cref="Online"/> addresses that might have the page.
 /// </summary>
-public sealed record OpAnswer(IReadOnlyList<string>? Lines, string? Error, string? Wait);
+public sealed record OpAnswer(IReadOnlyList<string>? Lines, string? Error, string? Wait, string? Local = null, IReadOnlyList<string>? Online = null);
 
 /// <summary>How a wait for an editor state ended; <see cref="Problem"/> is null when it was reached.</summary>
 public sealed record WaitOutcome(string? Problem, TimeSpan Elapsed)

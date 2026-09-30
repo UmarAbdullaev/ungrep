@@ -133,7 +133,7 @@ public sealed class BridgeClient : IDisposable
     public OpAnswer Op(string pathAndQuery, TimeSpan timeout)
     {
         OpAnswer answer = BridgeJson.Parse<OpAnswer>(Get(pathAndQuery, timeout));
-        return answer.Lines == null && answer.Error == null
+        return answer.Lines == null && answer.Error == null && answer.Local == null
             ? throw new BridgeUnavailableException("the bridge answered neither lines nor an error")
             : answer;
     }
