@@ -11,12 +11,14 @@ public sealed record Resolution(IReadOnlyList<Node> Nodes, bool Ambiguous)
 /// <summary>
 /// Turns `&lt;symbol&gt;` text into nodes (SPEC-query, Resolving): a `cs:`, `a:` or `o:` key, a GUID,
 /// an asset path or file name, or a dotted name that a node's qualified name ends with,
-/// optionally with a parameter list matched against `sig`.
+/// optionally with a parameter list matched against `sig`; failing those, a game object or prefab
+/// instance by name or hierarchy path (`Level/Spawn`).
 /// Overloads of one method named without parameters are one symbol.
 /// </summary>
 public static class SymbolResolver
 {
     private const int Candidates = 500;
+    private static readonly NodeKindSet _sceneObjects = NodeKindSet.Of(NodeKind.GameObject, NodeKind.PrefabInstance);
 
     public static Resolution Resolve(GraphStore store, string text)
     {
@@ -34,7 +36,8 @@ public static class SymbolResolver
         if (text.Contains('/', StringComparison.Ordinal))
         {
             string meta = (text.EndsWith(".meta", StringComparison.Ordinal) ? text : text + ".meta").TrimStart('/');
-            return One(store.KeysInFile(meta).Select(store.GetNode).FirstOrDefault(n => n?.Kind == NodeKind.Asset));
+            Node? asset = store.KeysInFile(meta).Select(store.GetNode).FirstOrDefault(n => n?.Kind == NodeKind.Asset);
+            return asset is null ? Objects(store, text.Trim('/')) : One(asset);
         }
 
         if (text.Contains('.', StringComparison.Ordinal) && !text.Contains('(', StringComparison.Ordinal))
@@ -54,7 +57,7 @@ public static class SymbolResolver
         string last = name[(name.LastIndexOf('.') + 1)..];
         if (last.Length == 0)
         {
-            return new Resolution([], false);
+            return Objects(store, text);
         }
 
         List<Node> named = store.FindByName(last, NodeKindSet.All, Candidates).Items
@@ -72,10 +75,56 @@ public static class SymbolResolver
             matches = Matching(named, name, StringComparison.OrdinalIgnoreCase);
         }
 
+        if (matches.Count == 0 && parameters is null)
+        {
+            return Objects(store, text);
+        }
+
         bool oneSymbol = matches.Count <= 1
             || (matches.All(n => n.Kind == NodeKind.Method)
                 && matches.Select(n => Names.Qualified(n.Key)).Distinct(StringComparer.Ordinal).Count() == 1);
         return new Resolution(matches, !oneSymbol);
+    }
+
+    // Game objects and prefab instances named `text`, or whose hierarchy path ends with it on a `/`.
+    private static Resolution Objects(GraphStore store, string text)
+    {
+        string name = text[(text.LastIndexOf('/') + 1)..];
+        if (name.Length == 0)
+        {
+            return new Resolution([], false);
+        }
+
+        List<Node> named = store.FindByName(name, _sceneObjects, Candidates).Items.ToList();
+        foreach (StringComparison comparison in (StringComparison[])[StringComparison.Ordinal, StringComparison.OrdinalIgnoreCase])
+        {
+            List<Node> matches = named
+                .Where(n => string.Equals(n.Name, name, comparison))
+                .Where(n => ObjectPath(store, n, 0) is { } path && (path.Equals(text, comparison) || path.EndsWith("/" + text, comparison)))
+                .OrderBy(n => n.File, StringComparer.Ordinal)
+                .ThenBy(n => n.Key, StringComparer.Ordinal)
+                .ToList();
+            if (matches.Count > 0)
+            {
+                return new Resolution(matches, matches.Count > 1);
+            }
+        }
+
+        return new Resolution([], false);
+    }
+
+    // A game object's indexed `path`; a prefab instance's parent path plus its name.
+    private static string ObjectPath(GraphStore store, Node node, int depth)
+    {
+        if (node.Kind == NodeKind.GameObject)
+        {
+            return Names.Prop(node, "path") ?? node.Name;
+        }
+
+        string? parent = store.EdgesFrom(node.Key, EdgeKindSet.Of(EdgeKind.ChildOf), 1).Items.FirstOrDefault()?.Edge.Dst;
+        return depth < 100 && parent is not null && store.GetNode(parent) is { } up
+            ? ObjectPath(store, up, depth + 1) + "/" + node.Name
+            : node.Name;
     }
 
     private static Resolution One(Node? node) => node is null ? new Resolution([], false) : new Resolution([node], false);

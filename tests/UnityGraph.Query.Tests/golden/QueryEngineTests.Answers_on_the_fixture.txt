@@ -316,6 +316,15 @@ Turntable/Platter  game_object  Assets/Prefabs/Turntable.prefab:65-77  [exact]
   components  MeshRenderer
   more  ug refs o:b1000000000000000000000000000001:200
 
+$ ug explain Lab Turntable/Marker
+Lab Turntable/Marker  game_object  Assets/Scenes/Lab.unity:203-214  [exact]
+  in      Assets/Scenes/Lab.unity
+  parent  Lab Turntable
+  more  ug refs 'Lab Turntable/Marker'
+
+$ ug explain Canvas/Nope
+not found: Canvas/Nope
+
 $ ug explain o:f6000000000000000000000000000006:-5
 Extra  sub_asset  Assets/Data/LabSettings.asset:3-22  [exact]
   in            Assets/Data/LabSettings.asset

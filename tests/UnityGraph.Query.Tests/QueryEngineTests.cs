@@ -73,6 +73,8 @@ public sealed class QueryEngineTests(QueryFixture fixture) : IClassFixture<Query
             "explain o:c3000000000000000000000000000003:512",
             "explain o:c3000000000000000000000000000003:600",
             "explain o:b1000000000000000000000000000001:200",
+            "explain Lab Turntable/Marker",
+            "explain Canvas/Nope",
             "explain o:f6000000000000000000000000000006:-5",
             "explain LabStage.OpenFirst",
             "refs Turntable",

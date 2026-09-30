@@ -191,16 +191,23 @@ Object lines: `in`, `parent`, `on`, `components`, `children`, `script` or `insta
 
 1. `cs:<doc id>`, `a:<guid>`, `o:<guid>:<fileID>`: that key.
 2. 32 lowercase hex characters: that GUID's asset.
-3. Text with a `/`: the asset at that project path (`Assets/Prefabs/Turntable.prefab`).
+3. Text with a `/`: the asset at that project path (`Assets/Prefabs/Turntable.prefab`); no
+   such asset: step 6.
 4. Text with a `.` and no `(` is first tried as an asset file name (`Turntable.prefab`),
    case-sensitive first; several assets with that name are ambiguous. No asset: step 5.
 5. Otherwise the text is a dotted name, optionally with a parameter list (`Rotate(float)` is
    matched against `sig`). Candidates are nodes named like its last segment; a candidate matches
    when its qualified name (the doc ID without prefix, parameters and generic arity marks) ends
-   with the text on a `.` boundary. Case-sensitive matches win; if none, case-insensitive.
-6. One match, or only overloads of one method: answer. Several: list them like `find` (at most
+   with the text on a `.` boundary. Case-sensitive matches win; if none, case-insensitive. No
+   match (and no parameter list): step 6.
+6. Scene objects: game objects and prefab instances named like the text's last `/` segment
+   whose hierarchy path is the text or ends with it on a `/` (`Spawn`, `Level/Spawn`, `Lab
+   Turntable/Marker`; a leading `/` is ignored). A prefab instance's path is its parent's plus its
+   name. Case-sensitive matches win; if none, case-insensitive. Code symbols come first, so
+   `Turntable` stays the class when a game object shares the name.
+7. One match, or only overloads of one method: answer. Several: list them like `find` (at most
    20) under `ambiguous: <text>` with a `more` line repeating the command for the first by its
-   qualified name, exit 0. None: `not found: <text>` followed by up to 5 `find` results for the
+   qualified name (a scene object by its `o:` key), exit 0. None: `not found: <text>` followed by up to 5 `find` results for the
    last segment.
 
 ## Freshness

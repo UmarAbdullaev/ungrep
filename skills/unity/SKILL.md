@@ -25,8 +25,10 @@ anchors; read only the lines you need after that.
 | `ug bridge install` | Print how to add the editor bridge that `status`, `compile` and `run` talk to. |
 
 `<symbol>`: `LabStage`, `LabStage.Open`, `Game.Lab.LabStage.Open(int)`, an asset path
-(`Assets/Prefabs/Turntable.prefab`), file name (`Turntable.prefab`) or GUID, or a `cs:`, `a:` or
-`o:` key from an answer. Overloads without parameters are answered together.
+(`Assets/Prefabs/Turntable.prefab`), file name (`Turntable.prefab`) or GUID, a game object or
+prefab instance by name or hierarchy path (`Spawn`, `Level/Spawn`; code symbols win a shared
+name), or a `cs:`, `a:` or `o:` key from an answer. Overloads without parameters are answered
+together.
 
 Reading answers:
 - `[exact]` came from the compiler; `[heuristic]` is a string match (`Invoke("Name")`); check it

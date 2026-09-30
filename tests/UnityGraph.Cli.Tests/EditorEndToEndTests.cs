@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using UnityGraph.EditorLink;
 
 namespace UnityGraph.Cli.Tests;
@@ -124,11 +123,8 @@ public sealed class EditorEndToEndTests : IDisposable
 
         // The saved YAML, read back through the graph (Unity makes no .csproj files in batch mode).
         WriteProject("Assembly-CSharp", "Assets\\Scripts\\Turret.cs");
-        // Scene objects resolve by key, o:<scene guid>:<file id> (SPEC-query, Resolving).
         string scene = File.ReadAllText(Path.Combine(_root, "Assets", "Scenes", "Main.unity"));
-        string sceneGuid = Regex.Match(File.ReadAllText(Path.Combine(_root, "Assets", "Scenes", "Main.unity.meta")), "guid: ([0-9a-f]{32})").Groups[1].Value;
-        string instanceId = Regex.Match(scene, @"--- !u!1001 &(\d+)").Groups[1].Value;
-        string spawn = Ug(log, "explain", "o:" + sceneGuid + ":" + instanceId);
+        string spawn = Ug(log, "explain", "Level/Spawn");
         Assert.Contains("\nSpawn  prefab_instance  Assets/Scenes/Main.unity:", spawn, StringComparison.Ordinal);
         Assert.Contains("instance of  Assets/Prefabs/Turret.prefab", spawn, StringComparison.Ordinal);
         Assert.Contains("speed = 7.5", spawn, StringComparison.Ordinal);
