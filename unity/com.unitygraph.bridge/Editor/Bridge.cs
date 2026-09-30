@@ -170,20 +170,8 @@ namespace UnityGraph.Bridge
                     return Now(TestResult(request));
                 case "/run":
                     return Now(Run(request));
-                case "/scene":
-                    return Now(SceneOps.Scenes());
-                case "/scene/open":
-                    return Now(SceneOps.Busy() ?? SceneOps.Open(request));
-                case "/save":
-                    return Now(SceneOps.Busy() ?? SceneOps.Save(request));
-                case "/play":
-                    return Now(SceneOps.Busy() ?? SceneOps.Play());
-                case "/pause":
-                    return Now(SceneOps.Pause());
-                case "/stop":
-                    return Now(SceneOps.Stop(_console));
                 default:
-                    return Now(Reply.Fail(404, "unknown request " + request.Path));
+                    return Routes.Handle(request, _console) ?? Now(Reply.Fail(404, "unknown request " + request.Path));
             }
         }
 

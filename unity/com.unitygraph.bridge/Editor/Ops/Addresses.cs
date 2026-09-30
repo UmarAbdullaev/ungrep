@@ -21,7 +21,8 @@ namespace UnityGraph.Bridge
         private const int MaxNear = 5;
 
         public static bool IsAssetPath(string address) =>
-            address.StartsWith("Assets/", StringComparison.Ordinal) || address.StartsWith("Packages/", StringComparison.Ordinal);
+            address.StartsWith("Assets/", StringComparison.Ordinal) || address.StartsWith("Packages/", StringComparison.Ordinal)
+            || address.StartsWith("ProjectSettings/", StringComparison.Ordinal);
 
         /// <summary>A game object in the loaded scenes or a prefab asset, or null with <paramref name="error"/>.</summary>
         public static GameObject Find(string address, out string error)
@@ -208,13 +209,71 @@ namespace UnityGraph.Bridge
                 return inner.Length == 0 ? root : Walk(Children(root), inner, prefab, out error);
             }
 
-            UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(address);
+            UnityEngine.Object asset = address.StartsWith("ProjectSettings/", StringComparison.Ordinal)
+                ? AssetDatabase.LoadAllAssetsAtPath(address).FirstOrDefault()
+                : AssetDatabase.LoadMainAssetAtPath(address);
             if (asset == null)
             {
                 error = "not found: " + address;
             }
 
             return asset;
+        }
+
+        /// <summary>
+        /// A component of <paramref name="target"/> by type name (`Rigidbody`, full name when two
+        /// types share a name), `#n` for the n-th of that type.
+        /// </summary>
+        public static Component Component(GameObject target, string name, out string error)
+        {
+            error = null;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                error = "no component given";
+                return null;
+            }
+
+            ParseSegment(name.Trim(), out string type, out int index);
+            Component[] all = target.GetComponents<Component>();
+            List<Component> matches = all.Where(c => c != null && (c.GetType().Name == type || c.GetType().FullName == type)).ToList();
+            if (matches.Count == 0)
+            {
+                matches = all.Where(c => c != null && string.Equals(c.GetType().Name, type, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (matches.Count == 0)
+            {
+                error = Of(target) + " has no " + type + " (has: " + string.Join(", ", all.Select(ComponentName)) + ")";
+                return null;
+            }
+
+            if (index > matches.Count)
+            {
+                error = Of(target) + " has " + matches.Count.ToString(CultureInfo.InvariantCulture) + " " + type + ", not " + index.ToString(CultureInfo.InvariantCulture);
+                return null;
+            }
+
+            if (index == 0 && matches.Count > 1)
+            {
+                error = "ambiguous: " + Of(target) + " has " + matches.Count.ToString(CultureInfo.InvariantCulture) + " " + type + ": "
+                    + string.Join(", ", Enumerable.Range(1, matches.Count).Select(i => type + "#" + i.ToString(CultureInfo.InvariantCulture)));
+                return null;
+            }
+
+            return matches[Math.Max(index, 1) - 1];
+        }
+
+        /// <summary>`Rigidbody`, `AudioSource#2` when an object holds several of a type, `missing script`.</summary>
+        public static string ComponentName(Component component)
+        {
+            if (component == null)
+            {
+                return "missing script";
+            }
+
+            Type type = component.GetType();
+            Component[] same = component.GetComponents(type).Where(c => c.GetType() == type).ToArray();
+            return same.Length > 1 ? type.Name + "#" + (Array.IndexOf(same, component) + 1).ToString(CultureInfo.InvariantCulture) : type.Name;
         }
 
         private static void ParseSegment(string segment, out string name, out int index)
@@ -230,7 +289,7 @@ namespace UnityGraph.Bridge
         }
 
         // `Enemy#2` when the parent (or scene root) holds more than one `Enemy`.
-        private static string Segment(GameObject target)
+        public static string Segment(GameObject target)
         {
             IList<GameObject> siblings = target.transform.parent != null
                 ? (IList<GameObject>)Children(target.transform.parent.gameObject)

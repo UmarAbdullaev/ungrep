@@ -72,11 +72,11 @@ Details and acceptance criteria: `plan.md`.
 - [x] E5 editor-link: purge-squad measurement (ask before installing the bridge there)
 - [x] O1 editor-ops spec
 - [x] O2 editor-ops: addressing, scenes and play mode
-- [ ] O3 editor-ops: tree and inspect
+- [x] O3 editor-ops: tree and inspect (38 EditMode tests)
 - [ ] O4 editor-ops: edits
 - [ ] O5 editor-ops: client, CLI, skill, end to end
 - [ ] O6 editor-ops: more scene ops, undo, selection, prefabs
 - [ ] O7 editor-ops: assets
 - [ ] O8 editor-ops: project, packages, menu
 - [ ] O9 editor-ops: screenshots, API lookup, stats, batch
-- [ ] O10 editor-ops: purge-squad measurement (ask before editing purge-squad scenes)
+- [ ] O10 editor-ops: purge-squad measurement (edits there allowed by the user 2026-09-30)

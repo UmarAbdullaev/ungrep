@@ -25,8 +25,8 @@ In:
 - CLI: `ug scene`, `ug scene open|save|new|close|active`, `ug play|stop|pause`, `ug tree`,
   `ug inspect`, `ug find --live`, `ug object create|delete|rename|move|active|duplicate`,
   `ug component add|remove`, `ug set`, `ug undo|redo`, `ug select`, `ug prefab ...`,
-  `ug asset ...`, `ug project`, `ug package list|add|remove`, `ug menu`, `ug shot`, `ug api`,
-  `ug stats`, and editor commands inside `ug batch`.
+  `ug asset ...`, `ug project`, `ug package list|add|remove`, `ug shot`, `ug api`, `ug docs`,
+  `ug perf`, menu items through `ug run`, and editor commands inside `ug batch`.
 - The `unity` skill: the commands and when to use them.
 - BridgeHost fixture scenes, prefab and ScriptableObject; EditMode tests; a `UG_UNITY` end to end.
 
@@ -48,12 +48,12 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_scene` | `ug scene` and its subcommands; `ug object move --scene` |
 | `manage_gameobject`, `manage_components` | `ug object`, `ug component`, `ug set` |
 | `manage_editor` | `ug play|stop|pause`, `ug undo|redo`, `ug select`, `ug project` (tags, layers) |
-| `execute_menu_item` | `ug menu <path>` |
+| `execute_menu_item` | `ug run <menu path>` (editor-link's runner already calls `ExecuteMenuItem`) |
 | `manage_prefabs` | `ug prefab create|instantiate|apply|revert|unpack`, prefab-content addresses |
 | `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
 | `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
-| `manage_graphics`, `manage_physics`, `manage_profiler` | `ug stats` (render, memory, profiler counters); settings through `ug set` on `ProjectSettings/*.asset` |
+| `manage_graphics`, `manage_physics`, `manage_profiler` | `ug perf` (render, memory, profiler counters; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
 | `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |
 | `batch_execute` | `ug batch` with editor commands, one process and one connection |
 | `set_active_instance`, `execute_custom_tool` | One editor per project root; `ug run` for project editor methods |
@@ -81,7 +81,11 @@ the same type on one object.
 ## Endpoints
 
 All `GET` with query parameters, token and origin checks as in editor-link, answered on the main
-thread. Each answer is JSON the client turns into `ug` lines.
+thread. Every answer is status 200 with `{"lines":[...]}`, the lines exactly as `ug` prints
+them (formatted in the bridge, so the client stays thin and the tests see the real output), or
+`{"error":"..."}` for a refusal. An answer may add `"wait":"playing"` or `"wait":"idle"`: the
+client then polls `/status` until that state (across the domain reload) before printing, and
+appends the time taken (`playing (entered in 2.1 s)`).
 
 | Request | Does |
 | --- | --- |
@@ -113,10 +117,10 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/set?object=Assets/X.png&importer=true&...` | Importer settings (texture, model, audio) through the importer's `SerializedObject`, then reimport. Material properties by name (`_BaseColor`, `_MainTex`). |
 | `/project` | Tags, sorting and physics layers, build scenes, Unity version, render pipeline. |
 | `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`; waits for the request; answers the resolved version. |
-| `/menu?path=` | `EditorApplication.ExecuteMenuItem`; refused for File/Quit, File/Exit and Build menu items. |
+| `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit and Build menu items. |
 | `/shot?view=game|scene|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/<name>.png`; answers the path and size. |
 | `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies. |
-| `/stats` | Render stats (in play mode), memory, object and asset counts. |
+| `/stats` (`ug perf`) | Render stats (in play mode), memory, object and asset counts. |
 
 `field` is the serialized name (`speed`, `m_LocalPosition`, `waves[2].count`); display names
 (`Speed`) also match. `value` by the field's type: numbers (invariant culture), `true`/`false`,
@@ -162,9 +166,9 @@ Assets/Scenes/UI.unity    loaded             3 roots
 edit mode
 
 $ ug tree Player --depth 1
-Player  Transform, Rigidbody, PlayerController
-  Model  Transform, Animator  (4 children)
-  Gun  Transform, Gun
+Player  Rigidbody, PlayerController
+  Model  Animator  (4 children)
+  Gun  Gun
 
 $ ug inspect Player --component PlayerController
 Player  PlayerController  Assets/Scripts/Player/PlayerController.cs
@@ -185,7 +189,8 @@ $ ug stop
 stopped after 12.4 s: 0 errors, 2 warnings (ug console)
 ```
 
-- Answers are one line per change or per object, with the address to use next.
+- Answers are one line per change or per object, with the address to use next. `ug tree` leaves
+  out the plain Transform every object has; `ug inspect <object>` shows it on one line.
 - Exit code 0 for any answer, 1 only for no Unity project or a bad config (as editor-link).
 - Without the bridge: `Unity not reachable (...); ug <command> needs the bridge` plus the
   install hint. A 0.1.0 bridge: `bridge 0.1.0 is too old for ug <command>: run ug bridge
@@ -219,7 +224,7 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
 - Never from a hook; never edits package contents or vendored folders; never discards unsaved
   work.
 - The only network access is rule 11's docs fallback, to docs.unity3d.com only.
-- Changing the user's scenes on purge-squad (O10) needs the user's go-ahead first; reads do not.
+- purge-squad is the testing ground: the user allowed edits there (2026-09-30; it is in git).
 
 ## Open points
 

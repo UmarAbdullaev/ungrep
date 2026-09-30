@@ -33,6 +33,7 @@ namespace UnityGraph.Bridge.Tests
             var player = new GameObject("Player");
             player.transform.SetParent(level.transform);
             new GameObject("Model").transform.SetParent(player.transform);
+            player.AddComponent<UgProbe>();
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), MainPath);
 
             Scene other = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
@@ -68,6 +69,14 @@ namespace UnityGraph.Bridge.Tests
 
             return request;
         }
+
+        // The body of the bridge's answer to an editor-ops request.
+        protected static string Ask(string path, params string[] query) =>
+            Routes.Handle(Request(path, query), new ConsoleBuffer())().Body;
+
+        protected static string Lines(params string[] lines) => Answer.Lines(lines).Body;
+
+        protected static string Err(string message) => Answer.Error(message).Body;
 
         // An object created through Undo, as ug edits are, so its scene counts as modified.
         protected static GameObject AddUnsaved(string name)
@@ -153,11 +162,7 @@ namespace UnityGraph.Bridge.Tests
         [Test]
         public void Lists_the_loaded_scenes()
         {
-            string body = SceneOps.Scenes().Body;
-
-            Assert.AreEqual(
-                "{\"play\":\"edit\",\"scenes\":[{\"path\":\"" + MainPath + "\",\"name\":\"Main\",\"active\":true,\"modified\":false,\"loaded\":true,\"roots\":2}]}",
-                body);
+            Assert.AreEqual(Lines(MainPath + "  active  2 roots", "edit mode"), Ask("/scene"));
         }
 
         [Test]
@@ -165,36 +170,44 @@ namespace UnityGraph.Bridge.Tests
         {
             AddUnsaved("Unsaved");
 
-            Assert.AreEqual(
-                "{\"error\":\"unsaved changes in " + MainPath + ": ug save, or --additive to keep them open\"}",
-                SceneOps.Open(Request("/scene/open", "path", OtherPath)).Body);
+            Assert.AreEqual(Err("unsaved changes in " + MainPath + ": ug save, or --additive to keep them open"), Ask("/scene/open", "path", OtherPath));
             Assert.AreEqual(1, SceneManager.sceneCount);
 
-            StringAssert.StartsWith("{\"opened\":\"" + OtherPath + "\"", SceneOps.Open(Request("/scene/open", "path", OtherPath, "additive", "true")).Body);
-            Assert.AreEqual(2, SceneManager.sceneCount);
-            Assert.IsTrue(SceneManager.GetSceneAt(0).isDirty, "the unsaved scene stays open and modified");
-            Assert.AreEqual("{\"error\":\"" + OtherPath + " is already open\"}", SceneOps.Open(Request("/scene/open", "path", OtherPath, "additive", "true")).Body);
+            Assert.AreEqual(
+                Lines("opened " + OtherPath, MainPath + "  active  modified  3 roots", OtherPath + "  1 root", "edit mode"),
+                Ask("/scene/open", "path", OtherPath, "additive", "true"));
+            Assert.AreEqual(Err(OtherPath + " is already open"), Ask("/scene/open", "path", OtherPath, "additive", "true"));
         }
 
         [Test]
         public void Open_replaces_a_saved_scene()
         {
-            string body = SceneOps.Open(Request("/scene/open", "path", OtherPath)).Body;
+            Assert.AreEqual(Lines("opened " + OtherPath, OtherPath + "  active  1 root", "edit mode"), Ask("/scene/open", "path", OtherPath));
+            Assert.AreEqual(Err("not a scene: " + PrefabPath), Ask("/scene/open", "path", PrefabPath));
+        }
 
-            StringAssert.Contains("\"name\":\"Other\",\"active\":true", body);
-            Assert.AreEqual(1, SceneManager.sceneCount);
-            Assert.AreEqual("{\"error\":\"not a scene: " + PrefabPath + "\"}", SceneOps.Open(Request("/scene/open", "path", PrefabPath)).Body);
+        [Test]
+        public void New_close_and_active_scenes()
+        {
+            string path = Folder + "/Third.unity";
+            Assert.AreEqual(Err("a new scene needs a path like Assets/Scenes/Level2.unity"), Ask("/scene/new", "path", "Third"));
+            Assert.AreEqual(Err(MainPath + " already exists: ug scene open " + MainPath), Ask("/scene/new", "path", MainPath));
+
+            Assert.AreEqual(Lines("created " + path, MainPath + "  2 roots", path + "  active  2 roots", "edit mode"), Ask("/scene/new", "path", path, "additive", "true"));
+            Assert.AreEqual(Lines(MainPath + "  active  2 roots", path + "  2 roots", "edit mode"), Ask("/scene/active", "path", "Main"));
+            Assert.AreEqual(Lines("closed " + path, MainPath + "  active  2 roots", "edit mode"), Ask("/scene/close", "path", path));
+            Assert.AreEqual(Err(MainPath + " is the only open scene: ug scene open another one instead"), Ask("/scene/close", "path", MainPath));
         }
 
         [Test]
         public void Save_writes_modified_scenes_only()
         {
-            Assert.AreEqual("{\"saved\":[]}", SceneOps.Save(Request("/save")).Body);
+            Assert.AreEqual(Lines("no modified scenes; assets saved"), Ask("/save"));
 
             AddUnsaved("Added");
-            Assert.AreEqual("{\"saved\":[\"" + MainPath + "\"]}", SceneOps.Save(Request("/save")).Body);
+            Assert.AreEqual(Lines("saved " + MainPath), Ask("/save"));
             Assert.IsFalse(SceneManager.GetActiveScene().isDirty);
-            Assert.AreEqual("{\"error\":\"" + OtherPath + " is not open\"}", SceneOps.Save(Request("/save", "path", OtherPath)).Body);
+            Assert.AreEqual(Err(OtherPath + " is not open"), Ask("/save", "path", OtherPath));
         }
 
         [Test]
@@ -203,17 +216,109 @@ namespace UnityGraph.Bridge.Tests
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             AddUnsaved("Added");
 
-            Assert.AreEqual(
-                "{\"error\":\"an untitled scene has changes: save it once in Unity to give it a path\"}",
-                SceneOps.Save(Request("/save")).Body);
+            Assert.AreEqual(Err("an untitled scene has changes: save it once in Unity to give it a path"), Ask("/save"));
         }
 
         [Test]
         public void Stop_and_pause_need_play_mode()
         {
-            Assert.AreEqual("{\"error\":\"not playing\"}", SceneOps.Stop(new ConsoleBuffer()).Body);
-            Assert.AreEqual("{\"error\":\"not playing\"}", SceneOps.Pause().Body);
-            Assert.AreEqual("edit", SceneOps.PlayState());
+            Assert.AreEqual(Err("not playing"), Ask("/stop"));
+            Assert.AreEqual(Err("not playing"), Ask("/pause"));
+            Assert.AreEqual("edit mode", SceneOps.PlayState());
+        }
+    }
+
+    public class ReadOpsTests : OpsFixture
+    {
+        [Test]
+        public void Tree_lists_roots_to_a_depth()
+        {
+            Assert.AreEqual(Lines("Camera", "Level  (3 children)"), Ask("/tree", "depth", "1"));
+            Assert.AreEqual(Lines("Camera", "Level", "  Enemy#1", "  Enemy#2", "  Player  UgProbe  (1 child)"), Ask("/tree"));
+        }
+
+        [Test]
+        public void Tree_of_one_object_or_prefab()
+        {
+            Assert.AreEqual(Lines("Level/Player  UgProbe", "  Model"), Ask("/tree", "object", "Level/Player"));
+            Assert.AreEqual(Lines(PrefabPath, "  Barrel", "    Muzzle"), Ask("/tree", "object", PrefabPath, "depth", "3"));
+            Assert.AreEqual(Err("not found: Nope in the loaded scenes"), Ask("/tree", "object", "Nope"));
+        }
+
+        [Test]
+        public void Tree_marks_scenes_inactive_objects_and_prefab_instances()
+        {
+            EditorSceneManager.OpenScene(OtherPath, OpenSceneMode.Additive);
+            Find("Level/Enemy#2").SetActive(false);
+            var turret = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath));
+
+            Assert.AreEqual(
+                Lines("Main:", "  Camera", "  Level", "    Enemy#1", "    Enemy#2  inactive", "    Player  UgProbe  (1 child)", "  Turret  [Turret.prefab]", "    Barrel  (1 child)", "Other:", "  Camera"),
+                Ask("/tree"));
+            Object.DestroyImmediate(turret);
+        }
+
+        [Test]
+        public void Inspect_gives_an_overview_of_an_object()
+        {
+            Find("Level/Player").transform.localPosition = new Vector3(1, 2.5f, 0);
+
+            Assert.AreEqual(
+                Lines(
+                    "Level/Player",
+                    "  Transform  position 1, 2.5, 0  rotation 0, 0, 0  scale 1, 1, 1",
+                    "  UgProbe  Packages/com.unitygraph.bridge/Tests/Runtime/UgProbe.cs",
+                    "  children: Model"),
+                Ask("/inspect", "object", "Level/Player"));
+        }
+
+        [Test]
+        public void Inspect_lists_a_components_fields()
+        {
+            UgProbe probe = Find("Level/Player").GetComponent<UgProbe>();
+            probe.target = Find("Level/Enemy#2").transform;
+            probe.paint = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+            probe.guns[0] = Find("Camera");
+
+            Assert.AreEqual(
+                Lines(
+                    "Level/Player  UgProbe  Packages/com.unitygraph.bridge/Tests/Runtime/UgProbe.cs",
+                    "  speed  float  5",
+                    "  lives  int  3",
+                    "  armed  bool  false",
+                    "  title  string  \"probe\"",
+                    "  mode  enum  Run",
+                    "  tint  Color  1, 0, 0, 1",
+                    "  offset  Vector3  1, 2, 3",
+                    "  mask  LayerMask  Default",
+                    "  target  Transform  Level/Enemy#2",
+                    "  paint  Material  " + MaterialPath,
+                    "  guns  GameObject[2]  Camera, null",
+                    "  waves  UgWave[1]  {count: 3, delay: 0.5}",
+                    "  boss  UgWave  {count: 1, delay: 2}",
+                    "  _secret  int  7"),
+                Ask("/inspect", "object", "Level/Player", "component", "ugprobe"));
+            Assert.AreEqual(Err("Level/Player has no Rigidbody (has: Transform, UgProbe)"), Ask("/inspect", "object", "Level/Player", "component", "Rigidbody"));
+        }
+
+        [Test]
+        public void Inspect_reads_assets_and_materials()
+        {
+            string body = Ask("/inspect", "object", MaterialPath);
+            StringAssert.StartsWith("{\"lines\":[\"" + MaterialPath + "  Material  shader Unlit/Color\"", body);
+            StringAssert.Contains("\"  _Color  Color  1, 1, 1, 1\"", body);
+
+            StringAssert.StartsWith("{\"lines\":[\"" + PrefabPath + "\",\"  Transform  position 0, 0, 0", Ask("/inspect", "object", PrefabPath));
+        }
+
+        [Test]
+        public void Find_matches_names_tags_layers_and_components()
+        {
+            Assert.AreEqual(Lines("Level/Enemy#1", "Level/Enemy#2"), Ask("/find", "name", "enemy"));
+            Assert.AreEqual(Lines("Level/Player"), Ask("/find", "component", "MonoBehaviour"));
+            Assert.AreEqual(Lines("no object in the loaded scenes matches"), Ask("/find", "name", "enemy", "tag", "Player"));
+            Assert.AreEqual(Err("no layer Nope"), Ask("/find", "layer", "Nope"));
+            Assert.AreEqual(Err("give a name, --tag, --layer or --component"), Ask("/find"));
         }
     }
 }

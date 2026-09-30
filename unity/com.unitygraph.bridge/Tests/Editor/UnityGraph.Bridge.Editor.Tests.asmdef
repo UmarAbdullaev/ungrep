@@ -3,6 +3,7 @@
     "rootNamespace": "UnityGraph.Bridge.Tests",
     "references": [
         "UnityGraph.Bridge.Editor",
+        "UnityGraph.Bridge.Tests.Runtime",
         "UnityEditor.TestRunner",
         "UnityEngine.TestRunner"
     ],
