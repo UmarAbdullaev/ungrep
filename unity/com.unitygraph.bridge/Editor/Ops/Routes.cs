@@ -28,6 +28,20 @@ namespace UnityGraph.Bridge
                 { "/tree", (r, c) => Checked(() => ReadOps.Tree(r)) },
                 { "/inspect", (r, c) => Checked(() => ReadOps.Inspect(r)) },
                 { "/find", (r, c) => Checked(() => ReadOps.Find(r)) },
+
+                // Edits.
+                { "/object/create", (r, c) => Checked(() => EditOps.Create(r)) },
+                { "/object/delete", (r, c) => Checked(() => EditOps.Delete(r)) },
+                { "/object/rename", (r, c) => Checked(() => EditOps.Rename(r)) },
+                { "/object/move", (r, c) => Checked(() => EditOps.Move(r)) },
+                { "/object/active", (r, c) => Checked(() => EditOps.Active(r)) },
+                { "/object/duplicate", (r, c) => Checked(() => EditOps.Duplicate(r)) },
+                { "/component/add", (r, c) => Checked(() => EditOps.AddComponent(r)) },
+                { "/component/remove", (r, c) => Checked(() => EditOps.RemoveComponent(r)) },
+                { "/set", (r, c) => Checked(() => EditOps.Set(r)) },
+                { "/undo", (r, c) => Checked(() => EditOps.UndoLast(false)) },
+                { "/redo", (r, c) => Checked(() => EditOps.UndoLast(true)) },
+                { "/select", (r, c) => Checked(() => EditOps.Select(r)) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>

@@ -14,6 +14,8 @@ namespace UnityGraph.Bridge
     {
         public static Reply Error(string message) => Reply.Ok(new Json().Object().Field("error", message).EndObject().ToString());
 
+        public static bool IsError(Reply reply) => reply.Body.StartsWith("{\"error\"", StringComparison.Ordinal);
+
         public static Reply Line(string line) => Lines(new[] { line });
 
         public static Reply Lines(IEnumerable<string> lines, string wait = null)
@@ -38,7 +40,8 @@ namespace UnityGraph.Bridge
         {
             Undo.IncrementCurrentGroup();
             int group = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName("ug " + name);
+            GroupName = "ug " + name;
+            Undo.SetCurrentGroupName(GroupName);
             try
             {
                 return edit();
@@ -49,9 +52,18 @@ namespace UnityGraph.Bridge
             }
         }
 
+        /// <summary>The running edit's undo group name; Undo records use it so Edit > Undo shows the command.</summary>
+        public static string GroupName { get; private set; } = "ug edit";
+
         /// <summary>What happens to an edit of this object: unsaved in its scene, lost after play, or written.</summary>
         public static string Unsaved(GameObject target)
         {
+            string contents = Addresses.ContentsPath(target);
+            if (contents != null)
+            {
+                return "  (written " + contents + ")";
+            }
+
             if (EditorUtility.IsPersistent(target))
             {
                 return "  (written " + AssetDatabase.GetAssetPath(target) + ")";

@@ -20,6 +20,11 @@ namespace UnityGraph.Bridge
         private const int MaxCandidates = 10;
         private const int MaxNear = 5;
 
+        // While an edit has a prefab asset's contents loaded: its root and path, so addresses
+        // inside name the asset (`Assets/X.prefab:Child`) and answers say the asset is written.
+        private static GameObject _contentsRoot;
+        private static string _contentsPath;
+
         public static bool IsAssetPath(string address) =>
             address.StartsWith("Assets/", StringComparison.Ordinal) || address.StartsWith("Packages/", StringComparison.Ordinal)
             || address.StartsWith("ProjectSettings/", StringComparison.Ordinal);
@@ -89,15 +94,40 @@ namespace UnityGraph.Bridge
             }
 
             segments.Reverse();
-            if (EditorUtility.IsPersistent(target))
+            string contents = ContentsPath(target);
+            if (contents != null || EditorUtility.IsPersistent(target))
             {
-                string asset = AssetDatabase.GetAssetPath(target);
+                string asset = contents ?? AssetDatabase.GetAssetPath(target);
                 return segments.Count == 1 ? asset : asset + ":" + string.Join("/", segments.Skip(1));
             }
 
             string path = string.Join("/", segments);
             return SceneManager.sceneCount > 1 && target.scene.IsValid() ? target.scene.name + ":" + path : path;
         }
+
+        /// <summary>Loads a prefab asset's contents for an edit; <see cref="UnloadContents"/> ends it.</summary>
+        public static GameObject LoadContents(string prefab)
+        {
+            UnloadContents();
+            _contentsRoot = PrefabUtility.LoadPrefabContents(prefab);
+            _contentsPath = prefab;
+            return _contentsRoot;
+        }
+
+        public static void UnloadContents()
+        {
+            if (_contentsRoot != null)
+            {
+                PrefabUtility.UnloadPrefabContents(_contentsRoot);
+            }
+
+            _contentsRoot = null;
+            _contentsPath = null;
+        }
+
+        /// <summary>The prefab asset whose loaded contents hold <paramref name="target"/>, or null.</summary>
+        public static string ContentsPath(GameObject target) =>
+            _contentsRoot != null && target != null && target.transform.root.gameObject == _contentsRoot ? _contentsPath : null;
 
         /// <summary>The loaded scenes in hierarchy order.</summary>
         public static IEnumerable<Scene> LoadedScenes()
@@ -135,7 +165,7 @@ namespace UnityGraph.Bridge
 
                 if (matches.Count == 0)
                 {
-                    error = "not found: " + segment + " in " + where + Near(name, level);
+                    error = "not found: " + segment + " in " + where + Near(name, level.Select(g => g.name));
                     return null;
                 }
 
@@ -298,11 +328,11 @@ namespace UnityGraph.Bridge
             return same.Count > 1 ? target.name + "#" + (same.IndexOf(target) + 1).ToString(CultureInfo.InvariantCulture) : target.name;
         }
 
-        private static string Near(string name, IEnumerable<GameObject> level)
+        /// <summary>` (near: A, B)` for the names close to <paramref name="name"/>, or empty.</summary>
+        public static string Near(string name, IEnumerable<string> names)
         {
             string lower = name.ToLowerInvariant();
-            List<string> near = level
-                .Select(g => g.name)
+            List<string> near = names
                 .Distinct(StringComparer.Ordinal)
                 .Select(n => (Name: n, Distance: Distance(lower, n.ToLowerInvariant())))
                 .Where(c => c.Distance <= Math.Max(2, name.Length / 3) || c.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase))

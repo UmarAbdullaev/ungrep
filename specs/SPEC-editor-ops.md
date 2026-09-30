@@ -102,7 +102,7 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/object/active?object=&value=` | `SetActive`. |
 | `/component/add?object=&type=` | Refused for types that are not components or not found. |
 | `/component/remove?object=&component=` | Refused when another component requires it. |
-| `/set?object=&component=&field=&value=` | Sets one serialized field through `SerializedObject`. |
+| `/set?object=&component=&field=&value=` | Sets one serialized field through `SerializedObject`. Without `component`, the field is looked up on the game object (name, tag, layer, active, static) and then on its components; two components with the field is ambiguous. |
 
 Added for parity (O6–O9; same rules, same answer shape):
 
@@ -111,7 +111,7 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/find?name=&tag=&layer=&component=` | Live objects matching all given filters, as addresses. At most 100. |
 | `/object/duplicate?object=`, `/object/move?...&scene=` | Duplicate next to the original; move a root object to another loaded scene. |
 | `/scene/new?path=&additive=`, `/scene/close?path=`, `/scene/active?path=` | New scene saved at `path`; close (refused when modified); set the active scene. |
-| `/undo`, `/redo`, `/select?object=` | Unity's Undo/Redo (answers the group name); selection read or set. |
+| `/undo`, `/redo`, `/select?object=&clear=` | Unity's Undo/Redo (answers the group name, `ug <command>`); selection read, set or cleared. |
 | `/prefab/create?object=&path=`, `/prefab/apply?object=`, `/prefab/revert?object=`, `/prefab/unpack?object=&completely=` | Save an object as a prefab (kept linked); apply or revert an instance's overrides; unpack. |
 | `/asset/folder`, `/asset/create?path=&type=`, `/asset/move?from=&to=`, `/asset/duplicate`, `/asset/delete?path=`, `/asset/reimport?path=` | Through `AssetDatabase`, so `.meta` files and GUIDs stay right. `create` makes folders, materials (`type=Material&shader=`) and ScriptableObjects. `delete` moves to the OS trash (`MoveAssetToTrash`). |
 | `/set?object=Assets/X.png&importer=true&...` | Importer settings (texture, model, audio) through the importer's `SerializedObject`, then reimport. Material properties by name (`_BaseColor`, `_MainTex`). |
