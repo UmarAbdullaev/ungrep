@@ -224,7 +224,7 @@ Standing assumptions:
 | `asset-index` | `.meta` GUID table and Unity YAML (scenes, prefabs with nesting, variants and overrides, ScriptableObjects, materials, animators, animations, input actions, asmdefs, Addressables): objects, components, references, UnityEvent calls. | `graph-core` |
 | `query` | `ug find / explain / refs / impact / outline / batch`; answer budgets, `file:line` anchors, confidence tags; reindex on edit. | `code-index`, `asset-index`, `plugin-shell` |
 | `editor-link` | Bridge package and client: status, refresh and compile, compile errors, console, tests, run a static method; `Editor.log` fallback when Unity is unreachable. | `plugin-shell` |
-| `editor-ops` | Work in the open editor through the bridge: open and save scenes, play mode, live hierarchy and component values, create/delete/move objects, add/remove components, set serialized fields; Undo for every edit, nothing saved unasked. | `editor-link` |
+| `editor-ops` | Work in the open editor through the bridge, covering what the Unity MCP server does: scenes, play mode, live hierarchy and component values, object and component edits, prefabs, assets, packages, project data, screenshots, API lookup; Undo for every edit, nothing saved unasked. | `editor-link` |
 | `unity-loop` | Compile gate (edit tracking + Stop hook, silent when clean); compact `ug console`, `ug test`, `ug log` (digest of the last play session). | `editor-link` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
 | `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract. | `query`, `unity-loop`, `editor-link` |
@@ -436,7 +436,8 @@ LabStage  class  Assets/Scripts/Lab/LabStage.cs:14-152  [exact]
   writes into a user's Unity project (installing the bridge package, generating `CLAUDE.md`
   files); any network access; widening the supported Unity versions.
 - **Never:** send code, transcripts or usage data off the machine; edit vendored folders or
-  `Packages/` in a user's project; change scenes or prefabs from a hook; add an MCP server
+  `Packages/` in a user's project (except `ug package add|remove` on an explicit command,
+  through Unity's Package Manager; user, 2026-09-30); change scenes or prefabs from a hook; add an MCP server
   without a measured reason; block the user's session because the plugin failed.
 
 ## Success criteria (v1)

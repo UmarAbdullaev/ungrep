@@ -75,4 +75,8 @@ Details and acceptance criteria: `plan.md`.
 - [ ] O3 editor-ops: tree and inspect
 - [ ] O4 editor-ops: edits
 - [ ] O5 editor-ops: client, CLI, skill, end to end
-- [ ] O6 editor-ops: purge-squad measurement (ask before editing purge-squad scenes)
+- [ ] O6 editor-ops: more scene ops, undo, selection, prefabs
+- [ ] O7 editor-ops: assets
+- [ ] O8 editor-ops: project, packages, menu
+- [ ] O9 editor-ops: screenshots, API lookup, stats, batch
+- [ ] O10 editor-ops: purge-squad measurement (ask before editing purge-squad scenes)

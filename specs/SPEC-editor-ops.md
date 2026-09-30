@@ -13,22 +13,53 @@ rename, reparent and toggle objects, add and remove components, set serialized f
 
 Why through `ug` and the bridge rather than a Unity MCP server: an MCP server puts every tool's
 schema in the context of every session, used or not; `ug` costs one skill line when idle and a
-few lines per answer. Measuring that difference on purge-squad is part of this module (O6), and
+few lines per answer. Measuring that difference on purge-squad is part of this module (O10), and
 is the measured reason SPEC Boundaries ask for before an MCP-shaped feature.
 
 ## Scope
 
 In:
 
-- Bridge endpoints (package version 0.2.0) for scenes, play mode, reading objects and editing.
-- CLI: `ug scene`, `ug scene open|save`, `ug play|stop|pause`, `ug tree`, `ug inspect`,
-  `ug object create|delete|rename|move|active`, `ug component add|remove`, `ug set`, `ug save`.
+- Bridge endpoints (package version 0.2.0 and up) for scenes, play mode, reading objects and
+  editing, prefabs, assets, project data, screenshots and API lookup.
+- CLI: `ug scene`, `ug scene open|save|new|close|active`, `ug play|stop|pause`, `ug tree`,
+  `ug inspect`, `ug find --live`, `ug object create|delete|rename|move|active|duplicate`,
+  `ug component add|remove`, `ug set`, `ug undo|redo`, `ug select`, `ug prefab ...`,
+  `ug asset ...`, `ug project`, `ug package list|add|remove`, `ug menu`, `ug shot`, `ug api`,
+  `ug stats`, and editor commands inside `ug batch`.
 - The `unity` skill: the commands and when to use them.
 - BridgeHost fixture scenes, prefab and ScriptableObject; EditMode tests; a `UG_UNITY` end to end.
 
-Out: hooks that edit anything (SPEC Boundaries: never from a hook); building players; scene view
-or camera control; animation, timeline and shader editing; multi-object batch scripts (Claude
-can chain commands); editing in `Packages/` or vendored folders; Unity's own CLI adapter.
+Out: hooks that edit anything (SPEC Boundaries: never from a hook); building players; animation,
+timeline and shader graph editing; ProBuilder and Cinemachine (ask when wanted); script editing
+(Claude's own Write and Edit do it, then `ug compile`); editing package contents in `Packages/`
+or vendored folders; Unity's own CLI adapter.
+
+## Unity MCP parity
+
+Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") offers, and more.
+
+| MCP tool | In unitygraph |
+| --- | --- |
+| `refresh_unity`, `validate_script` | `ug compile` (editor-link) |
+| `read_console`, `run_tests`, `get_test_job` | `ug console`, `ug test` (unity-loop) |
+| `create_script`, `script_apply_edits`, `apply_text_edits`, `delete_script`, `get_sha`, `find_in_file` | Claude's Write, Edit, Grep; `ug compile` after. Not duplicated. |
+| `find_gameobjects` | `ug find` (graph, editor closed) and `ug find --live` (name, tag, layer, component) |
+| `manage_scene` | `ug scene` and its subcommands; `ug object move --scene` |
+| `manage_gameobject`, `manage_components` | `ug object`, `ug component`, `ug set` |
+| `manage_editor` | `ug play|stop|pause`, `ug undo|redo`, `ug select`, `ug project` (tags, layers) |
+| `execute_menu_item` | `ug menu <path>` |
+| `manage_prefabs` | `ug prefab create|instantiate|apply|revert|unpack`, prefab-content addresses |
+| `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
+| `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API |
+| `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
+| `manage_graphics`, `manage_physics`, `manage_profiler` | `ug stats` (render, memory, profiler counters); settings through `ug set` on `ProjectSettings/*.asset` |
+| `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`: reflection, then the offline Scripting Reference |
+| `batch_execute` | `ug batch` with editor commands, one process and one connection |
+| `set_active_instance`, `execute_custom_tool` | One editor per project root; `ug run` for project editor methods |
+
+Beyond the MCP server: the code and asset graph (answers with Unity closed), the compile gate,
+guards on serialized-field renames and `.meta` safety, token stats, and no idle context cost.
 
 ## Addressing objects
 
@@ -69,6 +100,24 @@ thread. Each answer is JSON the client turns into `ug` lines.
 | `/component/remove?object=&component=` | Refused when another component requires it. |
 | `/set?object=&component=&field=&value=` | Sets one serialized field through `SerializedObject`. |
 
+Added for parity (O6–O9; same rules, same answer shape):
+
+| Request | Does |
+| --- | --- |
+| `/find?name=&tag=&layer=&component=` | Live objects matching all given filters, as addresses. At most 100. |
+| `/object/duplicate?object=`, `/object/move?...&scene=` | Duplicate next to the original; move a root object to another loaded scene. |
+| `/scene/new?path=&additive=`, `/scene/close?path=`, `/scene/active?path=` | New scene saved at `path`; close (refused when modified); set the active scene. |
+| `/undo`, `/redo`, `/select?object=` | Unity's Undo/Redo (answers the group name); selection read or set. |
+| `/prefab/create?object=&path=`, `/prefab/apply?object=`, `/prefab/revert?object=`, `/prefab/unpack?object=&completely=` | Save an object as a prefab (kept linked); apply or revert an instance's overrides; unpack. |
+| `/asset/folder`, `/asset/create?path=&type=`, `/asset/move?from=&to=`, `/asset/duplicate`, `/asset/delete?path=`, `/asset/reimport?path=` | Through `AssetDatabase`, so `.meta` files and GUIDs stay right. `create` makes folders, materials (`type=Material&shader=`) and ScriptableObjects. `delete` moves to the OS trash (`MoveAssetToTrash`). |
+| `/set?object=Assets/X.png&importer=true&...` | Importer settings (texture, model, audio) through the importer's `SerializedObject`, then reimport. Material properties by name (`_BaseColor`, `_MainTex`). |
+| `/project` | Tags, sorting and physics layers, build scenes, Unity version, render pipeline. |
+| `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`; waits for the request; answers the resolved version. |
+| `/menu?path=` | `EditorApplication.ExecuteMenuItem`; refused for File/Quit, File/Exit and Build menu items. |
+| `/shot?view=game|scene|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/<name>.png`; answers the path and size. |
+| `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies. |
+| `/stats` | Render stats (in play mode), memory, object and asset counts. |
+
 `field` is the serialized name (`speed`, `m_LocalPosition`, `waves[2].count`); display names
 (`Speed`) also match. `value` by the field's type: numbers (invariant culture), `true`/`false`,
 strings, enum names, vectors `1,2,3`, colors `#ff8800` or `1,0.5,0,1`, object references as an
@@ -92,6 +141,13 @@ object address, asset path or `null`, array size via `field.size`.
 6. **Busy editor.** Requests are refused while compiling or importing (`Unity is compiling`).
 7. **Read-only places.** Objects in `Packages/` or in vendored folders are refused for edits.
 8. **Hooks never call these** (SPEC Boundaries).
+9. **Assets through AssetDatabase.** Asset moves, renames, copies and deletes go through
+   `AssetDatabase` so `.meta` files and GUIDs follow; deletes go to the OS trash, never gone.
+10. **Packages.** `ug package add|remove` only on an explicit command, through Unity's Package
+    Manager (Unity writes `Packages/manifest.json`, not ug). Added 2026-09-30 by the user.
+11. **API lookup is offline.** `ug api` answers from reflection (signatures), then the local
+    Scripting Reference when the Hub's Documentation module is installed (summary and
+    parameters, trimmed). No network: see open point 3.
 
 ## Commands
 
@@ -154,9 +210,12 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
 
 ## Boundaries
 
-- Writes scene and asset files only on `ug save` and for prefab-content edits (rule 3).
-- Never from a hook; never in `Packages/` or vendored folders; never discards unsaved work.
-- Changing the user's scenes on purge-squad (O6) needs the user's go-ahead first; reads do not.
+- Writes scene and asset files only on `ug save`, for prefab-content edits (rule 3), and for
+  explicit `ug prefab`, `ug asset` and `ug package` commands.
+- Never from a hook; never edits package contents or vendored folders; never discards unsaved
+  work.
+- No network access (rule 11).
+- Changing the user's scenes on purge-squad (O10) needs the user's go-ahead first; reads do not.
 
 ## Open points
 
@@ -164,3 +223,7 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
    `ug refs` answer can feed `ug inspect` directly.
 2. Whether `ug play --for <s>` (play, wait, stop, digest) belongs here or in unity-loop's
    `ug log`.
+3. An online fallback for `ug api` (docs.unity3d.com, name-only request, trimmed and cached)
+   when the offline reference is not installed. Saves tokens only against Claude's own WebFetch
+   of the same page (~300 vs ~1000); reflection is cheaper still. Needs the user's decision
+   (SPEC Boundaries: network access).

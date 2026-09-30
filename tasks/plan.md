@@ -207,8 +207,13 @@ Added 2026-09-30 by the user: `ug` should cover what people use a Unity MCP serv
 unitygraph is the one plugin a Unity developer needs. Built before `unity-loop`.
 
 ```
-O1 spec ──> O2 addressing, scenes, play ──> O3 tree + inspect ──> O4 edits ──> O5 CLI + end to end ──> O6 purge-squad
+O1 spec ──> O2 addressing, scenes, play ──> O3 tree + inspect ──> O4 edits ──> O5 CLI + end to end
+  ──> O6 scenes + prefabs ──> O7 assets ──> O8 project, packages, menu ──> O9 shot, api, stats, batch
+  ──> O10 purge-squad
 ```
+
+O6–O9 added 2026-09-30 for parity with the Unity MCP server (spec: Unity MCP parity). Each ships
+its bridge endpoints, client, CLI lines and skill rows together.
 
 ### O1. editor-ops spec
 `specs/SPEC-editor-ops.md`; SPEC.md module table, build order and Boundaries.
@@ -229,7 +234,28 @@ Acceptance: EditMode tests per endpoint, including undo reverting each edit and 
 - Client requests, `ug` commands, answer lines, version check, skill section.
 Acceptance: fake-bridge CLI tests; `UG_UNITY` end to end passes; times recorded.
 
-### O6. editor-ops: purge-squad measurement
+### O6. editor-ops: more scene ops, undo, selection, prefabs
+- `/find`, `/object/duplicate`, move between scenes, `/scene/new|close|active`, `/undo`, `/redo`,
+  `/select`, `/prefab/create|apply|revert|unpack`.
+Acceptance: EditMode tests per endpoint; fake-bridge CLI tests.
+
+### O7. editor-ops: assets
+- `/asset/*` through AssetDatabase (trash on delete), materials and ScriptableObjects, importer
+  settings and material properties through `/set`.
+Acceptance: EditMode tests: GUIDs kept across move and rename, `.meta` follows, undo where Unity
+has it.
+
+### O8. editor-ops: project, packages, menu
+- `/project`, `/package/list|add|remove` (Package Manager client), `/menu` with its refusals.
+Acceptance: EditMode tests; package add/remove on a BridgeHost copy only (`UG_UNITY`).
+
+### O9. editor-ops: screenshots, API lookup, stats, batch
+- `/shot`, `/api` (reflection, then the offline Scripting Reference), `/stats`, editor commands in
+  `ug batch`.
+Acceptance: EditMode tests; PNG written and readable; `ug api` answers under 300 tokens for
+common types.
+
+### O10. editor-ops: purge-squad measurement
 - Reads on purge-squad's open editor; edits only with the user's go-ahead (or on a scratch scene
   they approve). Idle and per-task token cost against the Unity MCP server the user runs.
 Acceptance: Measured section filled; targets met or explained.
