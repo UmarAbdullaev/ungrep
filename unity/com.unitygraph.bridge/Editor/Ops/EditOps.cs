@@ -289,6 +289,12 @@ namespace UnityGraph.Bridge
                     copy.name = name.Trim();
                 }
 
+                if (Addresses.ContentsPath(copy) == null)
+                {
+                    // Unity's own duplicate leaves its last undo record, `Clear Selection`, naming the group.
+                    Undo.RegisterCompleteObjectUndo(copy, Answer.GroupName);
+                }
+
                 return Answer.Line("duplicated " + Addresses.Of(target) + " -> " + Addresses.Of(copy) + Answer.Unsaved(copy));
             });
         }
@@ -504,7 +510,7 @@ namespace UnityGraph.Bridge
         }
 
         // Safety rule 7: package contents are read-only. Vendored folders are refused by the client.
-        private static string ReadOnly(string address) =>
+        internal static string ReadOnly(string address) =>
             address != null && address.Trim().StartsWith("Packages/", StringComparison.Ordinal)
                 ? address.Trim() + " is in a package, which ug does not edit: copy it into Assets/ first"
                 : null;

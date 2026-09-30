@@ -405,6 +405,28 @@ internal static class EditorCommands
                 Query("/set", ("object", r.GetValue(target)), ("component", r.GetValue(setComponent)), ("field", r.GetValue(field)), ("value", r.GetValue(value)), ("importer", True(r.GetValue(setImporter)))),
                 r.GetValue(target)));
 
+        var prefabs = new Command("prefab", "Save an object as a prefab, apply or revert an instance's overrides, unpack an instance (`ug object create --prefab` instantiates).");
+        Argument<string> prefabSource = Required("object", "Scene object to save: " + Address);
+        Argument<string> prefabPath = Required("path", "Where to save it, like Assets/Prefabs/Crate.prefab. Refused when it exists.");
+        prefabs.Subcommands.Add(Ops("create", "prefab create", "Save a scene object as a prefab asset and keep it linked (writes the asset now; the scene stays unsaved).", [prefabSource, prefabPath], r =>
+            new OpRequest(
+                Query("/prefab/create", ("object", r.GetValue(prefabSource)), ("path", r.GetValue(prefabPath))),
+                r.GetValue(prefabSource),
+                r.GetValue(prefabPath))));
+        Argument<string> applied = Required("object", "Prefab instance in a loaded scene (its root).");
+        prefabs.Subcommands.Add(Ops("apply", "prefab apply", "Write an instance's overrides into its prefab asset (writes the asset now).", [applied], (r, config) =>
+            new OpRequest(
+                Query("/prefab/apply", ("object", r.GetValue(applied)), ("vendored", string.Join('|', config.Vendored.Prefixes))),
+                r.GetValue(applied))));
+        Argument<string> reverted = Required("object", "Prefab instance in a loaded scene (its root).");
+        prefabs.Subcommands.Add(Ops("revert", "prefab revert", "Throw an instance's overrides away, back to its prefab's values.", [reverted], r =>
+            new OpRequest(Query("/prefab/revert", ("object", r.GetValue(reverted))), r.GetValue(reverted))));
+        Argument<string> unpacked = Required("object", "Prefab instance in a loaded scene (its root).");
+        Option<bool> completely = Flag("--completely", "Unpack nested prefab instances too.");
+        prefabs.Subcommands.Add(Ops("unpack", "prefab unpack", "Cut an instance loose from its prefab (nested instances stay linked without --completely).", [unpacked, completely], r =>
+            new OpRequest(Query("/prefab/unpack", ("object", r.GetValue(unpacked)), ("completely", True(r.GetValue(completely)))), r.GetValue(unpacked))));
+        yield return prefabs;
+
         yield return Ops("undo", "undo", "Undo the editor's last change, like Ctrl+Z.", [], _ => new OpRequest("/undo"));
         yield return Ops("redo", "redo", "Redo the last undone change.", [], _ => new OpRequest("/redo"));
 
@@ -424,7 +446,10 @@ internal static class EditorCommands
 
     // An editor-ops command: `command` is how the user types it, for the messages.
     private static Command Ops(string name, string command, string description, Symbol[] symbols, Func<ParseResult, OpRequest> request) =>
-        Command(name, description, symbols, (root, config, result) => Op(root, config.Vendored, command, request(result)));
+        Ops(name, command, description, symbols, (result, _) => request(result));
+
+    private static Command Ops(string name, string command, string description, Symbol[] symbols, Func<ParseResult, UnityGraphConfig, OpRequest> request) =>
+        Command(name, description, symbols, (root, config, result) => Op(root, config.Vendored, command, request(result, config)));
 
     /// <summary>The package folder shipped with the plugin: `unity/com.unitygraph.bridge` above ug's own folder.</summary>
     public static string? FindPackage()

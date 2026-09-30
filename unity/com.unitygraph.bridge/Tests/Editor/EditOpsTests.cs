@@ -69,6 +69,9 @@ namespace UnityGraph.Bridge.Tests
             GameObject copy = SceneManager.GetActiveScene().GetRootGameObjects()[3];
             Assert.IsTrue(PrefabUtility.IsOutermostPrefabInstanceRoot(copy));
             Assert.AreSame(Find("Camera"), Selection.activeGameObject);
+            Assert.AreEqual(Lines("undid ug object duplicate"), Ask("/undo"));
+            Assert.AreEqual(3, SceneManager.GetActiveScene().rootCount);
+            Ask("/redo");
 
             Assert.AreEqual(Lines("duplicated Level/Player -> Level/Hero" + Unsaved), Ask("/object/duplicate", "object", "Level/Player", "name", "Hero"));
             Assert.AreEqual("Model", Find("Level/Hero/Model").name);

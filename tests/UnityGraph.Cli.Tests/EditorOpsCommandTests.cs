@@ -28,6 +28,10 @@ public sealed class EditorOpsCommandTests : IDisposable
         Directory.Delete(_root, recursive: true);
     }
 
+    // The default vendored folders, joined with | and escaped: what `ug prefab apply` sends so the bridge can refuse them.
+    private const string DefaultVendored =
+        "Assets%2FPlugins%2F%7CAssets%2F3rd%20Party%2F%7CAssets%2F3rdParty%2F%7CAssets%2FThird%20Party%2F%7CAssets%2FThirdParty%2F%7CAssets%2FVendor%2F%7CAssets%2FAssetStore%2F%7CPackages%2F";
+
     [Theory]
     [InlineData("/scene", "scene")]
     [InlineData("/scene/open?path=Assets%2FScenes%2FMain.unity", "scene", "open", "Assets/Scenes/Main.unity")]
@@ -59,6 +63,11 @@ public sealed class EditorOpsCommandTests : IDisposable
     [InlineData("/set?object=Player&component=PlayerController&field=speed&value=7.5", "set", "Player", "speed", "7.5", "--component", "PlayerController")]
     [InlineData("/set?object=Player&field=m_LocalPosition&value=1%2C2%2C3", "set", "Player", "m_LocalPosition", "1,2,3")]
     [InlineData("/set?object=Assets%2FArt%2FHero.png&field=m_MaxTextureSize&value=512&importer=true", "set", "Assets/Art/Hero.png", "m_MaxTextureSize", "512", "--importer")]
+    [InlineData("/prefab/create?object=Level%2FCrate&path=Assets%2FPrefabs%2FCrate.prefab", "prefab", "create", "Level/Crate", "Assets/Prefabs/Crate.prefab")]
+    [InlineData("/prefab/apply?object=Main%3ATurret&vendored=" + DefaultVendored, "prefab", "apply", "Main:Turret")]
+    [InlineData("/prefab/revert?object=Turret", "prefab", "revert", "Turret")]
+    [InlineData("/prefab/unpack?object=Turret", "prefab", "unpack", "Turret")]
+    [InlineData("/prefab/unpack?object=Turret&completely=true", "prefab", "unpack", "Turret", "--completely")]
     [InlineData("/undo", "undo")]
     [InlineData("/redo", "redo")]
     [InlineData("/select", "select")]
@@ -177,6 +186,17 @@ public sealed class EditorOpsCommandTests : IDisposable
 
         Assert.Equal("done\n", Run("inspect", "Assets/Plugins/Vendor.prefab").Output);
         Assert.Equal("done\n", Run("object", "create", "--prefab", "Assets/Plugins/Vendor.prefab").Output);
+    }
+
+    [Fact]
+    public void Prefab_apply_sends_the_projects_vendored_folders_for_the_bridge_to_check()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".claude"));
+        File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), "{\"vendored\":[\"Assets/Imported/\",\"Assets/Kits/\"]}");
+        Answer(_ => (200, "{\"lines\":[\"done\"]}"));
+
+        Assert.Equal("done\n", Run("prefab", "apply", "Turret").Output);
+        Assert.Equal(["/status", "/prefab/apply?object=Turret&vendored=Assets%2FImported%2F%7CAssets%2FKits%2F"], _bridge.Requests);
     }
 
     [Fact]

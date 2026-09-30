@@ -130,6 +130,68 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Contains("speed = 7.5", spawn, StringComparison.Ordinal);
         Assert.DoesNotContain("m_Name: Enemy", scene, StringComparison.Ordinal);
 
+        // Prefabs (O6): save an object as a prefab, override an instance, apply, revert, unpack.
+        clock.Restart();
+        string madePrefab = Ug(log, "prefab", "create", "Crate", "Assets/Prefabs/Crate.prefab");
+        Report("ug prefab create", clock.Elapsed);
+        Assert.Equal("created Assets/Prefabs/Crate.prefab from Crate  (written Assets/Prefabs/Crate.prefab; Main.unity modified, not saved)\n", madePrefab);
+        Assert.True(File.Exists(Path.Combine(_root, "Assets", "Prefabs", "Crate.prefab")));
+        Assert.Equal("added Turret to Crate  (Main.unity modified, not saved)\n", Ug(log, "component", "add", "Crate", "Turret"));
+        Assert.Equal("Crate  Turret.speed  5 -> 9  (Main.unity modified, not saved)\n", Ug(log, "set", "Crate", "speed", "9", "--component", "Turret"));
+
+        clock.Restart();
+        string applied = Ug(log, "prefab", "apply", "Crate");
+        Report("ug prefab apply", clock.Elapsed);
+        Assert.StartsWith("applied 1 override from Crate to Assets/Prefabs/Crate.prefab  (written Assets/Prefabs/Crate.prefab; Main.unity modified, not saved)\n", applied, StringComparison.Ordinal);
+        Assert.Contains("\n  Crate  added Turret\n", applied, StringComparison.Ordinal);
+        Assert.Equal("no overrides on Crate to apply\n", Ug(log, "prefab", "apply", "Crate"));
+
+        // The written asset, read back through the graph.
+        string crate = Ug(log, "explain", "Assets/Prefabs/Crate.prefab");
+        Assert.Contains("objects  1 game object", crate, StringComparison.Ordinal);
+        Assert.Contains("scripts  BridgeHost.Turret", crate, StringComparison.Ordinal);
+        Assert.Contains("speed: 9", File.ReadAllText(Path.Combine(_root, "Assets", "Prefabs", "Crate.prefab")), StringComparison.Ordinal);
+
+        Assert.Equal("Crate  Turret.speed  9 -> 4  (Main.unity modified, not saved)\n", Ug(log, "set", "Crate", "speed", "4", "--component", "Turret"));
+        Assert.Equal(
+            "reverted 1 override on Crate  (Main.unity modified, not saved)\n  Crate  Turret.speed\n",
+            Ug(log, "prefab", "revert", "Crate"));
+        Assert.Contains("9", Ug(log, "inspect", "Crate", "--component", "Turret"), StringComparison.Ordinal);
+        Assert.Equal("no overrides on Crate to revert\n", Ug(log, "prefab", "revert", "Crate"));
+
+        Assert.Equal("unpacked Crate from Assets/Prefabs/Crate.prefab  (Main.unity modified, not saved)\n", Ug(log, "prefab", "unpack", "Crate"));
+        Assert.Equal("Crate is not a prefab instance: ug prefab create Crate <path> makes a prefab from it\n", Ug(log, "prefab", "apply", "Crate"));
+        Assert.Equal("Assets/Prefabs/Crate.prefab already exists: ug does not overwrite it\n", Ug(log, "prefab", "create", "Crate", "Assets/Prefabs/Crate.prefab"));
+        Assert.Equal("Assets/Plugins/Crate.prefab is in the vendored folder Assets/Plugins/, which ug does not edit\n", Ug(log, "prefab", "create", "Crate", "Assets/Plugins/Crate.prefab"));
+
+        // Duplicate, undo, redo and selection (O2-O4 endpoints without an end to end until now).
+        Assert.Equal("duplicated Level/Spawn -> Level/Spawn2  (Main.unity modified, not saved)\n", Ug(log, "object", "duplicate", "Level/Spawn", "--name", "Spawn2"));
+        Assert.Contains("  Spawn2", Ug(log, "tree", "Level"), StringComparison.Ordinal);
+        Assert.Equal("undid ug object duplicate\n", Ug(log, "undo"));
+        Assert.DoesNotContain("Spawn2", Ug(log, "tree", "Level"), StringComparison.Ordinal);
+        Assert.Equal("redid ug object duplicate\n", Ug(log, "redo"));
+        Assert.Contains("  Spawn2", Ug(log, "tree", "Level"), StringComparison.Ordinal);
+
+        Assert.Equal("selected Level/Spawn\n", Ug(log, "select", "Level/Spawn"));
+        Assert.Equal("Level/Spawn\n", Ug(log, "select"));
+        Assert.Equal("nothing selected\n", Ug(log, "select", "--clear"));
+        Assert.Equal("nothing selected\n", Ug(log, "select"));
+
+        // Scenes: new (added), active, close.
+        Assert.StartsWith("saved Assets/Scenes/Main.unity\n", Ug(log, "save"), StringComparison.Ordinal);
+        Assert.Equal(
+            "created Assets/Scenes/Extra.unity\nAssets/Scenes/Main.unity  3 roots\nAssets/Scenes/Extra.unity  active  2 roots\nedit mode\n",
+            Ug(log, "scene", "new", "Assets/Scenes/Extra.unity", "--additive"));
+        Assert.True(File.Exists(Path.Combine(_root, "Assets", "Scenes", "Extra.unity")));
+        Assert.Equal(
+            "Assets/Scenes/Main.unity  active  3 roots\nAssets/Scenes/Extra.unity  2 roots\nedit mode\n",
+            Ug(log, "scene", "active", "Assets/Scenes/Main.unity"));
+        Assert.Equal(
+            "closed Assets/Scenes/Extra.unity\nAssets/Scenes/Main.unity  active  3 roots\nedit mode\n",
+            Ug(log, "scene", "close", "Assets/Scenes/Extra.unity"));
+        Assert.Contains("Extra.unity", Ug(log, "scene", "close", "Assets/Scenes/Extra.unity"), StringComparison.Ordinal);
+        Assert.Equal("no modified scenes; assets saved\n", Ug(log, "save"));
+
         clock.Restart();
         string play = Ug(log, "play");
         Report("ug play until playing", clock.Elapsed);

@@ -42,6 +42,12 @@ namespace UnityGraph.Bridge
                 { "/undo", (r, c) => Checked(() => EditOps.UndoLast(false)) },
                 { "/redo", (r, c) => Checked(() => EditOps.UndoLast(true)) },
                 { "/select", (r, c) => Checked(() => EditOps.Select(r)) },
+
+                // Prefabs.
+                { "/prefab/create", (r, c) => Checked(() => PrefabOps.Create(r)) },
+                { "/prefab/apply", (r, c) => Checked(() => PrefabOps.Apply(r)) },
+                { "/prefab/revert", (r, c) => Checked(() => PrefabOps.Revert(r)) },
+                { "/prefab/unpack", (r, c) => Checked(() => PrefabOps.Unpack(r)) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>

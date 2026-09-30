@@ -49,7 +49,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_gameobject`, `manage_components` | `ug object`, `ug component`, `ug set` |
 | `manage_editor` | `ug play|stop|pause`, `ug undo|redo`, `ug select`, `ug project` (tags, layers) |
 | `execute_menu_item` | `ug run <menu path>` (editor-link's runner already calls `ExecuteMenuItem`) |
-| `manage_prefabs` | `ug prefab create|instantiate|apply|revert|unpack`, prefab-content addresses |
+| `manage_prefabs` | `ug prefab create|apply|revert|unpack`, prefab-content addresses; `instantiate` is `ug object create --prefab`, no second command |
 | `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
 | `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
@@ -112,7 +112,7 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/object/duplicate?object=`, `/object/move?...&scene=` | Duplicate next to the original; move a root object to another loaded scene. |
 | `/scene/new?path=&additive=`, `/scene/close?path=`, `/scene/active?path=` | New scene saved at `path`; close (refused when modified); set the active scene. |
 | `/undo`, `/redo`, `/select?object=&clear=` | Unity's Undo/Redo (answers the group name, `ug <command>`); selection read, set or cleared. |
-| `/prefab/create?object=&path=`, `/prefab/apply?object=`, `/prefab/revert?object=`, `/prefab/unpack?object=&completely=` | Save an object as a prefab (kept linked); apply or revert an instance's overrides; unpack. |
+| `/prefab/create?object=&path=`, `/prefab/apply?object=`, `/prefab/revert?object=`, `/prefab/unpack?object=&completely=` | Save an object as a prefab (kept linked; a prefab instance becomes a variant); apply or revert an instance's overrides; unpack (`completely=true` unpacks nested prefabs too). Each is one undo group `ug prefab <sub>`. `create` refuses an existing path, a path outside `Assets/` or without `.prefab`, a missing folder, and objects inside a prefab asset or inside an instance (give the root). `apply` and `revert` answer the overrides they applied or reverted, one line per object (`Crate  Turret.speed`, `added Turret`, `removed object Barrel`); `apply` writes the asset at once and says so, `create` too. The client sends `vendored=<prefixes joined by '|'>` on `apply`, whose asset is unknown until the bridge resolves the instance; the bridge refuses Packages/ and those folders. |
 | `/asset/folder`, `/asset/create?path=&type=`, `/asset/move?from=&to=`, `/asset/duplicate`, `/asset/delete?path=`, `/asset/reimport?path=` | Through `AssetDatabase`, so `.meta` files and GUIDs stay right. `create` makes folders, materials (`type=Material&shader=`) and ScriptableObjects. `delete` moves to the OS trash (`MoveAssetToTrash`). |
 | `/set?object=Assets/X.png&importer=true&...` | Importer settings (texture, model, audio) through the importer's `SerializedObject`, then reimport. Material properties by name (`_BaseColor`, `_MainTex`). |
 | `/project` | Tags, sorting and physics layers, build scenes, Unity version, render pipeline. |
@@ -229,7 +229,10 @@ a fresh process's time is .NET start-up.
 - `UG_UNITY` end to end on a copy of BridgeHost (`Assets/Scenes/Main.unity`,
   `Assets/Prefabs/Turret.prefab`, `Assets/Scripts/Turret.cs`): open a scene, tree, inspect,
   create a prefab instance, set a field, move, delete, save and read the saved YAML back through
-  the graph (`ug explain o:<scene guid>:<file id>`), play, `find --live`, and stop.
+  the graph (`ug explain o:<scene guid>:<file id>`), prefab create from a scene object, a field set
+  on an instance, apply (asset read back with `ug explain Assets/Prefabs/Crate.prefab` and the YAML),
+  revert and unpack, object duplicate with undo and redo, select, scene new, active and close, play,
+  `find --live`, and stop.
 
 ## Boundaries
 

@@ -63,6 +63,7 @@ Editor ops (the open editor, through the bridge; `ug <command> --help` for optio
 | `ug component add\|remove <object> <type>` | Components. |
 | `ug set <object> <field> <value> [--component T] [--importer]` | One serialized field (`speed 7.5`, `m_LocalPosition 1,2,3`, references by address or asset path). |
 | `ug undo` / `ug redo` / `ug select [object]` | Unity's Undo and Redo; the editor's selection. |
+| `ug prefab create <object> <Assets/X.prefab>` / `apply` / `revert` / `unpack [--completely]` | Save an object as a prefab and keep it linked; write an instance's overrides into its prefab (`apply` writes the asset at once); throw them away; cut the link. `apply`, `revert` and `unpack` take the instance root. A new instance is `ug object create --prefab`. |
 
 - `<object>`: `Level/Enemy`, `Enemy#2` for the second of that name, `Main:Level/Enemy` for one
   scene, `Assets/Prefabs/Turret.prefab:Barrel` inside a prefab asset.
