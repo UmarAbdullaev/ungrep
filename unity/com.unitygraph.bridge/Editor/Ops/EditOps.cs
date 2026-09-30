@@ -869,6 +869,13 @@ namespace UnityGraph.Bridge
 
             string shown = Values.ShownName(p.name);
             string before = Values.Format(p);
+
+            // Importers keep most switches (isReadable, sRGBTexture) as 0/1 integers: accept true and false for them.
+            if (p.propertyType == SerializedPropertyType.Integer && (value.Trim() == "true" || value.Trim() == "false"))
+            {
+                value = value.Trim() == "true" ? "1" : "0";
+            }
+
             string problem = Values.Parse(p, value);
             if (problem != null)
             {

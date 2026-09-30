@@ -416,7 +416,7 @@ internal static class EditorCommands
         Argument<string> applied = Required("object", "Prefab instance in a loaded scene (its root).");
         prefabs.Subcommands.Add(Ops("apply", "prefab apply", "Write an instance's overrides into its prefab asset (writes the asset now).", [applied], (r, config) =>
             new OpRequest(
-                Query("/prefab/apply", ("object", r.GetValue(applied)), ("vendored", string.Join('|', config.Vendored.Prefixes))),
+                Query("/prefab/apply", ("object", r.GetValue(applied)), ("vendored", VendoredPrefixes(config))),
                 r.GetValue(applied))));
         Argument<string> reverted = Required("object", "Prefab instance in a loaded scene (its root).");
         prefabs.Subcommands.Add(Ops("revert", "prefab revert", "Throw an instance's overrides away, back to its prefab's values.", [reverted], r =>
@@ -426,6 +426,42 @@ internal static class EditorCommands
         prefabs.Subcommands.Add(Ops("unpack", "prefab unpack", "Cut an instance loose from its prefab (nested instances stay linked without --completely).", [unpacked, completely], r =>
             new OpRequest(Query("/prefab/unpack", ("object", r.GetValue(unpacked)), ("completely", True(r.GetValue(completely)))), r.GetValue(unpacked))));
         yield return prefabs;
+
+        var assets = new Command("asset", "Create, move, rename, duplicate, delete (to the trash) and reimport assets. Writes at once; Unity cannot undo these.");
+        Argument<string> folderPath = Required("path", "Folder under Assets/, like Assets/Art/Icons; missing parents are created.");
+        assets.Subcommands.Add(Ops("folder", "asset folder", "Create a folder (and any missing parents).", [folderPath], r =>
+            new OpRequest(Query("/asset/folder", ("path", r.GetValue(folderPath))), r.GetValue(folderPath))));
+        Argument<string> createPath = Required("path", "Where to create it, like Assets/Materials/Paint.mat or Assets/Data/Wave1.asset. Refused when it exists.");
+        Argument<string> createType = Required("type", "Folder, Material, or a ScriptableObject type name.");
+        Option<string?> createShader = Text("--shader", "Shader for a Material, like Universal Render Pipeline/Lit. Default: the render pipeline's.");
+        assets.Subcommands.Add(Ops("create", "asset create", "Create a folder, a material or a ScriptableObject asset.", [createPath, createType, createShader], r =>
+            new OpRequest(
+                Query("/asset/create", ("path", r.GetValue(createPath)), ("type", r.GetValue(createType)), ("shader", r.GetValue(createShader))),
+                r.GetValue(createPath))));
+        Argument<string> moveFrom = Required("from", "Asset or folder to move.");
+        Argument<string> moveTo = Required("to", "The new path, with the same extension. Refused when it exists.");
+        assets.Subcommands.Add(Ops("move", "asset move", "Move an asset or folder; its .meta and GUID go with it.", [moveFrom, moveTo], (r, config) =>
+            new OpRequest(
+                Query("/asset/move", ("from", r.GetValue(moveFrom)), ("to", r.GetValue(moveTo)), ("vendored", VendoredPrefixes(config))),
+                r.GetValue(moveFrom),
+                r.GetValue(moveTo))));
+        Argument<string> renameFrom = Required("path", "Asset or folder to rename.");
+        Argument<string> renameTo = Required("name", "The new name; a file keeps its extension.");
+        assets.Subcommands.Add(Ops("rename", "asset rename", "Rename an asset or folder in place; its GUID is kept.", [renameFrom, renameTo], (r, config) =>
+            new OpRequest(
+                Query("/asset/rename", ("path", r.GetValue(renameFrom)), ("name", r.GetValue(renameTo)), ("vendored", VendoredPrefixes(config))),
+                r.GetValue(renameFrom))));
+        Argument<string> copyFrom = Required("path", "Asset or folder to copy; may be in Packages/.");
+        Argument<string?> copyTo = Optional("to", "Where the copy goes, under Assets/. Default: next to the original, Unity's unique name.");
+        assets.Subcommands.Add(Ops("duplicate", "asset duplicate", "Copy an asset or folder to a new path with a new GUID.", [copyFrom, copyTo], r =>
+            new OpRequest(Query("/asset/duplicate", ("path", r.GetValue(copyFrom)), ("to", r.GetValue(copyTo))), r.GetValue(copyTo))));
+        Argument<string> trashPath = Required("path", "Asset or folder to delete.");
+        assets.Subcommands.Add(Ops("delete", "asset delete", "Move an asset or folder to the OS trash; refused for open scenes and Assets/ itself.", [trashPath], (r, config) =>
+            new OpRequest(Query("/asset/delete", ("path", r.GetValue(trashPath)), ("vendored", VendoredPrefixes(config))), r.GetValue(trashPath))));
+        Argument<string> reimportPath = Required("path", "Asset or folder to reimport.");
+        assets.Subcommands.Add(Ops("reimport", "asset reimport", "Force Unity to import an asset (a folder: everything under it) again.", [reimportPath], (r, config) =>
+            new OpRequest(Query("/asset/reimport", ("path", r.GetValue(reimportPath)), ("vendored", VendoredPrefixes(config))), r.GetValue(reimportPath))));
+        yield return assets;
 
         yield return Ops("undo", "undo", "Undo the editor's last change, like Ctrl+Z.", [], _ => new OpRequest("/undo"));
         yield return Ops("redo", "redo", "Redo the last undone change.", [], _ => new OpRequest("/redo"));
@@ -441,6 +477,9 @@ internal static class EditorCommands
         static Option<bool> Flag(string name, string description) => new(name) { Description = description };
         static Option<int> Seconds() => new("--timeout") { Description = "Seconds to wait for play mode to change. Default: 60.", DefaultValueFactory = _ => 60 };
         static string? True(bool flag) => flag ? "true" : null;
+
+        // The vendored folders joined with |, for requests whose target the bridge learns or checks itself.
+        static string VendoredPrefixes(UnityGraphConfig config) => string.Join('|', config.Vendored.Prefixes);
         static string? Number(int? number) => number?.ToString(CultureInfo.InvariantCulture);
     }
 

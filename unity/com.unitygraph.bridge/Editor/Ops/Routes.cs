@@ -48,6 +48,15 @@ namespace UnityGraph.Bridge
                 { "/prefab/apply", (r, c) => Checked(() => PrefabOps.Apply(r)) },
                 { "/prefab/revert", (r, c) => Checked(() => PrefabOps.Revert(r)) },
                 { "/prefab/unpack", (r, c) => Checked(() => PrefabOps.Unpack(r)) },
+
+                // Assets.
+                { "/asset/folder", (r, c) => Checked(() => AssetOps.Folder(r)) },
+                { "/asset/create", (r, c) => Checked(() => AssetOps.Create(r)) },
+                { "/asset/move", (r, c) => Checked(() => AssetOps.Move(r)) },
+                { "/asset/rename", (r, c) => Checked(() => AssetOps.Rename(r)) },
+                { "/asset/duplicate", (r, c) => Checked(() => AssetOps.Duplicate(r)) },
+                { "/asset/delete", (r, c) => Checked(() => AssetOps.Delete(r)) },
+                { "/asset/reimport", (r, c) => Checked(() => AssetOps.Reimport(r)) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>

@@ -206,8 +206,9 @@ namespace UnityGraph.Bridge
             return AssetDatabase.IsValidFolder(folder) ? null : "the folder " + folder + " does not exist";
         }
 
-        // The client's vendored folders (Safety rule 7) for a prefab asset this request would write.
-        private static string Vendored(Request request, string asset)
+        // The client's vendored folders (Safety rule 7) for an asset this request would write; for a
+        // folder (`holding`) also the vendored folders inside it, which a move or delete would take along.
+        internal static string Vendored(Request request, string asset, bool holding = false)
         {
             if (asset.StartsWith("Packages/", StringComparison.Ordinal))
             {
@@ -215,10 +216,20 @@ namespace UnityGraph.Bridge
             }
 
             string prefixes = request.Get("vendored");
-            string prefix = string.IsNullOrEmpty(prefixes)
-                ? null
-                : prefixes.Split('|').FirstOrDefault(p => p.Length > 0 && asset.StartsWith(p, StringComparison.OrdinalIgnoreCase));
-            return prefix == null ? null : asset + " is in the vendored folder " + prefix + ", which ug does not edit";
+            if (string.IsNullOrEmpty(prefixes))
+            {
+                return null;
+            }
+
+            string[] all = prefixes.Split('|').Where(p => p.Length > 0).ToArray();
+            string inside = all.FirstOrDefault(p => (holding ? asset + "/" : asset).StartsWith(p, StringComparison.OrdinalIgnoreCase));
+            if (inside != null)
+            {
+                return asset + " is in the vendored folder " + inside + ", which ug does not edit";
+            }
+
+            string within = holding ? all.FirstOrDefault(p => p.StartsWith(asset + "/", StringComparison.OrdinalIgnoreCase)) : null;
+            return within == null ? null : asset + " holds the vendored folder " + within + ", which ug does not edit";
         }
 
         // `  (written Assets/X.prefab; Main.unity modified, not saved)`.

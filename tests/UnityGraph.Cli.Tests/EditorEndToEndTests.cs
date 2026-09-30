@@ -192,6 +192,74 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Contains("Extra.unity", Ug(log, "scene", "close", "Assets/Scenes/Extra.unity"), StringComparison.Ordinal);
         Assert.Equal("no modified scenes; assets saved\n", Ug(log, "save"));
 
+        // Assets (O7): folders, a ScriptableObject from a script written into the project, a material,
+        // an importer setting, then move, rename, duplicate, trash and reimport; GUIDs read from the .meta files.
+        Assert.Equal("created folder Assets/Art/Icons  (written Assets/Art/Icons; not undoable)\n", Ug(log, "asset", "folder", "Assets/Art/Icons"));
+        Assert.True(File.Exists(Path.Combine(_root, "Assets", "Art", "Icons.meta")));
+        Assert.Equal("Assets/Art/Icons already exists: ug does not overwrite it\n", Ug(log, "asset", "folder", "Assets/Art/Icons"));
+
+        File.WriteAllText(Path.Combine(_root, "Assets", "Scripts", "Wave.cs"), "namespace BridgeHost { public class Wave : UnityEngine.ScriptableObject { public int count = 3; } }\n");
+        Assert.Matches(@"^compiled in \d+\.\d s: 0 errors\n$", Ug(log, "compile"));
+        Assert.Equal("created folder Assets/Data  (written Assets/Data; not undoable)\n", Ug(log, "asset", "folder", "Assets/Data"));
+        clock.Restart();
+        string wave = Ug(log, "asset", "create", "Assets/Data/Wave1.asset", "Wave");
+        Report("ug asset create (ScriptableObject)", clock.Elapsed);
+        Assert.Equal("created Assets/Data/Wave1.asset (BridgeHost.Wave)  (written Assets/Data/Wave1.asset; not undoable)\n", wave);
+        Assert.Equal("Assets/Data/Wave1.asset  count  3 -> 7  (Assets/Data/Wave1.asset modified, not saved)\n", Ug(log, "set", "Assets/Data/Wave1.asset", "count", "7"));
+        Assert.Equal("no modified scenes; assets saved\n", Ug(log, "save"));
+        Assert.Contains("count: 7", File.ReadAllText(Path.Combine(_root, "Assets", "Data", "Wave1.asset")), StringComparison.Ordinal);
+        WriteProject("Assembly-CSharp", "Assets\\Scripts\\Turret.cs", "Assets\\Scripts\\Wave.cs");
+        Assert.Contains("BridgeHost.Wave", Ug(log, "explain", "Assets/Data/Wave1.asset"), StringComparison.Ordinal);
+        Assert.Equal("no Material, Folder or ScriptableObject type Wav (near: Wave)\n", Ug(log, "asset", "create", "Assets/Data/W.asset", "Wav"));
+
+        Assert.Equal(
+            "created Assets/Art/Ink.mat (Material, shader Unlit/Color)  (written Assets/Art/Ink.mat; not undoable)\n",
+            Ug(log, "asset", "create", "Assets/Art/Ink.mat", "Material", "--shader", "Unlit/Color"));
+        Assert.Equal(
+            "Assets/Art/Ink.mat  _Color  1, 1, 1, 1 -> 1, 0, 0, 1  (Assets/Art/Ink.mat modified, not saved)\n",
+            Ug(log, "set", "Assets/Art/Ink.mat", "_Color", "#ff0000"));
+        Assert.Equal("no modified scenes; assets saved\n", Ug(log, "save"));
+        Assert.Contains("_Color: {r: 1, g: 0, b: 0, a: 1}", File.ReadAllText(Path.Combine(_root, "Assets", "Art", "Ink.mat")), StringComparison.Ordinal);
+        Assert.Contains("Unlit/Color", Ug(log, "inspect", "Assets/Art/Ink.mat"), StringComparison.Ordinal);
+
+        // A 1x1 PNG dropped into the project: reimport brings it in, then an importer setting.
+        string dot = Path.Combine(_root, "Assets", "Art", "Icons", "Dot.png");
+        File.WriteAllBytes(dot, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="));
+        Assert.StartsWith("reimported Assets/Art/Icons/Dot.png  (", Ug(log, "asset", "reimport", "Assets/Art/Icons/Dot.png"), StringComparison.Ordinal);
+        Assert.Equal(
+            "Assets/Art/Icons/Dot.png  TextureImporter.isReadable  0 -> 1  (reimported; .meta written)\n",
+            Ug(log, "set", "Assets/Art/Icons/Dot.png", "isReadable", "true", "--importer"));
+        Assert.Contains("isReadable: 1", File.ReadAllText(dot + ".meta"), StringComparison.Ordinal);
+        Assert.Contains("isReadable", Ug(log, "inspect", "Assets/Art/Icons/Dot.png", "--importer"), StringComparison.Ordinal);
+        Assert.Equal("no property _MainTex on Assets/Art/Ink.mat (shader Unlit/Color: _Color)\n", Ug(log, "set", "Assets/Art/Ink.mat", "_MainTex", "Assets/Art/Icons/Dot.png"));
+        Ug(log, "save");
+
+        string inkGuid = MetaGuid("Assets/Art/Ink.mat");
+        clock.Restart();
+        string moved = Ug(log, "asset", "move", "Assets/Art/Ink.mat", "Assets/Art/Icons/Ink.mat");
+        Report("ug asset move", clock.Elapsed);
+        Assert.Equal("moved Assets/Art/Ink.mat -> Assets/Art/Icons/Ink.mat  (written Assets/Art/Icons/Ink.mat; guid " + inkGuid + " kept; not undoable)\n", moved);
+        Assert.False(File.Exists(Path.Combine(_root, "Assets", "Art", "Ink.mat")) || File.Exists(Path.Combine(_root, "Assets", "Art", "Ink.mat.meta")));
+        Assert.Equal(inkGuid, MetaGuid("Assets/Art/Icons/Ink.mat"));
+        Assert.StartsWith("renamed Assets/Art/Icons/Ink.mat -> Assets/Art/Icons/Dye.mat  (written Assets/Art/Icons/Dye.mat; guid " + inkGuid + " kept", Ug(log, "asset", "rename", "Assets/Art/Icons/Ink.mat", "Dye"), StringComparison.Ordinal);
+        Assert.Equal(inkGuid, MetaGuid("Assets/Art/Icons/Dye.mat"));
+        string copy = Ug(log, "asset", "duplicate", "Assets/Art/Icons/Dye.mat", "Assets/Art/Icons/Dye Copy.mat");
+        string copyGuid = MetaGuid("Assets/Art/Icons/Dye Copy.mat");
+        Assert.NotEqual(inkGuid, copyGuid);
+        Assert.Equal("duplicated Assets/Art/Icons/Dye.mat -> Assets/Art/Icons/Dye Copy.mat  (written Assets/Art/Icons/Dye Copy.mat; new guid " + copyGuid + "; not undoable)\n", copy);
+        Assert.Contains("Assets/Art/Icons/Dye.mat", Ug(log, "explain", "Assets/Art/Icons/Dye.mat"), StringComparison.Ordinal);
+
+        clock.Restart();
+        string trashed = Ug(log, "asset", "delete", "Assets/Art/Icons/Dye Copy.mat");
+        Report("ug asset delete (to the trash)", clock.Elapsed);
+        Assert.Equal("deleted Assets/Art/Icons/Dye Copy.mat  (moved to the OS trash with its .meta; not undoable)\n", trashed);
+        Assert.False(File.Exists(Path.Combine(_root, "Assets", "Art", "Icons", "Dye Copy.mat")) || File.Exists(Path.Combine(_root, "Assets", "Art", "Icons", "Dye Copy.mat.meta")));
+
+        Assert.Equal("Assets/ itself cannot be deleted\n", Ug(log, "asset", "delete", "Assets"));
+        Assert.Equal("Assets/Scenes/Main.unity is an open scene: ug scene close Assets/Scenes/Main.unity first\n", Ug(log, "asset", "delete", "Assets/Scenes/Main.unity"));
+        Assert.Equal("Assets/Plugins/Dye.mat is in the vendored folder Assets/Plugins/, which ug does not edit\n", Ug(log, "asset", "move", "Assets/Art/Icons/Dye.mat", "Assets/Plugins/Dye.mat"));
+        Assert.Equal("Assets/Art/Icons/Dye.mat already exists: ug does not overwrite it\n", Ug(log, "asset", "duplicate", "Assets/Art/Icons/Dye.mat", "Assets/Art/Icons/Dye.mat"));
+
         clock.Restart();
         string play = Ug(log, "play");
         Report("ug play until playing", clock.Elapsed);
@@ -248,6 +316,13 @@ public sealed class EditorEndToEndTests : IDisposable
 
         times.Sort();
         return TimeSpan.FromMilliseconds(times[count / 2]);
+    }
+
+    // The guid Unity wrote into an asset's .meta file.
+    private string MetaGuid(string asset)
+    {
+        string meta = File.ReadAllText(Path.Combine(_root, asset.Replace('/', Path.DirectorySeparatorChar) + ".meta"));
+        return System.Text.RegularExpressions.Regex.Match(meta, @"^guid: ([0-9a-f]{32})", System.Text.RegularExpressions.RegexOptions.Multiline).Groups[1].Value;
     }
 
     // A minimal Unity-style project file, so the graph indexes the copy.

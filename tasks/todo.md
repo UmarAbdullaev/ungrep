@@ -76,7 +76,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] O4 editor-ops: edits (48 EditMode tests)
 - [x] O5 editor-ops: client, CLI, skill, end to end (fresh-process reads and edits ~125 ms, play 1.07 s)
 - [x] O6 editor-ops: more scene ops, undo, selection, prefabs (56 EditMode tests, ug prefab create|apply|revert|unpack, e2e covers O2-O4 endpoints)
-- [ ] O7 editor-ops: assets
+- [x] O7 editor-ops: assets (73 EditMode tests, ug asset folder|create|move|rename|duplicate|delete|reimport, importer and material sets, e2e covers assets)
 - [ ] O8 editor-ops: project, packages, menu
 - [ ] O9 editor-ops: screenshots, API lookup, stats, batch
 - [ ] O10 editor-ops: purge-squad measurement (edits there allowed by the user 2026-09-30)

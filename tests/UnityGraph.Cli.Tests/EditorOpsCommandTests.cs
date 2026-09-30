@@ -68,6 +68,15 @@ public sealed class EditorOpsCommandTests : IDisposable
     [InlineData("/prefab/revert?object=Turret", "prefab", "revert", "Turret")]
     [InlineData("/prefab/unpack?object=Turret", "prefab", "unpack", "Turret")]
     [InlineData("/prefab/unpack?object=Turret&completely=true", "prefab", "unpack", "Turret", "--completely")]
+    [InlineData("/asset/folder?path=Assets%2FArt%2FIcons", "asset", "folder", "Assets/Art/Icons")]
+    [InlineData("/asset/create?path=Assets%2FMats%2FInk.mat&type=Material&shader=Unlit%2FColor", "asset", "create", "Assets/Mats/Ink.mat", "Material", "--shader", "Unlit/Color")]
+    [InlineData("/asset/create?path=Assets%2FData%2FWave1.asset&type=Wave", "asset", "create", "Assets/Data/Wave1.asset", "Wave")]
+    [InlineData("/asset/move?from=Assets%2FA.png&to=Assets%2FArt%2FA.png&vendored=" + DefaultVendored, "asset", "move", "Assets/A.png", "Assets/Art/A.png")]
+    [InlineData("/asset/rename?path=Assets%2FA.png&name=Hero&vendored=" + DefaultVendored, "asset", "rename", "Assets/A.png", "Hero")]
+    [InlineData("/asset/duplicate?path=Assets%2FA.png&to=Assets%2FB.png", "asset", "duplicate", "Assets/A.png", "Assets/B.png")]
+    [InlineData("/asset/duplicate?path=Packages%2Fcom.x%2FA.prefab", "asset", "duplicate", "Packages/com.x/A.prefab")]
+    [InlineData("/asset/delete?path=Assets%2FOld&vendored=" + DefaultVendored, "asset", "delete", "Assets/Old")]
+    [InlineData("/asset/reimport?path=Assets%2FA.png&vendored=" + DefaultVendored, "asset", "reimport", "Assets/A.png")]
     [InlineData("/undo", "undo")]
     [InlineData("/redo", "redo")]
     [InlineData("/select", "select")]
@@ -171,6 +180,16 @@ public sealed class EditorOpsCommandTests : IDisposable
     [InlineData("Assets/Plugins/Vendor.prefab:Root is in the vendored folder Assets/Plugins/, which ug does not edit\n", "object", "create", "Spawn", "--parent", "Assets/Plugins/Vendor.prefab:Root")]
     [InlineData("Assets/Plugins/Vendor.prefab:Root is in the vendored folder Assets/Plugins/, which ug does not edit\n", "object", "move", "Player", "--parent", "Assets/Plugins/Vendor.prefab:Root")]
     [InlineData("Assets/Plugins/Hero.png is in the vendored folder Assets/Plugins/, which ug does not edit\n", "set", "Assets/Plugins/Hero.png", "m_MaxTextureSize", "512", "--importer")]
+    [InlineData("Assets/Plugins/Ink.mat is in the vendored folder Assets/Plugins/, which ug does not edit\n", "set", "Assets/Plugins/Ink.mat", "_Color", "#ff0000")]
+    [InlineData("Assets/Plugins/Deep is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "folder", "Assets/Plugins/Deep")]
+    [InlineData("Assets/Plugins/Ink.mat is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "create", "Assets/Plugins/Ink.mat", "Material")]
+    [InlineData("Assets/Plugins/A.png is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "move", "Assets/Plugins/A.png", "Assets/A.png")]
+    [InlineData("Assets/Plugins/A.png is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "move", "Assets/A.png", "Assets/Plugins/A.png")]
+    [InlineData("Assets/Plugins/A.png is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "rename", "Assets/Plugins/A.png", "B")]
+    [InlineData("Assets/ThirdParty/B.png is in the vendored folder Assets/ThirdParty/, which ug does not edit\n", "asset", "duplicate", "Assets/A.png", "Assets/ThirdParty/B.png")]
+    [InlineData("Packages/com.x/B.png is in the vendored folder Packages/, which ug does not edit\n", "asset", "duplicate", "Assets/A.png", "Packages/com.x/B.png")]
+    [InlineData("Assets/Plugins/A.png is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "delete", "Assets/Plugins/A.png")]
+    [InlineData("Assets/Plugins/A.png is in the vendored folder Assets/Plugins/, which ug does not edit\n", "asset", "reimport", "Assets/Plugins/A.png")]
     public void Edits_to_vendored_folders_are_refused_before_asking_Unity(string expected, params string[] args)
     {
         Answer(_ => (200, "{\"lines\":[\"done\"]}"));
@@ -186,6 +205,8 @@ public sealed class EditorOpsCommandTests : IDisposable
 
         Assert.Equal("done\n", Run("inspect", "Assets/Plugins/Vendor.prefab").Output);
         Assert.Equal("done\n", Run("object", "create", "--prefab", "Assets/Plugins/Vendor.prefab").Output);
+        Assert.Equal("done\n", Run("asset", "duplicate", "Assets/Plugins/Vendor.prefab", "Assets/Prefabs/Vendor.prefab").Output);
+        Assert.Equal("done\n", Run("asset", "duplicate", "Packages/com.x/Vendor.prefab", "Assets/Prefabs/Vendor.prefab").Output);
     }
 
     [Fact]
@@ -197,6 +218,26 @@ public sealed class EditorOpsCommandTests : IDisposable
 
         Assert.Equal("done\n", Run("prefab", "apply", "Turret").Output);
         Assert.Equal(["/status", "/prefab/apply?object=Turret&vendored=Assets%2FImported%2F%7CAssets%2FKits%2F"], _bridge.Requests);
+    }
+
+    [Fact]
+    public void Asset_move_and_delete_send_the_projects_vendored_folders_for_the_bridge_to_check()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".claude"));
+        File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), "{\"vendored\":[\"Assets/Imported/\",\"Assets/Kits/\"]}");
+        Answer(_ => (200, "{\"lines\":[\"done\"]}"));
+
+        Assert.Equal("done\n", Run("asset", "move", "Assets/Art", "Assets/Pics").Output);
+        Assert.Equal("done\n", Run("asset", "delete", "Assets/Art").Output);
+        Assert.Equal(
+            [
+                "/status",
+                "/asset/move?from=Assets%2FArt&to=Assets%2FPics&vendored=Assets%2FImported%2F%7CAssets%2FKits%2F",
+                "/status",
+                "/asset/delete?path=Assets%2FArt&vendored=Assets%2FImported%2F%7CAssets%2FKits%2F",
+            ],
+            _bridge.Requests);
+        Assert.Equal("Assets/Kits/A.png is in the vendored folder Assets/Kits/, which ug does not edit\n", Run("asset", "move", "Assets/A.png", "Assets/Kits/A.png").Output);
     }
 
     [Fact]
