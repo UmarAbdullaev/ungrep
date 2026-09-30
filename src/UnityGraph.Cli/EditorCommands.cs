@@ -176,7 +176,7 @@ internal static class EditorCommands
 
         int files = CopyPackage(package, destination);
         return (0, "copied the bridge (" + files.ToString(CultureInfo.InvariantCulture) + " files) to " + CopyFolder.Replace('\\', '/')
-            + "/; Unity compiles it on its next refresh, then ug status shows the editor\n");
+            + "/; Unity loads it when its window next has focus (click it once), then ug status shows the editor\n");
     }
 
     public static (int ExitCode, string Text) Remove(string root)

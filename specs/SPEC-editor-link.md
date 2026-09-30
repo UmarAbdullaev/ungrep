@@ -234,12 +234,18 @@ repeat block after a failed build (above) had ended at its `## CmdLine:` line, s
 of the error was counted in the next, successful build. Fixed in `EditorLog` with a regression
 test.
 
-purge-squad numbers: E5.
+E5 on purge-squad (2026-09-30), the user's open editor, Unity 6000.3.14f1, bridge added with
+`ug bridge install --copy` at the user's request:
+
+- The copy sat unnoticed until the Unity window got focus: an editor in the background does not
+  import new files, and with no bridge running yet nothing outside can ask it to. The bridge
+  answered 78 s after the copy, when the user clicked the editor. `ug bridge install --copy` now
+  says to click it once.
+- With the Claude app in the foreground and Unity in the background: `ug status`, fresh
+  process, 138–175 ms over 7 runs; `ug compile` with no script changes 159–223 ms over 5 runs.
+  The background throttle does not hold a refresh back noticeably.
 
 ## Open points
 
-1. Editor updates are throttled while Unity is in the background; how long a refresh waits for
-   the next update when Unity is unfocused is measured in E5 on purge-squad (needs the bridge
-   installed there: ask the user).
-2. Whether PlayMode test runs (which reload the domain) need more than `TestRunnerApi`'s own
+1. Whether PlayMode test runs (which reload the domain) need more than `TestRunnerApi`'s own
    callbacks re-registered after the reload.

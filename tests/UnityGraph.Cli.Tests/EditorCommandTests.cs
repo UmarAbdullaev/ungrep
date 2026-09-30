@@ -185,7 +185,7 @@ public sealed partial class EditorCommandTests : IDisposable
         File.WriteAllText(Path.Combine(folder, "Stale.cs"), "");
         var (_, second) = Run("bridge", "install", "--copy");
 
-        Assert.Matches(@"^copied the bridge \(\d+ files\) to Assets/Plugins/UnityGraphBridge/; Unity compiles it on its next refresh, then ug status shows the editor\n$", first);
+        Assert.Matches(@"^copied the bridge \(\d+ files\) to Assets/Plugins/UnityGraphBridge/; Unity loads it when its window next has focus \(click it once\), then ug status shows the editor\n$", first);
         Assert.Equal(first, second);
         Assert.True(File.Exists(Path.Combine(folder, "package.json")));
         Assert.True(File.Exists(Path.Combine(folder, "Editor", "Bridge.cs")));
