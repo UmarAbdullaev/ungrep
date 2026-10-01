@@ -88,7 +88,7 @@ Details and acceptance criteria: `plan.md`.
 Order: parity gap first, then token savers, then people-facing and measurement. Each task ships with
 its skill line (one line in SKILL.md, detail in `--help`; keep the body under 600 tokens).
 
-- [ ] L1 unity-loop spec (`specs/SPEC-unity-loop.md`)
+- [x] L1 unity-loop spec (`specs/SPEC-unity-loop.md`): console, test, log, play --for (decided yes), compile gate, bridge 0.3.0 `/playlog`
 - [ ] L2 `ug console`: compact console digest (errors first, repeats folded, answer budget, `more`); closes MCP `read_console`
 - [ ] L3 `ug test`: run EditMode/PlayMode through the bridge, failures only with `file:line`; closes MCP `run_tests`/`get_test_job`
 - [ ] L4 compile gate: edit tracking + Stop hook, silent when clean, at most 20 lines on errors, fail open

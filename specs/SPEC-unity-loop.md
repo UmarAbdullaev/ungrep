@@ -1,0 +1,188 @@
+# Spec: unity-loop
+
+Part of unitygraph (see `../SPEC.md`, module table). Status: **draft** (2026-10-01). Builds on
+`editor-link` (`SPEC-editor-link.md`: bridge, `BridgeClient`, `ug compile`) and closes what the
+Unity MCP server's `read_console`, `run_tests` and `get_test_job` do, in answers sized for Claude.
+
+## Objective
+
+The edit, compile, run, read-the-console loop costs about 4 calls per cycle and a lot of console
+text. `unity-loop` makes it: one silent check after the edits (compile gate), one call for the
+console (`ug console`), one call for a test run (`ug test`), one call for what a play session
+did (`ug log`). Every answer is short, errors come first, repeats are folded, and a clean result
+costs a line or nothing.
+
+## Scope
+
+In: `ug console`, `ug test`, `ug log`, `ug play --for <s>`; the compile gate (PostToolUse edit
+tracking and a Stop hook); one new bridge endpoint (`/playlog`, bridge 0.3.0).
+
+Out: reading `Editor.log` for the console or for tests (only `ug compile` falls back on it; with
+no bridge these commands say `Unity not reachable (<reason>)`); clearing the console; test runs in
+a player build; editing anything from a hook (hooks never touch scenes, prefabs or project files).
+
+## Commands
+
+All take `--project <dir>`; plain text; exit 0 for any answer, 1 only for no Unity project or an
+invalid config. They need the bridge: `Unity not reachable (<reason>); ug <cmd> needs the bridge`
+plus the install hint `ug status` gives. The config switches `editor-link` and `unity-loop` turn
+them off (`unity-loop is off in .claude/unitygraph.json`).
+
+### `ug console [--level error|warning|log] [--count N] [--after ID] [--budget T]`
+
+The editor console, from the bridge's ring buffer (2,000 entries since the editor started).
+
+- `--level` is the lowest level shown: `error` (errors only, asserts and exceptions count as
+  errors), `warning` (default: errors and warnings), `log` (everything).
+- `--count` is how many of the newest entries are looked at, 1 to 500, default 200. `--after` only
+  looks at entries newer than a console id (the id `ug console` printed last time), so a second
+  call shows only what is new.
+- Entries with the same level, text and frame are folded into one line with `xN` (the bridge
+  already folds consecutive repeats; this folds the rest). Order: errors, then warnings, then
+  logs; within a level the most recently seen first. Text is the first line, cut at 160
+  characters; the frame is the first stack frame in the project's own code (`Assets/...:line`).
+- The answer fits the token budget (`--budget`, default `answerBudget` = 1,200; a token is
+  4 bytes, as in `query`). A cut answer ends with `  more  ug console ... --budget <2 x>`.
+
+```
+$ ug console
+console  2 errors, 1 warning  (last #4120)
+  error x12  NullReferenceException: Object reference not set to an instance of an object  Assets/Scripts/Enemy.cs:42
+  error      Missing key 'Hit' in Animator  Assets/Scripts/Enemy.cs:51
+  warning    The referenced script on this Behaviour is missing!
+
+$ ug console
+console  nothing at warning level or worse  (last #4120)
+```
+
+### `ug test [--mode EditMode|PlayMode] [--filter <regex>] [--timeout S]`
+
+Runs the project's tests through the bridge (`/tests`, `TestRunnerApi`) and waits (default
+`--mode EditMode`, `--timeout` 300 s). `--filter` is a regex over the full test name.
+
+1. A compile check first (`ug compile`'s flow): when the scripts do not compile the run does not
+   start, the answer is the compile errors (same lines as `ug compile`).
+2. Start the run, poll `/tests/result` every 500 ms. A PlayMode run reloads the domain; the
+   client rides it out the way the compile wait does (refused connections while the editor
+   lives, new port from `bridge.json`).
+3. Answer. Green: one line. Red: the summary line, then one line per failure, at most 20
+   (`(+N more failures)` after): `file:line  Full.Test.Name  first line of the message` (message cut
+   at 160 characters; `(no file)` when the failure has no frame in the project's code).
+   Nothing is printed for passing tests.
+
+```
+$ ug test
+EditMode: 156 passed, 4 skipped in 8.2 s
+
+$ ug test --filter Turret
+EditMode: 1 failed, 11 passed in 1.4 s
+  Assets/Tests/Editor/TurretTests.cs:34  Game.Tests.TurretTests.Fires_at_range  Expected: 3  But was: 2
+```
+
+Other answers: `EditMode: no tests ran` (nothing matched); `not run: the scripts do not compile (1 error)`
+and the lines; `Unity was still running tests after 300 s` (the run goes on in the editor; a new
+`ug test` is refused with `a test run is in progress`); `com.unity.test-framework is not in this
+project`. `inconclusive` is counted when there are some.
+
+### `ug log`
+
+A digest of the last play session, from the bridge's play log (`/playlog`) and console buffer.
+
+- A session starts at the editor leaving edit mode (from `ug play` or the Play button) and ends
+  when play mode ends; it lists the pause and resume times (seconds since the start). Only the last
+  session is kept, across domain reloads, lost when the editor quits.
+- Console entries of the session are folded as in `ug console`, errors and warnings only, logs
+  as a count. Same budget flag and `more` line.
+
+```
+$ ug log
+play 12.4 s, stopped 14:02:23  (pause 4.1 s, resume 6.0 s)
+  3 errors, 1 warning, 212 logs  (last #4120)
+  error x2  NullReferenceException: Object reference not set to an instance of an object  Assets/Scripts/Enemy.cs:42
+  warning   The referenced script on this Behaviour is missing!
+```
+
+While playing the first line is `playing 5.3 s so far`. With no session since the editor opened:
+`no play session since the editor opened`. A bridge older than 0.3.0: `bridge 0.2.0 is too old for ug log: run ug bridge install again`.
+
+### `ug play --for <s>`
+
+Decision on the open point (editor-link and SPEC): **yes**. `ug play` enters play mode as before;
+with `--for <s>` (1 to 600) it then waits `s` seconds, runs `ug stop`, and prints the `ug log`
+digest: one call instead of play, sleep, stop, log. A refusal from `play` (compile errors, already
+playing) ends it there; if the editor was stopped meanwhile, the stop answer says so and the digest
+is still printed. Under 30 lines of code: no new bridge request.
+
+## Bridge change
+
+One request, `GET /playlog`, in bridge 0.3.0 (package version too; `ug` knows it as
+`MinimumLoopBridge`). `ug console` and `ug test` use requests that exist since 0.1.0 and work on any
+bridge. The bridge records the session from `EditorApplication.playModeStateChanged` (leaving
+edit mode: time and console id) and `pauseStateChanged`, in `SessionState`, so it survives the
+reload that entering play mode causes.
+
+```json
+{"session": null}
+{"session": {"start": "2026-10-01T14:02:11Z", "end": null, "after": 4001, "until": null,
+             "events": [{"at": 4.1, "what": "pause"}, {"at": 6.0, "what": "resume"}]}}
+```
+
+`after` and `until` are console ids at the start and end; the client reads `/console?after=<after>`
+and drops entries with an id above `until`. A repeat of an older entry gets a new id, so one
+logged before the session and repeated in it counts as in it.
+
+## Compile gate
+
+Two handlers of the module `unity-loop` on the hooks already wired in `hooks/hooks.json`; silent
+unless it fires (design rules 3 and 9).
+
+- **Edit tracking (PostToolUse on Edit, MultiEdit, Write, NotebookEdit).** A file with the extension `.cs`,
+  `.asmdef` or `.asmref` under `Assets/` or `Packages/` of the Unity project marks the session
+  dirty: it creates `Library/unitygraph/gate-<session_id>` (our own folder, where `bridge.json`
+  and `hook-errors.log` live). Nothing else is written, nothing is printed.
+- **Stop.** No marker for the session: exit at once, no output, no Unity call (0 tokens, about 100 ms).
+  With a marker: connect to the bridge; if the editor is playing or paused the check is skipped and
+  the marker stays; otherwise the marker is deleted and a compile runs as in `ug compile` with a
+  30 s deadline. No errors: silent. Errors: the answer is the `ug compile` text (count line and at
+  most 20 error lines) as `{"decision":"block","reason":"..."}`, so Claude fixes them before it
+  stops. The marker is gone, so a second Stop without a new script edit is silent: no loop.
+- **Fail open.** Unity closed, bridge missing or old, refused, timed out, malformed answer: no
+  output, marker deleted, nothing logged (Unity being closed is not a plugin failure). A handler
+  exception is logged to `hook-errors.log` by the dispatcher as for every hook.
+- **Time.** The Stop hook may take up to 40 s (hooks.json 45 s); the dispatcher's 2 s limit stays for
+  the tool hooks. The tracker is a path check and one small file write.
+- Edits made through Bash (`sed`, `mv`) are not seen; `ug compile` covers them.
+
+## Testing
+
+- **Client and formatting** (`tests/UnityGraph.EditorLink.Tests`, `UnityGraph.Cli.Tests`, fake
+  bridge): console folding, ordering, level filter, `--after`, budget cut and `more`, empty
+  answers; test run green, red with 20-line cap, no tests, compile errors first, a refused
+  connection mid-run with a new port, timeout, 501 and 409; log with and without a session, old
+  bridge; `play --for`; unreachable answers for each command; the gate's check (clean, errors,
+  playing, unreachable, timeout) against the fake bridge.
+- **Hooks** (`tests/UnityGraph.Hooks.Tests`): the recorded PostToolUse and Stop payloads: a `.cs`
+  edit marks, a `.txt` or outside-project edit does not, Stop with no marker is silent and calls
+  nothing, errors give the block JSON, a clean check and an unreachable bridge are silent, the
+  marker is deleted, a second Stop is silent, module off is silent.
+- **Bridge** (EditMode in `fixtures/BridgeHost`): `PlayLog` recording from simulated state changes,
+  JSON shape, survival through `Save` and `Restore`.
+- **End to end** (`UG_UNITY`): `ug console` shows a logged fixture error, `ug test` runs the
+  fixture's EditMode tests green and one red, `ug log` after a `ug play --for 2`. Times and token
+  sizes go in Measured.
+
+## Boundaries
+
+- Always: the gate stays silent when clean and when Unity is out of reach; answers within budget;
+  a hook never edits project files (only its marker in `Library/unitygraph/`).
+- Ask first: any further bridge request that changes the project; a new hook event; a network call
+  (none here).
+- Never: block a Stop for anything but compile errors; loop a Stop; wait for Unity past the deadline.
+
+## Measured
+
+(Filled in after the end-to-end run.)
+
+## Open points
+
+None.
