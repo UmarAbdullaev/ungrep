@@ -64,7 +64,7 @@ internal static partial class EditorCommands
         bridge.Subcommands.Add(Command("remove", "Delete the copy made by `ug bridge install --copy`.", [], (root, _) => Remove(root)));
         yield return bridge;
 
-        foreach (Command command in OpsCommands().Concat(ConsoleCommands()))
+        foreach (Command command in OpsCommands().Concat(ConsoleCommands()).Concat(TestCommands()))
         {
             yield return command;
         }

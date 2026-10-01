@@ -85,7 +85,7 @@ public static class CompileText
         return warnings > 0 ? text + ", " + Plural(warnings, "warning") : text;
     }
 
-    internal static string Lines(IReadOnlyList<CompileMessage> messages, bool warnings)
+    public static string Lines(IReadOnlyList<CompileMessage> messages, bool warnings)
     {
         List<CompileMessage> shown = Distinct(messages)
             .Where(m => warnings || m.IsError)

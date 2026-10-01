@@ -90,7 +90,7 @@ its skill line (one line in SKILL.md, detail in `--help`; keep the body under 60
 
 - [x] L1 unity-loop spec (`specs/SPEC-unity-loop.md`): console, test, log, play --for (decided yes), compile gate, bridge 0.3.0 `/playlog`
 - [x] L2 `ug console`: compact console digest (errors first, repeats folded, answer budget, `more`); closes MCP `read_console` (7 CLI tests; no bridge change)
-- [ ] L3 `ug test`: run EditMode/PlayMode through the bridge, failures only with `file:line`; closes MCP `run_tests`/`get_test_job`
+- [x] L3 `ug test`: run EditMode/PlayMode through the bridge, failures only with `file:line`; closes MCP `run_tests`/`get_test_job` (compile check first, play-mode refused, reload-safe wait; 8 CLI + 7 client tests; no bridge change)
 - [ ] L4 compile gate: edit tracking + Stop hook, silent when clean, at most 20 lines on errors, fail open
 - [ ] L5 `ug log`: digest of the last play session (play, wait, stop, errors; decides open point 2, `ug play --for`)
 - [ ] Q2 query: `ug outline <file>` (members with lines, no bodies) and `ug impact <symbol>` (what breaks if it changes: refs grouped by kind, serialized-data counts)

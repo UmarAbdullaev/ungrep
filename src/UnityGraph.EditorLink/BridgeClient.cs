@@ -231,6 +231,58 @@ public sealed class BridgeClient : IDisposable
             timedOut: true);
     }
 
+    /// <summary>
+    /// Starts a test run and waits for it (see `ug test` in SPEC-unity-loop). A PlayMode run reloads
+    /// the domain: refused connections are ridden out while the editor lives, as in the compile wait.
+    /// Never throws for a bridge that goes away mid-wait: the outcome says what is known.
+    /// </summary>
+    public TestOutcome RunTests(string platform, string? filter, TimeSpan timeout)
+    {
+        var clock = Stopwatch.StartNew();
+        string id;
+        try
+        {
+            id = StartTests(platform, filter);
+        }
+        catch (BridgeUnavailableException e)
+        {
+            return TestOutcome.Failed(e.Message, clock.Elapsed);
+        }
+
+        while (true)
+        {
+            try
+            {
+                TestRunResult result = TestResult(id);
+                if (!result.IsRunning)
+                {
+                    return new TestOutcome(result, null, clock.Elapsed);
+                }
+            }
+            catch (BridgeUnavailableException e) when (e.Message.StartsWith("bridge answered 4", StringComparison.Ordinal))
+            {
+                return TestOutcome.Failed(e.Message, clock.Elapsed);
+            }
+            catch (BridgeUnavailableException)
+            {
+                if (!Reconnect("during the test run", out string? gone))
+                {
+                    return TestOutcome.Failed(gone!, clock.Elapsed);
+                }
+            }
+
+            if (clock.Elapsed >= timeout)
+            {
+                return TestOutcome.Failed(
+                    "Unity was still running tests after " + timeout.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture) + " s",
+                    clock.Elapsed,
+                    timedOut: true);
+            }
+
+            Thread.Sleep(PollInterval);
+        }
+    }
+
     public void Dispose() => _http.Dispose();
 
     internal static BridgeInfo? ReadDiscovery(string projectRoot, out string? problem)
@@ -375,4 +427,12 @@ public sealed class BridgeClient : IDisposable
 public sealed record CompileOutcome(bool Changed, CompileResult? Result, string? Problem, bool TimedOut, TimeSpan Elapsed)
 {
     internal static CompileOutcome Failed(string problem, TimeSpan elapsed, bool timedOut = false) => new(false, null, problem, timedOut, elapsed);
+}
+
+/// <summary>What a test run ended with: the finished run's answer, or the problem that ended the wait.</summary>
+public sealed record TestOutcome(TestRunResult? Result, string? Problem, TimeSpan Elapsed)
+{
+    public bool TimedOut { get; init; }
+
+    internal static TestOutcome Failed(string problem, TimeSpan elapsed, bool timedOut = false) => new(null, problem, elapsed) { TimedOut = timedOut };
 }

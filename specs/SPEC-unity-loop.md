@@ -62,7 +62,7 @@ Runs the project's tests through the bridge (`/tests`, `TestRunnerApi`) and wait
 
 1. A compile check first (`ug compile`'s flow): when the scripts do not compile the run does not
    start, the answer is the compile errors (same lines as `ug compile`).
-2. Start the run, poll `/tests/result` every 500 ms. A PlayMode run reloads the domain; the
+2. Start the run, poll `/tests/result` every 250 ms (also not run while the editor is in play mode). A PlayMode run reloads the domain; the
    client rides it out the way the compile wait does (refused connections while the editor
    lives, new port from `bridge.json`).
 3. Answer. Green: one line. Red: the summary line, then one line per failure, at most 20

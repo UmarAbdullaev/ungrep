@@ -13,7 +13,7 @@ Open editor (bridge; "Unity not reachable" answers come from Editor.log, check t
 - read: `scene`, `tree`, `inspect`, `find --live`, `perf`
 - edit: `object`, `component`, `set`, `event`, `prefab`, `undo`, `redo`, `select`, `save`, `play`, `stop`, `pause`
 - assets and project: `asset`, `project`, `package`
-- loop: `console` (errors first, repeats folded; `--after <id>` for new only)
+- loop: `console` (errors first, repeats folded; `--after <id>` for new only), `test` (`--mode PlayMode`, `--filter`; failures with file:line)
 - look up: `shot`, `api <Type>`, `docs <page>`
 - `batch "step" "step"` runs many of these in one call.
 Address objects as `Level/Enemy`, `Enemy#2`, `Main:Level/Enemy`, `Assets/X.prefab:Child`; a component as `Object:Component`.
