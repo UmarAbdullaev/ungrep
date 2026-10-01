@@ -21,7 +21,6 @@ unitygraph cuts that cost without changing how the user works. It:
 - keeps multi-step Unity chores out of the main conversation (a worker subagent);
 - makes the compile loop automatic, and silent when the build is clean;
 - keeps Unity output compact;
-- keeps the always-loaded project map small, generated and true;
 - stops mistakes that cost a rework round (lost serialized data, broken `.meta` files, edits
   to vendored code).
 
@@ -105,8 +104,7 @@ measures each one, and `bench` fails a release that breaks one.
 | Overhead | Budget | Why it stays small |
 | --- | --- | --- |
 | Skill and agent descriptions, loaded every session | ≤ 300 tokens | ~0.1% of context on purge-squad's sessions |
-| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 510, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
-| Generated per-folder map | ≤ 600 tokens per folder, loaded only when a file there is read | replaces an always-loaded monolithic map |
+| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 596, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
 | Compile gate | 0 tokens when clean; ≤ 20 lines on errors | replaces 3–4 turns of recompile, wait and console |
 | Worker delegation | only chores of 3 or more steps; verdict ≤ 800 tokens | a 1-step chore costs more delegated than done inline |
 | Index builds and updates | 0 tokens: deterministic, no LLM | unlike Graphify's LLM extraction |
@@ -197,9 +195,8 @@ under 10%.
    sees one line (the path): 0 tokens of graph. Built after the step-3 checkpoint.
 6. **Worker subagent defaults to Sonnet** (configurable). `bench` measures the redo rate with
    Haiku; if it stays under ~5%, the default moves to Haiku.
-7. **Generated maps go in per-folder `CLAUDE.md` files**, only between `<!-- ug:begin -->` and
-   `<!-- ug:end -->` markers, so hand-written text survives. Written only after the user agrees
-   once per project.
+7. **Dropped (2026-10-01, user):** no generated project map, so no `project-map` module and no
+   writes into `CLAUDE.md` files. The number stays so references to later decisions hold.
 8. Name `unitygraph`, CLI `ug`. Name availability (GitHub, plugin directory) is checked before
    release.
 9. **MIT licence.** Distributed from its own GitHub marketplace first, the official directory
@@ -231,7 +228,6 @@ Standing assumptions:
 | `play-input` | Play the game through the bridge: `ug ui` (interactable uGUI elements with positions), `ug click`, `ug press`, `ug stick`, `ug tap`, `ug swipe`, `ug wait`, `ug play --step`; a one-line digest after each action; play mode only, nothing saved, held input released when play stops. | `editor-ops`, `unity-loop` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
 | `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract. | `query`, `unity-loop`, `editor-link` |
-| `project-map` | Generated sections of per-folder `CLAUDE.md` files and a small root index; staleness check. | `query` |
 | `viewer` | `ug view`: self-contained HTML graph for people; nodes coloured by kind, `exact` edges solid and `heuristic` dashed, filter and search. 0 tokens to Claude. | `query` |
 | `bench` | Question suites on purge-squad and 2–3 open Unity projects; arms: grep baseline, codegraph, Graphify, unitygraph; scores calls, tokens and correctness. | `stats`, all feature modules |
 
@@ -241,7 +237,7 @@ Standing assumptions:
 2. `code-index`, `asset-index`, `editor-link`, `editor-ops` (added 2026-09-30, user)
 3. `query`, `unity-loop`
 4. `worker-agent`, `guards`
-5. `project-map`, `viewer`
+5. `viewer`
 6. `bench`, then release
 
 **Checkpoint after step 3:** if real-session savings are under 10%, stop and re-plan before
@@ -297,9 +293,9 @@ it. Comments and trailing commas are allowed; an unknown setting or module is an
 ```jsonc
 {
   "answerBudget": 1200,           // tokens per query answer, 200 to 8000
-  "modules": {                    // defaults: all on except project-map (Decisions #7)
+  "modules": {                    // defaults: all on
     "asset-index": true, "code-index": true, "editor-link": true, "guards": true,
-    "play-input": true, "project-map": false, "query": true, "unity-loop": true, "viewer": true,
+    "play-input": true, "query": true, "unity-loop": true, "viewer": true,
     "worker-agent": true
   }
 }

@@ -1,0 +1,271 @@
+$ ug outline Turntable.cs
+Assets/Scripts/Lab/Turntable.cs  script  1 type, 6 members  [exact]
+  Game.Lab.Turntable  class     7-26   : UnityEngine.MonoBehaviour  public MonoBehaviour
+    _speed            field     9-11   float  serialized
+    Tint              property  13     Color  public  serialized
+    Rotated           event     15     Action<float>  public
+    Rotate            method    17-21  Rotate(float)  public
+    Stop              method    23     Stop()  public
+    OnOpened          method    25     OnOpened()
+
+$ ug outline Assets/Scripts/Lab/LabStage.cs
+Assets/Scripts/Lab/LabStage.cs  script  1 type, 12 members  [exact]
+  Game.Lab.LabStage  class   7-57   : Game.Core.Stage, Game.Lab.ILabDebug  public MonoBehaviour  partial, also in Assets/Scripts/Lab/LabStage.Debug.cs
+    ResetMethod      field   10     string  const
+    _turntable       field   12     Turntable  serialized
+    _data            field   13     StageData  serialized
+    speed            field   14     float  public  serialized
+    Count            field   15     int  public  static
+    _opened          field   16     int
+    Awake            method  18-22  Awake()  message
+    Open             method  24-36  Open(int)  public  override
+    ResetStage       method  38     ResetStage()
+    Spin             method  40-44  Spin()
+    OnClosed         method  46-53  OnClosed()  protected  override
+    OpenFirst        method  55-56  OpenFirst()  [ContextMenu]
+
+$ ug outline LabStage.Debug.cs
+Assets/Scripts/Lab/LabStage.Debug.cs  script  2 types, 2 members  [exact]
+  Game.Lab.LabStage   class      7      part of Assets/Scripts/Lab/LabStage.cs:7-57
+    Trace             method     7      Trace(int)  public
+  Game.Lab.ILabDebug  interface  10-13  public
+    Trace             method     12     Trace(int)  public
+
+$ ug outline Assets/Scripts/Core/Pool.cs
+Assets/Scripts/Core/Pool.cs  script  3 types, 8 members  [exact]
+  Game.Core.Pool   class     6-24   public
+    _items         field     8      Stack<T>  readonly
+    Count          property  10     int  public
+    Get            method    12-16  Get(Func<T>)  public
+    Release        method    18     Release(T)  public
+    Handle         class     20-23  public
+      Owner        field     22     Pool<T>  public
+  Game.Core.Money  struct    26-33  public
+    Cents          field     28     long  public
+    Money          method    30     Money(long)  public
+    op_Addition    method    32     op_Addition(Money, Money)  public  static
+
+$ ug outline Assets/Scripts/Core/Stage.cs
+Assets/Scripts/Core/Stage.cs  script  3 types, 6 members  [exact]
+  Game.Core.IOpenable  interface  7-10   public
+    Open               method     9      Open(int)  public
+  Game.Core.Stage      class      12-17  : UnityEngine.MonoBehaviour, Game.Core.IOpenable  public abstract MonoBehaviour
+    Open               method     14     Open(int)  public  abstract
+    OnClosed           method     16     OnClosed()  protected  virtual
+  Game.Core.StageData  class      19-25  public [Serializable]
+    level              field      22     int  public  serialized
+    points             field      23     List<Vector3>  public  serialized
+    _lookup            field      24     Dictionary<string, int>
+
+$ ug outline Assets/Scripts/Broken.cs
+Assets/Scripts/Broken.cs  script  1 type, 1 member  [exact]
+  Game.Broken  class   6-13  public
+    Run        method  8-12  Run(Turntable)  public
+
+$ ug outline Lab.unity
+Assets/Scenes/Lab.unity  scene  3 game objects, 1 component, 2 prefab instances  [exact]
+  Canvas             game_object      12-23    (no components)
+    Open Button      game_object      38-50    Button
+    prefab b2000000  prefab_instance  173-197  of Assets/Prefabs/Turntable Variant.prefab
+  Lab Turntable      prefab_instance  117-145  of Assets/Prefabs/Turntable.prefab
+    Marker           game_object      203-214  (no components)
+
+$ ug outline Turntable.prefab
+Assets/Prefabs/Turntable.prefab  prefab  2 game objects, 3 components  [exact]
+  Turntable  game_object  3-16   Turntable, LabStage
+    Platter  game_object  65-77  MeshRenderer  inactive
+
+$ ug outline Turntable Variant.prefab
+Assets/Prefabs/Turntable Variant.prefab  prefab  1 component, 1 prefab instance  [exact]
+  Turntable Variant  prefab_instance  3-30  of Assets/Prefabs/Turntable.prefab
+
+$ ug outline LabSettings.asset
+Assets/Data/LabSettings.asset  scriptable_object  1 sub asset  [exact]
+  Extra  sub_asset  3-22  Game.Data.LabExtra
+
+$ ug outline Turntable
+not a file: Turntable
+  more  ug explain Turntable --members
+
+$ ug outline Assets/Scripts/Nowhere.cs
+not found: Assets/Scripts/Nowhere.cs
+
+$ ug outline ../Outside.cs
+outside the project: ../Outside.cs
+
+$ ug impact Turntable
+Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
+  affects                                5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)
+  type uses                              5
+    Game.Broken.Run               Assets/Scripts/Broken.cs:8
+    Game.Lab.LabStage             Assets/Scripts/Lab/LabStage.cs:7
+    Game.Lab.LabStage.Awake       Assets/Scripts/Lab/LabStage.cs:20
+    Game.Lab.LabStage.OnClosed    Assets/Scripts/Lab/LabStage.cs:49
+    Game.Lab.LabStage._turntable  Assets/Scripts/Lab/LabStage.cs:12
+  serialized                             1 component of Game.Lab.Turntable in 1 asset
+    1 Turntable  Assets/Prefabs/Turntable.prefab:33
+  held via Game.Lab.LabStage._turntable  1 component in 1 asset
+    1 LabStage  Assets/Prefabs/Turntable.prefab:47
+
+$ ug impact Turntable.Rotate
+Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21  [exact]
+  affects       3 places in 2 files: 2 callers, 1 unity event (1 heuristic)
+  callers       2
+    Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:27
+    Game.Lab.LabStage.Spin  Assets/Scripts/Lab/LabStage.cs:43
+  unity events  1
+    Lab.unity > Canvas/Open Button > Button: m_OnClick  Assets/Scenes/Lab.unity:102  [heuristic]
+
+$ ug impact Turntable.Rotate(float)
+Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21  [exact]
+  affects       3 places in 2 files: 2 callers, 1 unity event (1 heuristic)
+  callers       2
+    Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:27
+    Game.Lab.LabStage.Spin  Assets/Scripts/Lab/LabStage.cs:43
+  unity events  1
+    Lab.unity > Canvas/Open Button > Button: m_OnClick  Assets/Scenes/Lab.unity:102  [heuristic]
+
+$ ug impact Turntable.OnOpened
+Game.Lab.Turntable.OnOpened()  method  Assets/Scripts/Lab/Turntable.cs:25  [exact]
+  affects          1 place in 1 file: 1 dispatch (1 heuristic)
+  dispatched from  1
+    Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:31  [heuristic]
+
+$ ug impact Turntable._speed
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:9-11  serialized  [exact]
+  affects        1 asset may hold data (1 prefab); 2 overrides
+  serialized     1 component of Game.Lab.Turntable in 1 asset  [heuristic]
+    1 Turntable  Assets/Prefabs/Turntable.prefab:33
+  overridden in  2
+    Lab Turntable: _speed = 3      Assets/Scenes/Lab.unity:133
+    Turntable Variant: _speed = 5  Assets/Prefabs/Turntable Variant.prefab:19
+  note           field reads and writes are not in the graph: grep _speed for code uses
+
+$ ug impact Turntable.Tint
+Game.Lab.Turntable.Tint  property  Assets/Scripts/Lab/Turntable.cs:13  serialized  [exact]
+  affects     1 asset may hold data (1 prefab)
+  serialized  1 component of Game.Lab.Turntable in 1 asset  [heuristic]
+    1 Turntable  Assets/Prefabs/Turntable.prefab:33
+
+$ ug impact Turntable.Rotated
+Game.Lab.Turntable.Rotated  event  Assets/Scripts/Lab/Turntable.cs:15  [exact]
+  affects  1 place in 1 file: 1 caller
+  callers  1
+    Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
+
+$ ug impact LabStage
+Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+  affects     2 places in 1 file: 2 type uses; 1 asset hold data (1 prefab)
+  type uses   2
+    Game.EditorTools.LabStageEditor    Assets/Editor/LabTools.cs:16
+    Game.EditorTools.LabTools.OpenLab  Assets/Editor/LabTools.cs:12
+  serialized  1 component of Game.Lab.LabStage in 1 asset
+    1 LabStage  Assets/Prefabs/Turntable.prefab:47
+
+$ ug impact LabStage.Open
+Game.Lab.LabStage.Open(int)  method  Assets/Scripts/Lab/LabStage.cs:24-36  [exact]
+  affects       3 places in 3 files: 2 callers, 1 unity event
+  callers       2
+    Game.EditorTools.LabTools.OpenLab  Assets/Editor/LabTools.cs:12
+    Game.Lab.LabStage.OpenFirst        Assets/Scripts/Lab/LabStage.cs:56
+  overrides     1
+    Game.Core.Stage.Open  Assets/Scripts/Core/Stage.cs:14
+  unity events  1
+    Lab.unity > Canvas/Open Button > Button: m_OnClick  Assets/Scenes/Lab.unity:78
+
+$ ug impact LabStage.Spin
+Game.Lab.LabStage.Spin()  method  Assets/Scripts/Lab/LabStage.cs:40-44  [exact]
+  affects          1 place in 1 file: 1 dispatch
+  dispatched from  1
+    Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:30
+
+$ ug impact StageData
+Game.Core.StageData  class  Assets/Scripts/Core/Stage.cs:19-25  [exact]
+  affects                           1 place in 1 file: 1 type use; 1 asset hold data (1 prefab)
+  type uses                         1
+    Game.Lab.LabStage._data  Assets/Scripts/Lab/LabStage.cs:13
+  held via Game.Lab.LabStage._data  1 component in 1 asset
+    1 LabStage  Assets/Prefabs/Turntable.prefab:47
+
+$ ug impact Game.Core.Stage
+Game.Core.Stage  class  Assets/Scripts/Core/Stage.cs:12-17  [exact]
+  affects     1 place in 1 file: 1 subclass; 1 asset hold data (1 prefab)
+  subclasses  1
+    Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:8
+  serialized  1 component of Game.Core.Stage in 1 asset
+    1 LabStage  Assets/Prefabs/Turntable.prefab:47
+
+$ ug impact Stage.Open
+Game.Core.Stage.Open(int)  method  Assets/Scripts/Core/Stage.cs:14  [exact]
+  affects        1 place in 1 file: 1 override
+  overridden by  1
+    Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:24
+  overrides      1
+    Game.Core.IOpenable.Open  Assets/Scripts/Core/Stage.cs:9
+
+$ ug impact ILabDebug
+Game.Lab.ILabDebug  interface  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  [exact]
+  affects         1 place in 1 file: 1 implementation
+  implemented by  1
+    Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.Debug.cs:5
+
+$ ug impact ILabDebug.Trace
+Game.Lab.ILabDebug.Trace(int)  method  Assets/Scripts/Lab/LabStage.Debug.cs:12  [exact]
+  affects         1 place in 1 file: 1 implementation
+  implemented by  1
+    Game.Lab.LabStage.Trace  Assets/Scripts/Lab/LabStage.Debug.cs:7
+
+$ ug impact Pool
+Game.Core.Pool  class  Assets/Scripts/Core/Pool.cs:6-24  [exact]
+  affects    2 places in 2 files: 2 type uses
+  type uses  2
+    Game.Core.Pool.Handle.Owner  Assets/Scripts/Core/Pool.cs:22
+    Game.Lab.LabStage.OnClosed   Assets/Scripts/Lab/LabStage.cs:49
+
+$ ug impact Pool.Release
+Game.Core.Pool.Release(T)  method  Assets/Scripts/Core/Pool.cs:18  [exact]
+  affects  1 place in 1 file: 1 caller
+  callers  1
+    Game.Lab.LabStage.OnClosed  Assets/Scripts/Lab/LabStage.cs:50
+
+$ ug impact Trace
+ambiguous: Trace
+  Game.Lab.ILabDebug.Trace  method  Assets/Scripts/Lab/LabStage.Debug.cs:12  Trace(int)
+  Game.Lab.LabStage.Trace   method  Assets/Scripts/Lab/LabStage.Debug.cs:7   Trace(int)
+  more  ug impact Game.Lab.ILabDebug.Trace
+
+$ ug impact Turntable.cs
+Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
+  affects                                5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)
+  type uses                              5
+    Game.Broken.Run               Assets/Scripts/Broken.cs:8
+    Game.Lab.LabStage             Assets/Scripts/Lab/LabStage.cs:7
+    Game.Lab.LabStage.Awake       Assets/Scripts/Lab/LabStage.cs:20
+    Game.Lab.LabStage.OnClosed    Assets/Scripts/Lab/LabStage.cs:49
+    Game.Lab.LabStage._turntable  Assets/Scripts/Lab/LabStage.cs:12
+  serialized                             1 component of Game.Lab.Turntable in 1 asset
+    1 Turntable  Assets/Prefabs/Turntable.prefab:33
+  held via Game.Lab.LabStage._turntable  1 component in 1 asset
+    1 LabStage  Assets/Prefabs/Turntable.prefab:47
+
+$ ug impact Turntable.prefab
+impact is for code symbols; use ug refs Turntable.prefab
+
+$ ug impact Nope.Missing
+not found: Nope.Missing
+
+$ ug impact cs:T:Game.Lab.Gone
+not found: cs:T:Game.Lab.Gone
+
+$ ug outline Turntable.cs --json
+{"file":"Assets/Scripts/Lab/Turntable.cs","kind":"script","counts":"1 type, 6 members","rows":[{"depth":0,"kind":"class","name":"Game.Lab.Turntable","lines":[7,26],"detail":": UnityEngine.MonoBehaviour  public MonoBehaviour"},{"depth":1,"kind":"field","name":"_speed","lines":[9,11],"detail":"float  serialized"},{"depth":1,"kind":"property","name":"Tint","lines":[13,13],"detail":"Color  public  serialized"},{"depth":1,"kind":"event","name":"Rotated","lines":[15,15],"detail":"Action<float>  public"},{"depth":1,"kind":"method","name":"Rotate","lines":[17,21],"detail":"Rotate(float)  public"},{"depth":1,"kind":"method","name":"Stop","lines":[23,23],"detail":"Stop()  public"},{"depth":1,"kind":"method","name":"OnOpened","lines":[25,25],"detail":"OnOpened()"}],"cut":false}
+
+$ ug impact Turntable --json
+{"symbol":[{"key":"cs:T:Game.Lab.Turntable","kind":"class","location":"Assets/Scripts/Lab/Turntable.cs:7-26"}],"affects":"5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)","groups":[{"label":"type uses","count":5,"summary":"5","confidence":"exact","rows":[{"name":"Game.Broken.Run","file":"Assets/Scripts/Broken.cs","line":8,"confidence":"exact"},{"name":"Game.Lab.LabStage","file":"Assets/Scripts/Lab/LabStage.cs","line":7,"confidence":"exact"},{"name":"Game.Lab.LabStage.Awake","file":"Assets/Scripts/Lab/LabStage.cs","line":20,"confidence":"exact"},{"name":"Game.Lab.LabStage.OnClosed","file":"Assets/Scripts/Lab/LabStage.cs","line":49,"confidence":"exact"},{"name":"Game.Lab.LabStage._turntable","file":"Assets/Scripts/Lab/LabStage.cs","line":12,"confidence":"exact"}],"more":0},{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"exact","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"held via Game.Lab.LabStage._turntable","count":1,"summary":"1 component in 1 asset","confidence":"exact","rows":[{"name":"1 LabStage","file":"Assets/Prefabs/Turntable.prefab","line":47,"confidence":"exact"}],"more":0}],"cut":false}
+
+$ ug impact Turntable._speed --json
+{"symbol":[{"key":"cs:F:Game.Lab.Turntable._speed","kind":"field","location":"Assets/Scripts/Lab/Turntable.cs:9-11"}],"affects":"1 asset may hold data (1 prefab); 2 overrides","groups":[{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"heuristic","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"overridden in","count":2,"summary":"2","confidence":"exact","rows":[{"name":"Lab Turntable: _speed = 3","file":"Assets/Scenes/Lab.unity","line":133,"confidence":"exact"},{"name":"Turntable Variant: _speed = 5","file":"Assets/Prefabs/Turntable Variant.prefab","line":19,"confidence":"exact"}],"more":0}],"note":"field reads and writes are not in the graph: grep _speed for code uses","cut":false}
+
+$ ug impact Nothing --json
+{"error":"not found: Nothing","lines":[]}
+

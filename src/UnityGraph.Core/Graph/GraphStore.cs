@@ -454,6 +454,14 @@ public sealed class GraphStore : IDisposable
         return ReadStrings(command);
     }
 
+    /// <summary>Indexed files whose path is, or ends in a folder then, <paramref name="fileName"/>, ordered.</summary>
+    public IReadOnlyList<string> FilesNamed(string fileName)
+    {
+        using SqliteCommand command = ReadCommand("SELECT path FROM files WHERE path = $name OR substr(path, -length($name) - 1) = '/' || $name ORDER BY path");
+        command.Parameters.AddWithValue("$name", fileName);
+        return ReadStrings(command);
+    }
+
     /// <summary>Files owning an edge of one of <paramref name="kinds"/> into any of <paramref name="keys"/>, ordered.</summary>
     public IReadOnlyList<string> FilesWithEdgesTo(IEnumerable<string> keys, EdgeKindSet kinds)
     {

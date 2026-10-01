@@ -3,10 +3,10 @@ using UnityGraph.Core.Graph;
 namespace UnityGraph.Query;
 
 /// <summary>
-/// `ug find`, `ug refs` and `ug explain` over an open graph (SPEC-query, Commands). Reads only;
-/// every answer is plain text within the budget, deterministic for a given graph.
+/// `ug find`, `ug refs`, `ug explain`, `ug outline` and `ug impact` over an open graph (SPEC-query,
+/// Commands). Reads only; every answer is within the budget, deterministic for a given graph.
 /// </summary>
-public sealed class QueryEngine
+public sealed partial class QueryEngine
 {
     private const int FindLimit = 50;
     private const int AmbiguousLimit = 20;
@@ -18,9 +18,16 @@ public sealed class QueryEngine
         NodeKind.Asset, NodeKind.GameObject, NodeKind.PrefabInstance);
 
     private readonly GraphStore _store;
+    private readonly string? _projectRoot;
     private readonly Dictionary<string, Node?> _nodes = new(StringComparer.Ordinal);
 
-    public QueryEngine(GraphStore store) => _store = store;
+    /// <param name="store">The open graph.</param>
+    /// <param name="projectRoot">The Unity project folder, to turn an absolute path into a project path (`outline`).</param>
+    public QueryEngine(GraphStore store, string? projectRoot = null)
+    {
+        _store = store;
+        _projectRoot = projectRoot;
+    }
 
     public string Find(string text, NodeKind? kind, int budget)
     {

@@ -12,14 +12,17 @@ navigation call is the graph call instead of a grep-and-read streak (design rule
 Pulled forward (user, 2026-09-29): the first version covered the code graph only. Asset answers
 (task A5) joined once `asset-index` landed; the command names and line format stayed.
 
+Q2 (2026-10-01) adds `ug outline <file>` (the shape of a file without its bodies) and `ug impact
+<symbol>` (what breaks if the symbol changes), see their sections below.
+
 ## Scope
 
-In: `ug find`, `ug refs`, `ug explain` (with `--members`); symbol resolution; answer budgets and
-`more` handles; bringing the graph up to date before answering; the `unity` skill's command
-table.
+In: `ug find`, `ug refs`, `ug explain` (with `--members`), `ug outline`, `ug impact`; symbol
+resolution; answer budgets and `more` handles; bringing the graph up to date before answering;
+the `unity` skill's command table; `--json` on `outline` and `impact` only (Q2).
 
-Out (later modules): `impact`, `outline`, `batch` (SPEC module table, after asset-index);
-`--json`; reindex from hooks (step 3, `guards`/reindex-on-edit).
+Out (later modules): `batch` (editor-ops has `ug batch` for editor steps); `--json` on `find`,
+`refs`, `explain`; reindex from hooks (step 3, `guards`/reindex-on-edit).
 
 ## Commands
 
@@ -187,6 +190,133 @@ Object lines: `in`, `parent`, `on`, `components`, `children`, `script` or `insta
 `overrides`, `references` (serialized object fields, not for prefab instances), `unity events`
 (`field -> Method`). Separators are ASCII (` > `, `->`) so every console shows them.
 
+### `ug outline <file> [--json]`
+
+The shape of one file, no bodies: what to read before reading, with the lines to read.
+`<file>` is a project path (relative, or absolute inside the project; `\` is accepted), or a
+file name (`LabStage.cs`) resolved like `explain` resolves asset names; a `.cs` name with no
+`.meta` yet (`LabStage.Debug.cs`) is found in the code graph when one indexed file has it. A
+path outside the project (`../x.cs`, or absolute outside) answers `outside the project: <text>`. A file name that
+several assets share is `ambiguous:` and lists them. A name that is not a file (a type, a
+member) answers `not a file: <text>` with `more  ug explain <text> --members`.
+
+For a `.cs` file (from the code graph, so partial types and nested types come out right):
+
+```
+$ ug outline Assets/Scripts/Lab/LabStage.cs
+Assets/Scripts/Lab/LabStage.cs  script  1 type, 12 members  [exact]
+  Game.Lab.LabStage  class   7-57   : Game.Core.Stage, Game.Lab.ILabDebug  public MonoBehaviour  partial, also in Assets/Scripts/Lab/LabStage.Debug.cs
+    ResetMethod      field   10     string  const
+    _turntable       field   12     Turntable  serialized
+    ...
+    Open             method  24-36  Open(int)  public  override
+    OpenFirst        method  55-56  OpenFirst()  [ContextMenu]
+```
+
+Rows are in source order; a type's members are indented under it; nested types are rows too,
+with their members one level deeper. Columns: `name`, `kind`, `lines` (`24-36`, or one line),
+then the detail (a type's bases, a member's signature or type) and the same flags as
+`explain --members`. When the file declares
+only a part of a partial type (`LabStage.Debug.cs`), the type row says `part of
+<file>:<lines>` and lists the members this file declares.
+
+For a scene, prefab or other Unity YAML asset the answer is the object tree **from the graph**,
+without Unity running; `ug tree` and `ug inspect` stay the way to see live and unsaved state
+(decided 2026-10-01: an offline tree with YAML line anchors replaces a streak of `Read`
+offsets on a big scene, and the graph has it already). Each row is a game object or prefab
+instance, indented by hierarchy, with the file lines to read and its components:
+
+```
+$ ug outline Assets/Prefabs/Turntable.prefab
+Assets/Prefabs/Turntable.prefab  prefab  2 game objects, 3 components  [exact]
+  Turntable  game_object  3-16   Turntable, LabStage
+    Platter  game_object  65-77  MeshRenderer  inactive
+```
+
+Prefab instances read `Lab Turntable  prefab_instance  117-145  of Assets/Prefabs/Turntable.prefab`.
+A component list is cut at 6 (`(+N)`). Assets without objects (a material, a ScriptableObject)
+answer one line, `no objects in <path>`, with `more  ug explain <path>`; so do assets whose
+YAML the graph does not hold (binary, vendored). A file that is not in the graph answers the
+standard `not found: <path>`.
+
+Budget as everywhere: rows go in whole, then the `more` line. `--json`: `{"file", "kind",
+"rows": [{"depth", "kind", "name", "lines": [start, end], "detail", "flags"}], "cut": bool}`;
+rows are dropped from the end until the document fits the budget.
+
+### `ug impact <symbol> [--json]`
+
+What breaks if the symbol changes (renamed, removed, its signature or type changed): the code
+and data that depend on it, grouped by how they depend, with counts, plus the assets that hold
+serialized data for it. Direct dependents only; a caller's own callers are one more `ug impact`
+away (a transitive walk would spend the budget on its first rows).
+
+`<symbol>` resolves like `refs` (types, members, a script asset by path or name, which means the
+type it defines). Overloads named without a signature are one symbol, as in `refs`. Other assets
+and scene objects answer `impact is for code symbols; use ug refs <symbol>`.
+
+```
+$ ug impact Turntable._speed
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:9-11  serialized  [exact]
+  affects        1 asset may hold data (1 prefab); 2 overrides
+  serialized     1 component of Game.Lab.Turntable in 1 asset  [heuristic]
+    1 Turntable  Assets/Prefabs/Turntable.prefab:33
+  overridden in  2
+    Lab Turntable: _speed = 3      Assets/Scenes/Lab.unity:133
+    Turntable Variant: _speed = 5  Assets/Prefabs/Turntable Variant.prefab:19
+  note           field reads and writes are not in the graph: grep _speed for code uses
+```
+
+**Groups** (this order; a group with no rows is left out; a row is `<what>  <file>:<line>` and
+ends `[heuristic]` when the edge is; a holder row is `<count> <type>  <file>:<line>`):
+
+| Group | For | Rows |
+| --- | --- | --- |
+| `callers` | method, property, event | `calls` edges in |
+| `dispatched from` | method | `dispatches` edges in (string names; confidence of the edge) |
+| `overridden by` / `implemented by` | virtual, abstract and interface members | `overrides` edges in |
+| `overrides` | a member that overrides or implements one | the base members: changing the signature breaks that contract |
+| `subclasses` / `extended by` | type | `inherits` edges in |
+| `implemented by` | interface | `implements` edges in |
+| `type uses` | type | `uses_type` edges in: members and types naming it |
+| `unity events` | method | `event_calls` in, with the owning object path; param-less dynamic calls are `[heuristic]` |
+| `serialized` | Unity types, serialized fields | assets holding components, below |
+| `held via` | `[Serializable]` types, `[SerializeReference]` subtypes | serialized fields of this type and their owners' holders, below |
+| `overridden in` | serialized field | prefab-instance overrides of the field: `Instance: path = value` |
+| `field data` | serialized field | `references` edges whose field path starts with the field's name |
+
+**Serialized-data holders.** Field values are not indexed (asset-index keeps references,
+overrides and UnityEvent calls only), so holders come from the component, which carries every
+serialized field of its type:
+
+- A Unity type (it has `script_defines`): the components and sub-assets `instance_of` its script
+  asset, and those of every subclass, are its holders (`exact`). One row per file: the first
+  component's line, the count and the type name. `affects` counts files by kind (scene, prefab,
+  other asset).
+- A serialized field or `[field: SerializeField]` property: the holders of its owner type are
+  assets that *may* hold a value (a component saved before the field existed does not), so
+  `serialized` is `[heuristic]`. `overridden in` and `field data` rows are `exact` when the
+  field path matches the current name and `[heuristic]` when it matches a `former` name; a
+  property's YAML name is `<Name>k__BackingField`.
+- A `[Serializable]` class or struct without a script of its own: the owners reached through
+  serialized fields of that type (`uses_type` from a `serialized` field), up to 3 levels, then
+  their holders, as `held via Game.Lab.LabStage._data`. `exact`.
+- A type that inherits or implements the declared type of a `[SerializeReference]` field: the
+  field owner's holders, `held via ... (SerializeReference)`, `[heuristic]` (the instance may
+  be of another subtype).
+
+**Budget and cuts.** The header and the `affects` line always fit; `affects` is the fixed
+summary (`N places in M files: 2 callers, 1 unity event (1 heuristic)` for code, the holder
+counts above for data), so the shape of the impact is known from two lines. Each group shows at
+most 10 rows, then `    +N more  ug refs <symbol>`. The whole answer is cut on a line like every
+answer; a cut answer's `more` line says how many lines were left and names the larger budget.
+
+`--json`: `{"symbol": [{"key", "kind", "location"}], "affects": "<the affects line>", "groups":
+[{"label", "count", "rows": [{"name", "file", "line", "confidence"}], "more": n}], "cut": bool}`;
+rows are dropped from the end until it fits the budget.
+
+Not covered (ask first): transitive walks, impact of assets and scene objects, field reads and
+writes (the graph has none), a "what to change" plan.
+
 ## Resolving `<symbol>`
 
 1. `cs:<doc id>`, `a:<guid>`, `o:<guid>:<fileID>`: that key.
@@ -236,9 +366,9 @@ The header line always fits. Deterministic: same graph and command, same bytes.
 ## Code
 
 `src/UnityGraph.Query`: `SymbolResolver` (text → keys), `Answer` (budgeted line builder),
-`QueryEngine` (`Find`, `Refs`, `Explain` over an open `GraphStore`, returning text). The CLI
-(`FindCommand`, `RefsCommand`, `ExplainCommand`) opens the project, freshens the graph and
-prints. The engine never writes.
+`QueryEngine` (`Find`, `Refs`, `Explain`, `Outline`, `Impact` over an open `GraphStore`, returning
+text or, for `Outline` and `Impact`, JSON). The CLI (`QueryCommands`) opens the project, freshens
+the graph and prints. The engine never writes.
 
 ## Testing
 
@@ -248,13 +378,21 @@ prints. The engine never writes.
 - Resolver table: key, dotted names, nested and generic types, `sig`, case fallback.
 - Budget: a small budget cuts on a line boundary and names the larger budget; determinism.
 - Freshness: edit a file, query sees it; locked graph answers with the note.
-- Performance: env-gated purge-squad run records p95 in Measured.
+- Q2: golden answers for `outline` (a plain file, a partial type's two files, nested types, a
+  prefab, a scene with instances, a material, a bare name, an ambiguous name, a type name, a
+  missing file) and `impact` (method with callers, dispatch and a UnityEvent; interface member;
+  type with subclasses and holders; serialized field with a former name and an override;
+  `[Serializable]` type held via a field; unknown symbol; ambiguous name; an asset). Budget cuts
+  and the 10-row group cap, JSON for both (parsed back, within budget), determinism.
+- Performance: env-gated purge-squad run (`UG_PURGE_SQUAD`) records p95 in Measured, Q2 commands
+  included (`PurgeSquadQueryTests` for `outline` and `impact`, in process, warm).
 - Coverage ≥ 80% lines on Query.
 
 ## Boundaries
 
 - Always: read-only on the project; the only write is the graph write through `GraphUpdate`.
-- Ask first: a new command; `--json`; changing the line format once the skill documents it.
+- Ask first: a new command; `--json` on `find`, `refs`, `explain` (allowed on `outline` and
+  `impact` by the Q2 task); changing the line format once the skill documents it.
 - Never: network; answers without a location; more than the budget.
 
 ## Measured
@@ -265,3 +403,12 @@ graph up to date, 21 runs per query (`find Gun`, `refs LabStage`, `explain LabSt
 268–304 ms, p95 324–363 ms, overall p95 345 ms (target ≤ 500 ms: met). About 260 ms of that is
 process start plus the freshness check. Answer sizes: 6 to 1,165 tokens (`find Update` hits the
 50-result cap within the 1,200 budget).
+
+Q2, purge-squad, 2026-10-01, dev machine (Windows 11, Debug build, in process, graph in a temp
+folder, second of two runs, 2 runs of the env-gated `PurgeSquadQueryTests`): `outline` of the
+largest own script (`MapShapes.cs`, 22 KiB, 49 lines of answer) 2-4 ms, of the largest own scene
+(`GalaxyMap.unity`, 633 KiB, 53 lines) 2-3 ms, of the largest own prefab (`HubStation.prefab`,
+722 KiB, 42 lines) 2-5 ms; `impact` of `MapShapes` and two of its nested types 0-3 ms (6-16
+lines). Far inside the 50 ms in-process target; a fresh `ug` process stays at the ~260 ms start
+and freshness cost above. Vendored assets (`Assets/3rd Party`) are not in the asset graph:
+`outline` answers `not found:` for them.

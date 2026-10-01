@@ -54,6 +54,16 @@ internal static class QueryCommands
         var members = new Option<bool>("--members") { Description = "List a type's members too." };
         yield return Command("explain", "What a symbol is: location, Unity facts, members, users.", [explained, members], (result, engine, budget) =>
             engine.Explain(result.GetValue(explained)!, result.GetValue(members), budget));
+
+        var file = new Argument<string>("file") { Description = "A .cs, scene, prefab or asset file: project-relative path, absolute path, or file name." };
+        var outlineJson = new Option<bool>("--json") { Description = "Answer as JSON." };
+        yield return Command("outline", "Members of a .cs file, or the object tree of a scene or prefab, with line numbers and no bodies.", [file, outlineJson], (result, engine, budget) =>
+            engine.Outline(result.GetValue(file)!, result.GetValue(outlineJson), budget));
+
+        var impacted = new Argument<string>("symbol") { Description = "Type or member: Name, Type.Member, Namespace.Type.Member(args), or a cs: key." };
+        var impactJson = new Option<bool>("--json") { Description = "Answer as JSON." };
+        yield return Command("impact", "What breaks if a symbol changes: dependents by kind and the assets that hold its serialized data.", [impacted, impactJson], (result, engine, budget) =>
+            engine.Impact(result.GetValue(impacted)!, result.GetValue(impactJson), budget));
     }
 
     // instead: answers without the graph when it returns an answer (`find --live`); gets the start folder.
@@ -142,7 +152,7 @@ internal static class QueryCommands
             string indexed = created
                 ? string.Create(CultureInfo.InvariantCulture, $"indexed {summary.Files:N0} files in {summary.Elapsed.TotalSeconds:0.0} s\n")
                 : "";
-            text = indexed + ask(new QueryEngine(store), tokens);
+            text = indexed + ask(new QueryEngine(store, unity.Root), tokens);
             return 0;
         }
         catch (GraphLockedException)
@@ -150,7 +160,12 @@ internal static class QueryCommands
             try
             {
                 using GraphStore store = GraphStore.Open(unity.Root, StoreMode.ReadOnly, graphDirectory: graphDirectory);
-                text = ask(new QueryEngine(store), tokens) + "note: graph busy, edits from the last seconds may be missing\n";
+                text = ask(new QueryEngine(store, unity.Root), tokens);
+                if (!text.StartsWith('{'))
+                {
+                    text += "note: graph busy, edits from the last seconds may be missing\n";
+                }
+
                 return 0;
             }
             catch (GraphRebuildRequiredException)

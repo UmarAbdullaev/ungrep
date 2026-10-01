@@ -54,6 +54,38 @@ public sealed partial class QueryCommandTests : IDisposable
     }
 
     [Fact]
+    public void Outline_takes_a_name_a_relative_path_or_an_absolute_path()
+    {
+        string full = Path.Combine(_root, "Assets", "Scripts", "Lab", "Turntable.cs");
+
+        var (exitCode, byName) = Run("outline", "Turntable.cs");
+        var (_, byPath) = Run("outline", "Assets/Scripts/Lab/Turntable.cs");
+        var (_, byAbsolute) = Run("outline", full);
+
+        Assert.Equal(0, exitCode);
+        Assert.StartsWith("indexed 28 files in <t> s\nAssets/Scripts/Lab/Turntable.cs  script  1 type, 6 members", byName, StringComparison.Ordinal);
+        Assert.Equal(byPath, byAbsolute);
+        Assert.EndsWith(byPath, byName, StringComparison.Ordinal);
+        Assert.StartsWith("outside the project:", Run("outline", Path.Combine(_root, "..", "Other.cs")).Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Impact_json_is_one_document_even_when_the_graph_is_busy()
+    {
+        Run("find", "Turntable");
+        using (GraphStore.Open(_root, StoreMode.ReadWrite))
+        {
+            var (exitCode, output) = Run("impact", "Turntable._speed", "--json");
+
+            Assert.Equal(0, exitCode);
+            using var document = System.Text.Json.JsonDocument.Parse(output);
+            Assert.Equal("cs:F:Game.Lab.Turntable._speed", document.RootElement.GetProperty("symbol")[0].GetProperty("key").GetString());
+        }
+
+        Assert.StartsWith("impact is for code symbols", Run("impact", "Turntable.prefab").Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_busy_graph_still_answers_with_a_note()
     {
         Run("find", "Turntable");

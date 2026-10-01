@@ -30,6 +30,9 @@ public sealed class Answer
     /// <summary>True once a line didn't fit; later lines are dropped.</summary>
     public bool Cut { get; private set; }
 
+    /// <summary>How many lines were offered after the cut and left out, for `more` lines that say so.</summary>
+    public int Dropped { get; private set; }
+
     /// <summary>Adds <paramref name="line"/> if it fits; the first line always does.</summary>
     public bool Add(string line)
     {
@@ -37,6 +40,7 @@ public sealed class Answer
         if (Cut || (_bytes > 0 && _bytes + bytes > _limit))
         {
             Cut = true;
+            Dropped++;
             return false;
         }
 
@@ -49,19 +53,25 @@ public sealed class Answer
     {
         foreach (string line in lines)
         {
-            if (!Add(line))
-            {
-                return;
-            }
+            Add(line);
         }
     }
 
-    /// <summary>The text; when cut, followed by `  more  &lt;command&gt; --budget &lt;2 × budget&gt;`.</summary>
-    public string Finish(string command)
+    /// <summary>
+    /// The text; when cut, followed by `  more  &lt;command&gt; --budget &lt;2 × budget&gt;`, which says
+    /// how many lines were left out when <paramref name="countDropped"/> is set.
+    /// </summary>
+    public string Finish(string command, bool countDropped = false)
     {
         if (Cut && _budget < MaxBudget)
         {
-            _text.Append("  more  ").Append(command).Append(" --budget ").Append(Math.Min(_budget * 2, MaxBudget)).Append('\n');
+            _text.Append("  more  ");
+            if (countDropped)
+            {
+                _text.Append(Dropped).Append(" more lines: ");
+            }
+
+            _text.Append(command).Append(" --budget ").Append(Math.Min(_budget * 2, MaxBudget)).Append('\n');
         }
         else if (Cut)
         {

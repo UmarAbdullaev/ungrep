@@ -98,9 +98,8 @@ its skill line (one line in SKILL.md, detail in `--help`; keep the body under 60
 - [x] I2 `ug ui`: interactable elements on screen (buttons, toggles, sliders, input fields) as addresses with screen positions, no screenshot needed; `ug click <element>`: pointer down/up/click through the EventSystem (uGUI first; UI Toolkit is a spike)
 - [x] I3 `ug press <key|button> [--hold s]`, `ug stick <left|right> x,y [--hold s]`, `ug tap|swipe x,y`, `ug wait <s>`: queued Input System events; `ug play --step`
 - [x] I4 after each action a one-line digest (new console errors, objects changed, scene change) and optional `--shot`; batchable through `ug batch`
-- [ ] Q2 query: `ug outline <file>` (members with lines, no bodies) and `ug impact <symbol>` (what breaks if it changes: refs grouped by kind, serialized-data counts)
+- [x] Q2 query: `ug outline <file>` (members with lines, no bodies) and `ug impact <symbol>` (what breaks if it changes: refs grouped by kind, serialized-data counts)
 - [ ] G1 guards spec, then hooks: serialized field renamed or removed (assets holding data), `[SerializeReference]` type moves, `.meta`-safe `mv`/`cp`/`rm`, vendored-folder edits; each hook silent unless it fires
-- [ ] M1 project-map: generated per-folder `CLAUDE.md` section (at most 600 tokens, between `<!-- ug:begin -->` markers) + small root index + staleness check; writes into the user's project, so ask before first run
 - [ ] W1 worker-agent: Unity worker subagent, delegation rules (only chores of 3+ steps), verdict at most 800 tokens
 - [ ] V1 viewer: `ug view` self-contained HTML graph for people, 0 tokens to Claude
 - [ ] B1 bench: question suites (grep baseline, codegraph, Graphify, unitygraph) scored on calls, tokens, correctness

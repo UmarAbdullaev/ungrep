@@ -12,7 +12,7 @@ graph-core knows nothing about C# or Unity YAML. It stores what `code-index` and
 give it, replaces one file's contribution atomically, and answers lookups fast enough that a
 `ug` query stays under its 500 ms p95 including process start.
 
-Users of this module: `code-index`, `asset-index` (writers); `query`, `guards`, `project-map`,
+Users of this module: `code-index`, `asset-index` (writers); `query`, `guards`,
 `viewer` (readers).
 
 ## Scope

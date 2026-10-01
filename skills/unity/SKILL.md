@@ -5,7 +5,7 @@ description: Unity project questions and editor work. Use the ug CLI before grep
 Run `"${CLAUDE_PLUGIN_ROOT}/bin/ug" <cmd>` (`--project <dir>` elsewhere). Options: `ug <cmd> --help`, don't guess.
 
 Graph (no Unity needed; one call beats grep and reads, answers carry `file:line`, read only those lines):
-`explain <symbol>` what it is, users, prefabs and scenes holding it; `refs <symbol>` everything pointing at it; `find <text>` types, members, assets, objects (`--kind`); `index`, `doctor`, `stats`.
+`explain <symbol>` what it is, users, prefabs and scenes holding it; `refs <symbol>` everything pointing at it; `impact <symbol>` what breaks if it changes; `outline <file>` members or object tree with lines, no bodies; `find <text>` types, members, assets, objects (`--kind`); `index`, `doctor`, `stats`.
 `<symbol>`: type, `Type.Member`, asset path, name or GUID, object name or path, or a `cs:`/`a:`/`o:` key. `[exact]` is compiler-true, `[heuristic]` is a string match: verify. `ambiguous:` and `not found:` list candidates. Run a `more` line only if needed.
 
 Open editor (bridge; "Unity not reachable" answers come from Editor.log, check their age):
