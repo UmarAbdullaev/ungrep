@@ -27,7 +27,7 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal static class Bridge
     {
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";
@@ -35,6 +35,7 @@ namespace UnityGraph.Bridge
 
         private static readonly ConsoleBuffer _console = new ConsoleBuffer();
         private static Server _server;
+        private static readonly PlayLog _playLog = new PlayLog();
         private static CompileLog _compile;
         private static volatile string _status = "{}";
         private static string _statusInputs;
@@ -69,6 +70,7 @@ namespace UnityGraph.Bridge
         {
             _console.Restore(SessionState.GetString(ConsoleKey, ""));
             SessionState.EraseString(ConsoleKey);
+            _playLog.Load();
             Application.logMessageReceivedThreaded += OnLog;
             _compile = new CompileLog(ProjectRoot, Folder);
             _compile.Attach();
@@ -88,6 +90,7 @@ namespace UnityGraph.Bridge
 
             EditorApplication.update += Update;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            EditorApplication.pauseStateChanged += OnPauseChanged;
             AssemblyReloadEvents.beforeAssemblyReload += Stop;
             EditorApplication.quitting += Quit;
         }
@@ -96,6 +99,7 @@ namespace UnityGraph.Bridge
         {
             EditorApplication.update -= Update;
             EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            EditorApplication.pauseStateChanged -= OnPauseChanged;
             AssemblyReloadEvents.beforeAssemblyReload -= Stop;
             Application.logMessageReceivedThreaded -= OnLog;
             _compile?.Detach();
@@ -124,7 +128,18 @@ namespace UnityGraph.Bridge
             _server.Pump(Handle);
         }
 
-        private static void OnPlayModeChanged(PlayModeStateChange change) => SceneOps.OnPlayModeChanged(change, _console.LastId);
+        private static void OnPlayModeChanged(PlayModeStateChange change)
+        {
+            SceneOps.OnPlayModeChanged(change, _console.LastId);
+            _playLog.OnPlayModeChanged(change, DateTime.UtcNow, _console.LastId);
+            _playLog.Persist();
+        }
+
+        private static void OnPauseChanged(PauseState state)
+        {
+            _playLog.OnPause(state == PauseState.Paused, DateTime.UtcNow);
+            _playLog.Persist();
+        }
 
         private static void OnLog(string condition, string stackTrace, LogType type) =>
             _console.Add(ConsoleBuffer.TypeName(type), condition, StackFrames.OwnFrame(stackTrace, ProjectRoot));
@@ -164,6 +179,8 @@ namespace UnityGraph.Bridge
                     return Now(Reply.Ok(_compile.Answer));
                 case "/console":
                     return Now(ConsoleEntries(request));
+                case "/playlog":
+                    return Now(Reply.Ok(_playLog.Answer()));
                 case "/tests":
                     return Now(StartTests(request));
                 case "/tests/result":

@@ -29,6 +29,15 @@ public sealed record ConsoleEntry(long Id, string Type, string Text, string? Fra
 /// <summary>`GET /console`: entries after the asked id, and the newest id.</summary>
 public sealed record ConsolePage(long Last, IReadOnlyList<ConsoleEntry> Entries);
 
+/// <summary>A pause or resume in a play session, <see cref="At"/> seconds after it started.</summary>
+public sealed record PlayEvent(double At, string What);
+
+/// <summary>The last play session: console ids around it (<see cref="Until"/> is null while playing).</summary>
+public sealed record PlaySession(DateTimeOffset Start, DateTimeOffset? End, long After, long? Until, IReadOnlyList<PlayEvent> Events);
+
+/// <summary>`GET /playlog`: the last play session, or none since the editor opened.</summary>
+public sealed record PlayLogPage(PlaySession? Session);
+
 /// <summary>A failed test in a run's answer.</summary>
 public sealed record TestFailure(string Name, string? Message, string? Frame);
 

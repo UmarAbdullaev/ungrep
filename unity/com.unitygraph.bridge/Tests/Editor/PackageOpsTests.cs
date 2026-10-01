@@ -41,7 +41,7 @@ namespace UnityGraph.Bridge.Tests
 
         [TestCase("com.unitygraph.bridge")]
         [TestCase("COM.UnityGraph.Bridge")]
-        [TestCase("com.unitygraph.bridge@0.2.0")]
+        [TestCase("com.unitygraph.bridge@0.3.0")]
         public void Removing_the_bridge_itself_is_refused(string name) =>
             Assert.AreEqual(
                 Err("removing com.unitygraph.bridge would end this connection: remove it in Package Manager (Window > Package Manager)"),

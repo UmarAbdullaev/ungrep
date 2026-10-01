@@ -64,7 +64,7 @@ internal static partial class EditorCommands
         bridge.Subcommands.Add(Command("remove", "Delete the copy made by `ug bridge install --copy`.", [], (root, _) => Remove(root)));
         yield return bridge;
 
-        foreach (Command command in OpsCommands().Concat(ConsoleCommands()).Concat(TestCommands()))
+        foreach (Command command in OpsCommands().Concat(ConsoleCommands()).Concat(TestCommands()).Concat(LogCommands()))
         {
             yield return command;
         }
@@ -372,8 +372,9 @@ internal static partial class EditorCommands
             new OpRequest(Query("/save", ("path", r.GetValue(savePath)))) { Timeout = _sceneTimeout });
 
         Option<int> playTimeout = Seconds();
-        yield return Ops("play", "play", "Enter play mode (or resume from pause) and wait until playing.", [playTimeout], r =>
-            new OpRequest("/play") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(playTimeout))) });
+        var playFor = new Option<int?>("--for") { Description = "Stay in play mode this many seconds (1 to 600), then stop and print the ug log digest." };
+        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log.", [playTimeout, playFor], (root, config, r) =>
+            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor)));
         Option<int> stopTimeout = Seconds();
         yield return Ops("stop", "stop", "Leave play mode; says how long it played and what it logged.", [stopTimeout], r =>
             new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(stopTimeout))) });

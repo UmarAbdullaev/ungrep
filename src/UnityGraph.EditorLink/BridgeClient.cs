@@ -20,6 +20,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge with the editor-ops requests (SPEC-editor-ops).</summary>
     public const string MinimumOpsBridge = "0.2.0";
 
+    /// <summary>The oldest bridge with `/playlog` (SPEC-unity-loop).</summary>
+    public const string MinimumLoopBridge = "0.3.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -46,6 +49,9 @@ public sealed class BridgeClient : IDisposable
 
     /// <summary>Whether the bridge answers editor-ops requests.</summary>
     public bool HasOps => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumOpsBridge);
+
+    /// <summary>Whether the bridge answers `/playlog`.</summary>
+    public bool HasPlayLog => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumLoopBridge);
 
     /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
@@ -107,6 +113,8 @@ public sealed class BridgeClient : IDisposable
 
         return BridgeJson.Parse<ConsolePage>(Get(query, RequestTimeout));
     }
+
+    public PlayLogPage PlayLog() => BridgeJson.Parse<PlayLogPage>(Get("/playlog", RequestTimeout));
 
     /// <summary>Starts a test run and returns its id.</summary>
     public string StartTests(string platform, string? filter)
