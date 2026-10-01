@@ -93,6 +93,10 @@ its skill line (one line in SKILL.md, detail in `--help`; keep the body under 60
 - [x] L3 `ug test`: run EditMode/PlayMode through the bridge, failures only with `file:line`; closes MCP `run_tests`/`get_test_job` (compile check first, play-mode refused, reload-safe wait; 8 CLI + 7 client tests; no bridge change)
 - [ ] L4 compile gate: edit tracking + Stop hook, silent when clean, at most 20 lines on errors, fail open
 - [ ] L5 `ug log`: digest of the last play session (play, wait, stop, errors; decides open point 2, `ug play --for`)
+- [ ] I1 play-input spec (`specs/SPEC-play-input.md`): play mode only, nothing saved; reference: Unity MCP servers' manage_playmode, simulate_ui_input, input_keyboard/mouse/gamepad/touch (holdSeconds, stick x/y, batched actions); Input System package required for devices, legacy projects get a clear refusal and still get `ug click`
+- [ ] I2 `ug ui`: interactable elements on screen (buttons, toggles, sliders, input fields) as addresses with screen positions, no screenshot needed; `ug click <element>`: pointer down/up/click through the EventSystem (uGUI first; UI Toolkit is a spike)
+- [ ] I3 `ug press <key|button> [--hold s]`, `ug stick <left|right> x,y [--hold s]`, `ug tap|swipe x,y`, `ug wait <s>`: queued Input System events; `ug play --step`
+- [ ] I4 after each action a one-line digest (new console errors, objects changed, scene change) and optional `--shot`; batchable through `ug batch`
 - [ ] Q2 query: `ug outline <file>` (members with lines, no bodies) and `ug impact <symbol>` (what breaks if it changes: refs grouped by kind, serialized-data counts)
 - [ ] G1 guards spec, then hooks: serialized field renamed or removed (assets holding data), `[SerializeReference]` type moves, `.meta`-safe `mv`/`cp`/`rm`, vendored-folder edits; each hook silent unless it fires
 - [ ] M1 project-map: generated per-folder `CLAUDE.md` section (at most 600 tokens, between `<!-- ug:begin -->` markers) + small root index + staleness check; writes into the user's project, so ask before first run
