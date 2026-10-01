@@ -1,6 +1,6 @@
 # Spec: unity-loop
 
-Part of unitygraph (see `../SPEC.md`, module table). Status: **draft** (2026-10-01). Builds on
+Part of unitygraph (see `../SPEC.md`, module table). Status: **built** (2026-10-01). Builds on
 `editor-link` (`SPEC-editor-link.md`: bridge, `BridgeClient`, `ug compile`) and closes what the
 Unity MCP server's `read_console`, `run_tests` and `get_test_job` do, in answers sized for Claude.
 
@@ -48,8 +48,8 @@ The editor console, from the bridge's ring buffer (2,000 entries since the edito
 $ ug console
 console  2 errors, 1 warning  (last #4120)
   error x12  NullReferenceException: Object reference not set to an instance of an object  Assets/Scripts/Enemy.cs:42
-  error      Missing key 'Hit' in Animator  Assets/Scripts/Enemy.cs:51
-  warning    The referenced script on this Behaviour is missing!
+  error  Missing key 'Hit' in Animator  Assets/Scripts/Enemy.cs:51
+  warning  The referenced script on this Behaviour is missing!
 
 $ ug console
 console  nothing at warning level or worse  (last #4120)
@@ -99,7 +99,7 @@ $ ug log
 play 12.4 s, stopped 14:02:23  (pause 4.1 s, resume 6.0 s)
   3 errors, 1 warning, 212 logs  (last #4120)
   error x2  NullReferenceException: Object reference not set to an instance of an object  Assets/Scripts/Enemy.cs:42
-  warning   The referenced script on this Behaviour is missing!
+  warning  The referenced script on this Behaviour is missing!
 ```
 
 While playing the first line is `playing 5.3 s so far`. With no session since the editor opened:
@@ -123,7 +123,7 @@ reload that entering play mode causes.
 
 ```json
 {"session": null}
-{"session": {"start": "2026-10-01T14:02:11Z", "end": null, "after": 4001, "until": null,
+{"session": {"start": "2026-10-01T14:02:11.000Z", "end": null, "after": 4001, "until": null,
              "events": [{"at": 4.1, "what": "pause"}, {"at": 6.0, "what": "resume"}]}}
 ```
 
@@ -181,7 +181,21 @@ unless it fires (design rules 3 and 9).
 
 ## Measured
 
-(Filled in after the end-to-end run.)
+End to end on a copy of `fixtures/BridgeHost`, Unity 6000.3.14f1, batch mode (`UG_UNITY`, 2026-10-01).
+Tokens are bytes / 4 of the printed answer.
+
+| What | Time | Answer |
+|---|---|---|
+| `ug console`, 2 errors | 0.03 s | 49 tokens |
+| `ug test --filter E2E`, 1 red, 1 green | 0.35 s | 25 tokens |
+| `ug test --filter PlayLogTests`, 9 green | 0.29 s | 7 tokens |
+| compile gate check, 1 error | 0.6 s | block reason, the `ug compile` text |
+| compile gate check after the fix (domain reload) | 1.6 s | silent |
+| `ug play --for 2` | 3.4 s | `ug log` digest, 2 lines when clean |
+
+Not measured: a PlayMode `ug test` run, and a Stop hook against a project with many errors (cut at 20 lines by design).
+
+Not yet understood: in the end-to-end run a `Debug.LogError` made by `ug run` right after `ug stop` (play mode left, domain reload) did not reach the console buffer, while the same call before any play session did. Editor.log had it. The e2e checks `ug console` before the play steps for that reason.
 
 ## Open points
 

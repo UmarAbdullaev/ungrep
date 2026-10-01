@@ -11,6 +11,8 @@ namespace BridgeHost
 
         public static void Throws() => throw new InvalidOperationException("thrown on purpose");
 
+        public static void LogError() => Debug.LogError("e2e fixture error");
+
         [MenuItem("Tools/BridgeHost/Log Hello")]
         public static void LogHello() => Debug.Log("hello from the menu");
     }

@@ -86,6 +86,8 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Contains("threw after", Ug(log, "run", "BridgeHost.FixtureMethods.Throws"), StringComparison.Ordinal);
         Assert.StartsWith("did not run UnityEditor.EditorApplication.Exit", Ug(log, "run", "UnityEditor.EditorApplication.Exit"), StringComparison.Ordinal);
 
+        LoopConsole(log);
+
         // editor-ops (SPEC-editor-ops, Testing): open, read, edit, save and read back, play and stop.
         clock.Restart();
         string opened = Ug(log, "scene", "open", "Assets/Scenes/Main.unity");
@@ -383,6 +385,8 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Matches(@"^stopped after \d+\.\d s: 0 errors, 0 warnings\n$", stop);
         Assert.EndsWith("\nedit mode\n", Ug(log, "scene"), StringComparison.Ordinal);
 
+        LoopCommands(log);
+
         string ug = Path.Combine(repo, "artifacts", "bin", "UnityGraph.Cli", "release", OperatingSystem.IsWindows() ? "ug.exe" : "ug");
         if (File.Exists(ug))
         {
@@ -472,6 +476,65 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Fail("the bridge was not idle within " + limit.TotalMinutes.ToString(CultureInfo.InvariantCulture) + " min");
     }
 
+    // unity-loop (SPEC-unity-loop, Testing): `ug console` shows a logged fixture error.
+    private void LoopConsole(string log)
+    {
+        var clock = Stopwatch.StartNew();
+        Ug(log, "run", "BridgeHost.FixtureMethods.LogError");
+        string console = Ug(log, "console");
+        Report("ug console (1 error)", clock.Elapsed);
+        Tokens("ug console answer", console);
+        Assert.Matches(@"^console  \d+ errors?(, \d+ warnings?)?  \(last #\d+\)\n  error  e2e fixture error", console);
+    }
+
+    // unity-loop: the compile gate check, `ug test`, `ug play --for` and `ug log`.
+    private void LoopCommands(string log)
+    {
+        var clock = Stopwatch.StartNew();
+
+        string broken = Path.Combine(_root, "Assets", "Editor", "Broken.cs");
+        File.WriteAllText(broken, "namespace BridgeHost { static class Broken { static int Speed() { return spd; } } }\n");
+        clock.Restart();
+        GateAnswer gate = CompileGate.Check(_root, TimeSpan.FromSeconds(60));
+        Report("compile gate with an error", clock.Elapsed);
+        Assert.Equal(GateResult.Errors, gate.Result);
+        Assert.Contains("Assets/Editor/Broken.cs:1:", gate.Text, StringComparison.Ordinal);
+        File.WriteAllText(broken, "namespace BridgeHost { static class Broken { static int Speed() { return 1; } } }\n");
+        clock.Restart();
+        Assert.Equal(GateResult.Clean, CompileGate.Check(_root, TimeSpan.FromSeconds(60)).Result);
+        Report("compile gate after the fix", clock.Elapsed);
+
+        string tests = Path.Combine(_root, "Assets", "E2ETests");
+        Directory.CreateDirectory(tests);
+        File.WriteAllText(
+            Path.Combine(tests, "E2E.Tests.asmdef"),
+            "{\"name\":\"E2E.Tests\",\"references\":[\"UnityEngine.TestRunner\",\"UnityEditor.TestRunner\"],\"includePlatforms\":[\"Editor\"],"
+            + "\"overrideReferences\":true,\"precompiledReferences\":[\"nunit.framework.dll\"],\"defineConstraints\":[\"UNITY_INCLUDE_TESTS\"]}");
+        File.WriteAllText(
+            Path.Combine(tests, "RedTests.cs"),
+            "using NUnit.Framework;\nnamespace E2E\n{\n    public class RedTests\n    {\n        [Test] public void Passes() { }\n\n"
+            + "        [Test] public void Fails() { Assert.AreEqual(3, 2); }\n    }\n}\n");
+        Assert.Matches(@"^compiled in \d+\.\d s: 0 errors\n$", Ug(log, "compile"));
+
+        clock.Restart();
+        string red = Ug(log, "test", "--filter", "E2E");
+        Report("ug test (1 red, 1 green)", clock.Elapsed);
+        Tokens("ug test red answer", red);
+        Assert.Matches(@"^EditMode: 1 failed, 1 passed in \d+\.\d s\n  Assets/E2ETests/RedTests\.cs:8  E2E\.RedTests\.Fails  ", red);
+
+        clock.Restart();
+        string green = Ug(log, "test", "--filter", "PlayLogTests");
+        Report("ug test (green)", clock.Elapsed);
+        Tokens("ug test green answer", green);
+        Assert.Matches(@"^EditMode: \d+ passed in \d+\.\d s\n$", green);
+
+        clock.Restart();
+        string played = Ug(log, "play", "--for", "2");
+        Report("ug play --for 2", clock.Elapsed);
+        Assert.Matches(@"^play \d+\.\d s, stopped \d\d:\d\d:\d\d\n  ", played);
+        Assert.Equal(played, Ug(log, "log"));
+    }
+
     private string Ug(string editorLog, params string[] args)
     {
         var output = new StringWriter();
@@ -482,6 +545,9 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Equal(0, exitCode);
         return output.ToString().ReplaceLineEndings("\n");
     }
+
+    private static void Tokens(string what, string answer) =>
+        TestContext.Current.TestOutputHelper?.WriteLine(what + ": " + (answer.Length / 4).ToString(CultureInfo.InvariantCulture) + " tokens (" + answer.Length.ToString(CultureInfo.InvariantCulture) + " bytes)");
 
     private static void Report(string what, TimeSpan elapsed) =>
         TestContext.Current.TestOutputHelper?.WriteLine(what + ": " + elapsed.TotalSeconds.ToString("0.000", CultureInfo.InvariantCulture) + " s");
