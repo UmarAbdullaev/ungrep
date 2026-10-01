@@ -26,7 +26,7 @@ and `ug click`; the Input System package (`com.unity.inputsystem`) for devices.
 Out:
 
 - **UI Toolkit** (UIDocument, UXML) **is deferred**: `ug ui` only says how many UI Toolkit documents
-  it did not list (`2 UI Toolkit documents not listed: not supported yet`). Driving a runtime panel
+  it did not list (`2 UI Toolkit documents not listed` in the headline). Driving a runtime panel
   needs its own event simulation (`PanelEventHandler`, `UIElements.Event` pooling) and a way to find
   and address a `VisualElement`; that is a spike (open point 1), not part of this build.
 - 3D objects that take clicks through a `PhysicsRaycaster` (`IPointerClickHandler` on a collider),
@@ -87,7 +87,7 @@ Canvas/Menu/Quality  dropdown  "High" (3 options)  640,620  300x40
 
 Without uGUI: `com.unity.ugui is not in this project: ug ui and ug click need it`. With no active
 Canvas: `ui  1280x720  playing  no canvas`. With no EventSystem the elements are still listed and the
-headline ends `no EventSystem: ug run "GameObject/UI/Event System"` (nothing would receive a click).
+headline gets `no EventSystem (nothing receives clicks)`; `ug click` then refuses with `no EventSystem in the loaded scenes: ug click needs one (add it in edit mode: GameObject > UI > Event System)`. The UI Toolkit count joins the headline (`..., 2 UI Toolkit documents not listed`), so `ug ui` stays within 42 lines.
 
 ### `ug click <element> [--value <v>] [--shot]`
 

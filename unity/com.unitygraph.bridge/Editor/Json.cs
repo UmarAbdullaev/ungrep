@@ -5,6 +5,8 @@ using System.Text;
 
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Tests")]
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.TestRuns")]
+[assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Ugui")]
+[assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.InputSystem")]
 
 namespace UnityGraph.Bridge
 {

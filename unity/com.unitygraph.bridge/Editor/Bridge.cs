@@ -27,7 +27,7 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal static class Bridge
     {
-        public const string Version = "0.3.0";
+        public const string Version = "0.4.0";
 
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";

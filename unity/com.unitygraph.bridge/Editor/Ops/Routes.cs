@@ -71,6 +71,10 @@ namespace UnityGraph.Bridge
                 { "/shot", (r, c) => Checked(() => ShotOps.Shot(r)) },
                 { "/api", (r, c) => Checked(() => ApiOps.Api(r)) },
                 { "/stats", (r, c) => Checked(StatsOps.Stats) },
+
+                // Play input: uGUI elements and clicks (SPEC-play-input).
+                { "/ui", (r, c) => Checked(() => PlayInput.UiList(r)) },
+                { "/ui/click", (r, c) => Deferred(() => PlayInput.UiClick(r)) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>

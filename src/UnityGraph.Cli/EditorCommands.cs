@@ -237,6 +237,9 @@ internal static partial class EditorCommands
     /// </summary>
     public sealed record OpRequest(string PathAndQuery, IReadOnlyList<string?> Edits, TimeSpan Timeout, TimeSpan WaitTimeout)
     {
+        /// <summary>A play-input request (SPEC-play-input): needs the module switch and bridge 0.4.0.</summary>
+        public bool PlayInput { get; init; }
+
         public OpRequest(string pathAndQuery, params string?[] edits)
             : this(pathAndQuery, edits, OpTimeout, TimeSpan.FromSeconds(60))
         {
@@ -268,6 +271,11 @@ internal static partial class EditorCommands
     public static (int ExitCode, string Text) Op(string root, UnityGraphConfig config, string command, OpRequest request)
     {
         _opFailed = false;
+        if (request.PlayInput && !config.IsEnabled("play-input"))
+        {
+            return Failed("play-input is off in " + UnityGraphConfig.RelativePath + "\n");
+        }
+
         foreach (string? address in request.Edits)
         {
             string? path = address?.Trim().Split(':')[0];
@@ -296,6 +304,11 @@ internal static partial class EditorCommands
     private static (int ExitCode, string Text) Ask(BridgeClient client, UnityGraphConfig config, string command, OpRequest request)
     {
         if (!client.HasOps)
+        {
+            return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
+        }
+
+        if (request.PlayInput && !client.HasPlayInput)
         {
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
@@ -572,6 +585,11 @@ internal static partial class EditorCommands
         Option<bool> clear = Flag("--clear", "Clear the selection.");
         yield return Ops("select", "select", "Show, set or clear the editor's selection.", [selected, clear], r =>
             new OpRequest(Query("/select", ("object", r.GetValue(selected)), ("clear", True(r.GetValue(clear))))));
+
+        foreach (Command command in InputCommands())
+        {
+            yield return command;
+        }
 
         static Argument<string> Required(string name, string description) => new(name) { Description = description };
         static Argument<string?> Optional(string name, string description) => new(name) { Description = description, Arity = ArgumentArity.ZeroOrOne };
