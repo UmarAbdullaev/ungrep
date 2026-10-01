@@ -80,4 +80,23 @@ Details and acceptance criteria: `plan.md`.
 - [x] O8 editor-ops: project, packages, menu (96 EditMode tests, ug project, ug package list|add|remove, File/Quit and Build menu refusals, e2e adds and removes a local package)
 - [x] O9 editor-ops: screenshots, API lookup, stats, batch (147 EditMode tests, 3 skipped without a graphics device; ug shot|api|docs|perf|batch; docs fallback with trimmer and cache; e2e covers them)
 - [x] U1 editor-ops UI tools (P1 Part 1 gaps: `ug event list|add|remove` for UnityEvent calls, component addresses `Object:Component` in `ug set`, overlay canvases in `ug shot game`; 156 EditMode tests, e2e covers events; UI Toolkit is not drawn by `ug shot`, the answer says so; skill has a UI recipe)
+- [x] K1 skill diet: SKILL.md 10.7 KB (~2.7k tokens) to 2.0 KB (~510); option lists left to `ug <cmd> --help`, UI recipe moved to skills/unity/ui.md (read on demand); SPEC budget now 600
 - [ ] O10 editor-ops: purge-squad measurement (edits there allowed by the user 2026-09-30)
+
+## Not built yet (planned 2026-10-01; spec first for each, then tests, then a purge-squad measurement)
+
+Order: parity gap first, then token savers, then people-facing and measurement. Each task ships with
+its skill line (one line in SKILL.md, detail in `--help`; keep the body under 600 tokens).
+
+- [ ] L1 unity-loop spec (`specs/SPEC-unity-loop.md`)
+- [ ] L2 `ug console`: compact console digest (errors first, repeats folded, answer budget, `more`); closes MCP `read_console`
+- [ ] L3 `ug test`: run EditMode/PlayMode through the bridge, failures only with `file:line`; closes MCP `run_tests`/`get_test_job`
+- [ ] L4 compile gate: edit tracking + Stop hook, silent when clean, at most 20 lines on errors, fail open
+- [ ] L5 `ug log`: digest of the last play session (play, wait, stop, errors; decides open point 2, `ug play --for`)
+- [ ] Q2 query: `ug outline <file>` (members with lines, no bodies) and `ug impact <symbol>` (what breaks if it changes: refs grouped by kind, serialized-data counts)
+- [ ] G1 guards spec, then hooks: serialized field renamed or removed (assets holding data), `[SerializeReference]` type moves, `.meta`-safe `mv`/`cp`/`rm`, vendored-folder edits; each hook silent unless it fires
+- [ ] M1 project-map: generated per-folder `CLAUDE.md` section (at most 600 tokens, between `<!-- ug:begin -->` markers) + small root index + staleness check; writes into the user's project, so ask before first run
+- [ ] W1 worker-agent: Unity worker subagent, delegation rules (only chores of 3+ steps), verdict at most 800 tokens
+- [ ] V1 viewer: `ug view` self-contained HTML graph for people, 0 tokens to Claude
+- [ ] B1 bench: question suites (grep baseline, codegraph, Graphify, unitygraph) scored on calls, tokens, correctness
+- [ ] D1 decide the open editor-ops points: `o:` keys through `GlobalObjectId`; UI Toolkit in `ug shot` (offscreen panel spike)

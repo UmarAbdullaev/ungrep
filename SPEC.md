@@ -105,7 +105,7 @@ measures each one, and `bench` fails a release that breaks one.
 | Overhead | Budget | Why it stays small |
 | --- | --- | --- |
 | Skill and agent descriptions, loaded every session | ≤ 300 tokens | ~0.1% of context on purge-squad's sessions |
-| `unity` skill body, loaded when first used | ≤ 1,500 tokens | once per session, not per turn |
+| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 510, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
 | Generated per-folder map | ≤ 600 tokens per folder, loaded only when a file there is read | replaces an always-loaded monolithic map |
 | Compile gate | 0 tokens when clean; ≤ 20 lines on errors | replaces 3–4 turns of recompile, wait and console |
 | Worker delegation | only chores of 3 or more steps; verdict ≤ 800 tokens | a 1-step chore costs more delegated than done inline |
