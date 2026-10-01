@@ -25,6 +25,7 @@ public sealed class UnityGraphConfig
         ["code-index"] = true,
         ["editor-link"] = true,
         ["guards"] = true,
+        ["play-input"] = true,
         ["project-map"] = false,
         ["query"] = true,
         ["unity-loop"] = true,

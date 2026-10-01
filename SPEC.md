@@ -228,6 +228,7 @@ Standing assumptions:
 | `editor-link` | Bridge package and client: status, refresh and compile, compile errors, console, tests, run a static method; `Editor.log` fallback when Unity is unreachable. | `plugin-shell` |
 | `editor-ops` | Work in the open editor through the bridge, covering what the Unity MCP server does: scenes, play mode, live hierarchy and component values, object and component edits, prefabs, assets, packages, project data, screenshots, API lookup; Undo for every edit, nothing saved unasked. | `editor-link` |
 | `unity-loop` | Compile gate (edit tracking + Stop hook, silent when clean); compact `ug console`, `ug test`, `ug log` (digest of the last play session). | `editor-link` |
+| `play-input` | Play the game through the bridge: `ug ui` (interactable uGUI elements with positions), `ug click`, `ug press`, `ug stick`, `ug tap`, `ug swipe`, `ug wait`, `ug play --step`; a one-line digest after each action; play mode only, nothing saved, held input released when play stops. | `editor-ops`, `unity-loop` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
 | `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract. | `query`, `unity-loop`, `editor-link` |
 | `project-map` | Generated sections of per-folder `CLAUDE.md` files and a small root index; staleness check. | `query` |
@@ -298,7 +299,8 @@ it. Comments and trailing commas are allowed; an unknown setting or module is an
   "answerBudget": 1200,           // tokens per query answer, 200 to 8000
   "modules": {                    // defaults: all on except project-map (Decisions #7)
     "asset-index": true, "code-index": true, "editor-link": true, "guards": true,
-    "project-map": false, "query": true, "unity-loop": true, "viewer": true, "worker-agent": true
+    "play-input": true, "project-map": false, "query": true, "unity-loop": true, "viewer": true,
+    "worker-agent": true
   }
 }
 ```
