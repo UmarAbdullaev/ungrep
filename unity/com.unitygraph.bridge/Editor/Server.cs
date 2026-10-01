@@ -14,6 +14,9 @@ namespace UnityGraph.Bridge
         public int Status;
         public string Body;
 
+        /// <summary>The lines of an editor-ops answer, so a later step can add to them; null for other replies.</summary>
+        public IReadOnlyList<string> Lines;
+
         public static Reply Ok(string json) => new Reply { Status = 200, Body = json };
 
         public static Reply Fail(int status, string error) => new Reply { Status = status, Body = new Json().Object().Field("error", error).EndObject().ToString() };

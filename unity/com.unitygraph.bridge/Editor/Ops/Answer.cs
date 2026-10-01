@@ -20,8 +20,9 @@ namespace UnityGraph.Bridge
 
         public static Reply Lines(IEnumerable<string> lines, string wait = null)
         {
+            var kept = new List<string>(lines);
             var json = new Json().Object().Key("lines").Array();
-            foreach (string line in lines)
+            foreach (string line in kept)
             {
                 json.Value(line);
             }
@@ -32,7 +33,22 @@ namespace UnityGraph.Bridge
                 json.Field("wait", wait);
             }
 
-            return Reply.Ok(json.EndObject().ToString());
+            Reply reply = Reply.Ok(json.EndObject().ToString());
+            reply.Lines = kept;
+            return reply;
+        }
+
+        /// <summary>The answer with more lines after its own; an answer that is not lines is returned as it is.</summary>
+        public static Reply Extend(Reply reply, IEnumerable<string> more)
+        {
+            if (reply.Lines == null)
+            {
+                return reply;
+            }
+
+            var all = new List<string>(reply.Lines);
+            all.AddRange(more);
+            return Lines(all);
         }
 
         /// <summary>Runs an edit as one undo group named `ug <name>`, so one Ctrl+Z in the editor reverts it.</summary>

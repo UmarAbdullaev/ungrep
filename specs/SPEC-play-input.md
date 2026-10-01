@@ -116,7 +116,7 @@ The component's own events fire (`onValueChanged`). Anything else is refused:
 ```
 $ ug click Play
 clicked Canvas/Menu/Play (button "Play") at 640,360
-  now: scene Main -> Level1; 1 error; changed 4 objects
+  now: 1 error; scene Main -> Level1; changed Player (new), Menu (inactive), 12 gone
   error  NullReferenceException: Object reference not set  Assets/Scripts/Level.cs:12
 
 $ ug click Volume --value 0.2
@@ -185,7 +185,10 @@ update) and prints the digest. Answer `stepped 5 frames (frame 1042)`. Refused w
 Every action answers with one `  now:` line after its action line. It is made by the bridge from a
 snapshot taken when the action started and a comparison after it **settled**: two frames and 0.15
 real seconds after the action's last event (so a click that changes scene shows the new scene).
-Changes slower than that show in a following `ug wait`.
+Changes slower than that show in a following `ug wait`. While the editor is paused no frame
+runs, so only the 0.15 s counts. `ug wait` and `ug play --step` do not settle further: they print the
+digest at their own end. An error that repeats one already last in the console counts only its new
+repeats.
 
 Parts, in this order, joined with `; `, left out when empty; with none: `nothing changed`:
 

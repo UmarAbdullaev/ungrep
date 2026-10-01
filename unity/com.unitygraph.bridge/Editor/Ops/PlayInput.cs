@@ -44,6 +44,9 @@ namespace UnityGraph.Bridge
 
         internal static IDeviceInput Devices { get; set; }
 
+        /// <summary>The bridge's console buffer, for the digest of what an action logged; set by the bridge.</summary>
+        internal static ConsoleBuffer Console { get; set; }
+
         public static Reply UiList(Request request)
         {
             Reply refused = NeedPlaying(false) ?? NoUgui();
@@ -59,8 +62,13 @@ namespace UnityGraph.Bridge
                 refused = Answer.Error("ug click needs an element: an address or label from ug ui, or x,y");
             }
 
-            Reply done = refused ?? Ui.Click(element.Trim(), request.Get("value"));
-            return () => done;
+            if (refused != null)
+            {
+                return () => refused;
+            }
+
+            string value = request.Get("value");
+            return InputQueue.Start(new PlayAction("click") { Start = () => Ui.Click(element.Trim(), value) });
         }
 
         public static Func<Reply> Press(Request request)
@@ -149,6 +157,7 @@ namespace UnityGraph.Bridge
             {
                 Start = () => Answer.Line("waited " + InputQueue.Seconds(seconds)),
                 Hold = PlayAction.Lasting(seconds, 0),
+                Settle = false,
             };
             return InputQueue.Start(action);
         }
@@ -168,7 +177,7 @@ namespace UnityGraph.Bridge
             }
 
             int frames = (int)count;
-            var action = new PlayAction("step");
+            var action = new PlayAction("step") { Settle = false };
             int done = 0;
             int atStep = 0;
             double sent = 0;

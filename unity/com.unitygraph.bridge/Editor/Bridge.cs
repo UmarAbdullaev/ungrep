@@ -82,6 +82,7 @@ namespace UnityGraph.Bridge
                 SessionState.SetString(TokenKey, token);
             }
 
+            PlayInput.Console = _console;
             RefreshStatus();
             _server = new Server(token, () => _status);
             _server.Start(SessionState.GetInt(PortKey, 0));

@@ -35,6 +35,9 @@ namespace UnityGraph.Bridge
         /// <summary>The answer; Start sets it, and a hold that learns more (a step count) may replace it.</summary>
         public Reply Result { get; set; }
 
+        /// <summary>Whether the digest waits for the game to react (two frames and 0.15 s) after the release; a wait and a step do not.</summary>
+        public bool Settle { get; set; } = true;
+
         /// <summary>
         /// A hold of <paramref name="seconds"/> real seconds that is never shorter than <paramref name="frames"/> frames
         /// (an input is read on a frame). <paramref name="move"/> gets 0 to 1 once per frame while it lasts.
@@ -73,7 +76,16 @@ namespace UnityGraph.Bridge
             public double Started;
             public int StartFrame;
             public Reply Result;
+            public Digest Before;
+            public bool Released;
+            public bool Settling;
+            public double SettledAt;
+            public int SettledFrame;
         }
+
+        // The digest waits this long after the last event: the game reacts on frames, and a scene may load.
+        private const int SettleFrames = 2;
+        private const double SettleSeconds = 0.15;
 
         private static Run _current;
 
@@ -86,7 +98,7 @@ namespace UnityGraph.Bridge
                 return () => busy;
             }
 
-            var run = new Run { Action = action, Started = EditorApplication.timeSinceStartup, StartFrame = Time.frameCount };
+            var run = new Run { Action = action, Before = Digest.Take(PlayInput.Console), Started = EditorApplication.timeSinceStartup, StartFrame = Time.frameCount };
             _current = run;
             Reply started;
             try
@@ -128,6 +140,12 @@ namespace UnityGraph.Bridge
                 return;
             }
 
+            if (run.Settling)
+            {
+                run.Result = Finish(run, true);
+                return;
+            }
+
             double elapsed = EditorApplication.timeSinceStartup - run.Started;
             Drop(run);
             run.Result = Answer.Line(run.Action.Name + ": " + why + " after " + Seconds(elapsed) + ", released");
@@ -144,26 +162,58 @@ namespace UnityGraph.Bridge
 
             if (!EditorApplication.isPlaying)
             {
+                if (run.Settling)
+                {
+                    return Finish(run, true);
+                }
+
                 Abort("play mode ended");
                 return run.Result;
             }
 
             try
             {
-                double elapsed = EditorApplication.timeSinceStartup - run.Started;
-                if (run.Action.Hold != null && !run.Action.Hold(elapsed, Time.frameCount - run.StartFrame))
+                if (!run.Settling)
+                {
+                    double elapsed = EditorApplication.timeSinceStartup - run.Started;
+                    if (run.Action.Hold != null && !run.Action.Hold(elapsed, Time.frameCount - run.StartFrame))
+                    {
+                        return null;
+                    }
+
+                    Release(run);
+                    run.Settling = true;
+                    run.SettledAt = EditorApplication.timeSinceStartup;
+                    run.SettledFrame = Time.frameCount;
+                }
+
+                if (run.Action.Settle && !Settled(run))
                 {
                     return null;
                 }
+
+                return Finish(run, false);
             }
             catch (Exception e) when (!(e is OutOfMemoryException))
             {
                 Drop(run);
                 return Answer.Error("Unity threw " + e.GetType().Name + ": " + e.Message);
             }
+        }
 
-            Drop(run);
-            return run.Action.Result;
+        // Paused, no frame runs, so only the time counts.
+        private static bool Settled(Run run) =>
+            EditorApplication.timeSinceStartup - run.SettledAt >= SettleSeconds && (EditorApplication.isPaused || Time.frameCount - run.SettledFrame >= SettleFrames);
+
+        // The action's answer and the digest of what it changed.
+        private static Reply Finish(Run run, bool stopped)
+        {
+            if (_current == run)
+            {
+                _current = null;
+            }
+
+            return Answer.Extend(run.Action.Result, run.Before.Compare(stopped));
         }
 
         // Releases and forgets the run; a release that throws must not leave the queue stuck.
@@ -174,6 +224,17 @@ namespace UnityGraph.Bridge
                 _current = null;
             }
 
+            Release(run);
+        }
+
+        private static void Release(Run run)
+        {
+            if (run.Released)
+            {
+                return;
+            }
+
+            run.Released = true;
             try
             {
                 run.Action.Release?.Invoke();
