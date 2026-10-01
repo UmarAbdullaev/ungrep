@@ -17,14 +17,17 @@ public sealed class HookDispatcher
 
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(2);
 
+    /// <summary>The Stop hook waits for Unity's compile (compile gate, SPEC-unity-loop), so it gets longer.</summary>
+    public static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(40);
+
     private readonly IReadOnlyList<IHookHandler> _handlers;
-    private readonly TimeSpan _timeout;
+    private readonly TimeSpan? _timeout;
     private readonly Func<DateTimeOffset> _clock;
 
     public HookDispatcher(IReadOnlyList<IHookHandler> handlers, TimeSpan? timeout = null, Func<DateTimeOffset>? clock = null)
     {
         _handlers = handlers;
-        _timeout = timeout ?? DefaultTimeout;
+        _timeout = timeout;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
     }
 
@@ -33,14 +36,15 @@ public sealed class HookDispatcher
     public int Run(string eventName, TextReader stdin, TextWriter stdout, string fallbackCwd)
     {
         UnityProject? project = null;
+        TimeSpan timeout = _timeout ?? (eventName == "Stop" ? StopTimeout : DefaultTimeout);
         try
         {
             using var cancel = new CancellationTokenSource();
             Task<string> work = Task.Run(() => Dispatch(eventName, stdin, fallbackCwd, p => project = p, cancel.Token));
-            if (!work.Wait(_timeout))
+            if (!work.Wait(timeout))
             {
                 cancel.Cancel();
-                Log(project, eventName, $"timed out after {_timeout.TotalSeconds:0.#} s");
+                Log(project, eventName, $"timed out after {timeout.TotalSeconds:0.#} s");
                 return 0;
             }
 

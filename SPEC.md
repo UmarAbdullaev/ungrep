@@ -329,7 +329,7 @@ Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 
   (guards), PostToolUse on the edit tools (reindex on edit, edit tracking), Stop (compile gate).
   Grep and Read are not matched: interception was dropped (Decisions #4), and every matched
   call pays the `ug` start. `ug hook` bypasses the command parser, reads and writes UTF-8, and
-  exits 0 with no output outside a Unity project, on any exception, and past 2 s; failures go
+  exits 0 with no output outside a Unity project, on any exception, and past 2 s (Stop: 40 s, the compile gate waits for Unity); failures go
   to `Library/unitygraph/hook-errors.log` (rolled over at 1 MB). Cold start on Windows,
   measured: ~100 ms through `bin/ug`, ~115 ms including the `bash -c` hooks run in (`dotnet
   ug.dll` alone ~85 ms); the launcher starts no subshells on this path.

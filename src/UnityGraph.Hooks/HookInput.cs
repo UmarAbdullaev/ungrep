@@ -18,6 +18,9 @@ public sealed class HookInput
 
     public JsonElement Payload { get; }
 
+    /// <summary>Claude Code's id for the session; null when the payload has none.</summary>
+    public string? SessionId => GetString("session_id");
+
     /// <summary>The session's working folder; null when the payload has none.</summary>
     public string? Cwd => GetString("cwd");
 

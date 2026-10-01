@@ -91,7 +91,7 @@ its skill line (one line in SKILL.md, detail in `--help`; keep the body under 60
 - [x] L1 unity-loop spec (`specs/SPEC-unity-loop.md`): console, test, log, play --for (decided yes), compile gate, bridge 0.3.0 `/playlog`
 - [x] L2 `ug console`: compact console digest (errors first, repeats folded, answer budget, `more`); closes MCP `read_console` (7 CLI tests; no bridge change)
 - [x] L3 `ug test`: run EditMode/PlayMode through the bridge, failures only with `file:line`; closes MCP `run_tests`/`get_test_job` (compile check first, play-mode refused, reload-safe wait; 8 CLI + 7 client tests; no bridge change)
-- [ ] L4 compile gate: edit tracking + Stop hook, silent when clean, at most 20 lines on errors, fail open
+- [x] L4 compile gate: PostToolUse marks edited scripts, Stop hook compiles and blocks with at most 20 error lines; silent when clean, playing or Unity unreachable (5 client + 10 hook tests; no bridge change)
 - [ ] L5 `ug log`: digest of the last play session (play, wait, stop, errors; decides open point 2, `ug play --for`)
 - [ ] I1 play-input spec (`specs/SPEC-play-input.md`): play mode only, nothing saved; reference: Unity MCP servers' manage_playmode, simulate_ui_input, input_keyboard/mouse/gamepad/touch (holdSeconds, stick x/y, batched actions); Input System package required for devices, legacy projects get a clear refusal and still get `ug click`
 - [ ] I2 `ug ui`: interactable elements on screen (buttons, toggles, sliders, input fields) as addresses with screen positions, no screenshot needed; `ug click <element>`: pointer down/up/click through the EventSystem (uGUI first; UI Toolkit is a spike)
