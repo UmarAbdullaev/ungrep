@@ -136,7 +136,22 @@ Added for parity (O6–O9; same rules, same answer shape):
 `field` is the serialized name (`speed`, `m_LocalPosition`, `waves[2].count`); display names
 (`Speed`) also match. `value` by the field's type: numbers (invariant culture), `true`/`false`,
 strings, enum names, vectors `1,2,3`, colors `#ff8800` or `1,0.5,0,1`, object references as an
-object address, asset path or `null`, array size via `field.size`.
+object address, asset path or `null`, array size via `field.size`. Compound values read what
+`ug inspect` prints, so a value read can be set back:
+
+| Type | Text |
+|---|---|
+| Bounds | `center 0,1,0 size 2,2,2` or six numbers |
+| AnimationCurve | `0:0, 1:1` (time:value), led by `linear`, `constant` or `smooth` (default); one number is a flat curve; `empty` |
+| Gradient | `#ff0000@0, #0000ff80@1` (color@time, at most 8; without `@` the stops spread evenly), led by `fixed` for a stepped gradient |
+| Hash128 | 32 hex digits |
+| struct, class | `{count: 3, offset: 1,2,3}` or `count: 3`; fields not named keep their value |
+| list or array | `[a, b, c]`, `a, b, c` or `empty`; vector items as `(1,2,3)` or bare in runs of their size; struct items as `{...}` |
+| `[SerializeReference]` | `TypeName`, `TypeName {radius: 4}`, `{radius: 4}` (keeps the type) or `null`; the type is a short or full name of a concrete type that fits the field, else the error lists them |
+
+A problem in any part sets nothing (`pairs[1]: count: not a whole number: x`). Still refused:
+private fields without `[SerializeField]`, properties and statics (not serialized; `ug run`
+or a script change), and anything under `Packages/` or vendored code.
 
 ## Safety rules
 

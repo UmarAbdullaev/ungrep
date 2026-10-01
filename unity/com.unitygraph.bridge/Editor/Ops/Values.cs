@@ -13,7 +13,7 @@ namespace UnityGraph.Bridge
     /// numbers in the invariant culture, vectors `1, 2, 3`, colors `#rrggbb` or `r, g, b, a`,
     /// quaternions as euler angles, object references as addresses or asset paths.
     /// </summary>
-    internal static class Values
+    internal static partial class Values
     {
         public const int MaxItems = 10;
 
@@ -231,9 +231,9 @@ namespace UnityGraph.Bridge
                     return p.vector3IntValue.x.ToString(CultureInfo.InvariantCulture) + ", " + p.vector3IntValue.y.ToString(CultureInfo.InvariantCulture)
                         + ", " + p.vector3IntValue.z.ToString(CultureInfo.InvariantCulture);
                 case SerializedPropertyType.AnimationCurve:
-                    return "curve, " + Answer.Count(p.animationCurveValue?.length ?? 0, "key", "keys");
+                    return FormatCurve(p.animationCurveValue);
                 case SerializedPropertyType.Gradient:
-                    return "gradient";
+                    return FormatGradient(p.gradientValue);
                 case SerializedPropertyType.Hash128:
                     return p.hash128Value.ToString();
                 case SerializedPropertyType.ManagedReference:
@@ -256,7 +256,7 @@ namespace UnityGraph.Bridge
             string trimmed = text.Trim();
             if (p.isArray && p.propertyType != SerializedPropertyType.String)
             {
-                return "set " + ShownName(p.name) + ".size or " + ShownName(p.name) + "[i], not the whole list";
+                return ParseArray(p, trimmed);
             }
 
             switch (p.propertyType)
@@ -362,8 +362,20 @@ namespace UnityGraph.Bridge
                     return WithNumbers(trimmed, 3, n => p.vector3IntValue = new Vector3Int(Mathf.RoundToInt(n[0]), Mathf.RoundToInt(n[1]), Mathf.RoundToInt(n[2])));
                 case SerializedPropertyType.ObjectReference:
                     return ParseReference(p, trimmed);
+                case SerializedPropertyType.Bounds:
+                    return ParseBounds(p, trimmed);
+                case SerializedPropertyType.AnimationCurve:
+                    return ParseCurve(p, trimmed);
+                case SerializedPropertyType.Gradient:
+                    return ParseGradient(p, trimmed);
+                case SerializedPropertyType.Hash128:
+                    return ParseHash(p, trimmed);
+                case SerializedPropertyType.ManagedReference:
+                    return ParseManaged(p, trimmed);
+                case SerializedPropertyType.Generic:
+                    return ParseFields(p, trimmed);
                 default:
-                    return "ug set cannot set a " + TypeLabel(p) + " from text; set its fields one by one (" + ShownName(p.name) + ".<field>)";
+                    return "ug set cannot set a " + TypeLabel(p) + " from text";
             }
         }
 

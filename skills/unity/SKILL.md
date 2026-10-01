@@ -11,7 +11,7 @@ Graph (no Unity needed; one call beats grep and reads, answers carry `file:line`
 Open editor (bridge; "Unity not reachable" answers come from Editor.log, check their age):
 - `status`, `compile` (after every script edit, instead of reading Editor.log), `run`, `bridge`
 - read: `scene`, `tree`, `inspect`, `find --live`, `perf`
-- edit: `object`, `component`, `set`, `event`, `prefab`, `undo`, `redo`, `select`, `save`, `play`, `stop`, `pause`
+- edit: `object`, `component`, `set` (also `{a: 1}` structs, `[a, b]` lists, curves, gradients), `event`, `prefab`, `undo`, `redo`, `select`, `save`, `play`, `stop`, `pause`
 - assets and project: `asset`, `project`, `package`
 - loop: `console` (errors first, repeats folded; `--after <id>` for new only), `test` (`--mode PlayMode`, `--filter`; failures with file:line), `log` (last play session), `play --for <s>` (play, stop, log); a Stop hook reports compile errors after script edits
 - look up: `shot`, `api <Type>`, `docs <page>`
