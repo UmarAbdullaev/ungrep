@@ -11,7 +11,7 @@ namespace UnityGraph.Cli.Tests;
 /// and SPEC-editor-ops record.
 /// </summary>
 [Collection(nameof(EditorCommandTests))]
-public sealed class EditorEndToEndTests : IDisposable
+public sealed partial class EditorEndToEndTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ug-e2e-" + Guid.NewGuid().ToString("N")[..8]);
     private Process? _unity;
@@ -49,6 +49,7 @@ public sealed class EditorEndToEndTests : IDisposable
             "file:../../../unity/com.unitygraph.bridge",
             "file:" + Path.Combine(repo, "unity", "com.unitygraph.bridge").Replace('\\', '/'),
             StringComparison.Ordinal));
+        bool input = PrepareInput(manifest);
         string log = Path.Combine(_root, "editor.log");
 
         var clock = Stopwatch.StartNew();
@@ -60,7 +61,7 @@ public sealed class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.3.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.4.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -300,7 +301,7 @@ public sealed class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.3.0  local  ", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.4.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
@@ -386,6 +387,10 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.EndsWith("\nedit mode\n", Ug(log, "scene"), StringComparison.Ordinal);
 
         LoopCommands(log);
+        if (input)
+        {
+            PlayInputCommands(log, repo);
+        }
 
         string ug = Path.Combine(repo, "artifacts", "bin", "UnityGraph.Cli", "release", OperatingSystem.IsWindows() ? "ug.exe" : "ug");
         if (File.Exists(ug))

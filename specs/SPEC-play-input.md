@@ -303,7 +303,19 @@ Written once, after I4 (the build order of the task: no tests while building).
 
 ## Measured
 
-Not measured yet (the end-to-end run after I4 fills this in).
+End to end on a copy of `fixtures/BridgeHost` with `com.unity.ugui` and Input System 1.14.2, Active Input
+Handling "Both", Unity 6000.3.14f1, batch mode with `-nographics` (`UG_UNITY`, 2026-10-01). Tokens are bytes / 4
+of the printed answer. The Game view is 640x480 without a window.
+
+| What | Time | Answer |
+|---|---|---|
+| `ug ui`, 2 usable, 1 blocked | 0.03 s | 43 tokens |
+| `ug click Start` with its digest (1 error, 2 objects changed) | 0.19 s | 41 tokens |
+| `ug press Space` with its digest | 0.27 s | 13 tokens |
+| `ug batch` of press, stick 0.2 s, tap, wait 0.2 s | 1.2 s | 98 tokens |
+
+`--shot` under `-nographics` answers `cannot take a screenshot: this Unity runs without a graphics device`
+after the action's own answer; the picture itself is not measured here.
 
 ## Open points
 

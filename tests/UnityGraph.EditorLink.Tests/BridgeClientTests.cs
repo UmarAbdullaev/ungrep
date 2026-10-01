@@ -346,6 +346,41 @@ public sealed class BridgeClientTests : IDisposable
         Assert.Equal(hasOps, client.HasOps);
     }
 
+    [Theory]
+    [InlineData("0.2.0", false)]
+    [InlineData("0.3.0", false)]
+    [InlineData("0.4.0", true)]
+    [InlineData("0.10.1", true)]
+    public void Play_input_needs_bridge_0_4_0(string version, bool hasInput)
+    {
+        FakeBridge bridge = Bridge();
+        bridge.Handle = _ => (200, FakeBridge.Status("idle", 0));
+        bridge.Publish(_root, bridge: version);
+        using BridgeClient client = BridgeClient.Connect(_root, _ => true).Client!;
+
+        Assert.Equal(hasInput, client.HasPlayInput);
+    }
+
+    [Fact]
+    public void An_op_waits_as_long_as_its_own_timeout_not_the_default_two_seconds()
+    {
+        using BridgeClient client = Connected(path =>
+        {
+            if (path == "/input/wait?seconds=3")
+            {
+                Thread.Sleep(2500);
+                return (200, "{\"lines\":[\"waited 3 s\"]}");
+            }
+
+            return (200, FakeBridge.Status("idle", 0));
+        });
+
+        OpAnswer answer = client.Op("/input/wait?seconds=3", TimeSpan.FromSeconds(13));
+
+        Assert.Equal(["waited 3 s"], answer.Lines);
+        Assert.Throws<BridgeUnavailableException>(() => client.Op("/input/wait?seconds=3", TimeSpan.FromMilliseconds(500)));
+    }
+
     [Fact]
     public void Op_reads_lines_errors_and_waits()
     {
