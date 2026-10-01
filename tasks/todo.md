@@ -79,4 +79,5 @@ Details and acceptance criteria: `plan.md`.
 - [x] O7 editor-ops: assets (73 EditMode tests, ug asset folder|create|move|rename|duplicate|delete|reimport, importer and material sets, e2e covers assets)
 - [x] O8 editor-ops: project, packages, menu (96 EditMode tests, ug project, ug package list|add|remove, File/Quit and Build menu refusals, e2e adds and removes a local package)
 - [x] O9 editor-ops: screenshots, API lookup, stats, batch (147 EditMode tests, 3 skipped without a graphics device; ug shot|api|docs|perf|batch; docs fallback with trimmer and cache; e2e covers them)
+- [x] U1 editor-ops UI tools (P1 Part 1 gaps: `ug event list|add|remove` for UnityEvent calls, component addresses `Object:Component` in `ug set`, overlay canvases in `ug shot game`; 156 EditMode tests, e2e covers events; UI Toolkit is not drawn by `ug shot`, the answer says so; skill has a UI recipe)
 - [ ] O10 editor-ops: purge-squad measurement (edits there allowed by the user 2026-09-30)

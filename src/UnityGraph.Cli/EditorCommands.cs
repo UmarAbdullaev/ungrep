@@ -448,6 +448,32 @@ internal static partial class EditorCommands
                 Query("/set", ("object", r.GetValue(target)), ("component", r.GetValue(setComponent)), ("field", r.GetValue(field)), ("value", r.GetValue(value)), ("importer", True(r.GetValue(setImporter)))),
                 r.GetValue(target)));
 
+        var events = new Command("event", "List, add and remove the persistent calls of a UnityEvent field, like Button.onClick (unsaved until ug save).");
+        Argument<string> eventsOf = Required("object", Address);
+        Argument<string?> listedEvent = Optional("event", "Only this event, like onClick. Default: every event that has calls.");
+        Option<string?> listComponent = Text("--component", "The component with the event.");
+        events.Subcommands.Add(Ops("list", "event list", "Show the calls of an object's events.", [eventsOf, listedEvent, listComponent], r =>
+            new OpRequest(Query("/event/list", ("object", r.GetValue(eventsOf)), ("event", r.GetValue(listedEvent)), ("component", r.GetValue(listComponent))))));
+        Argument<string> eventHolder = Required("object", Address);
+        Argument<string> eventName = Required("event", "The event field: onClick, onValueChanged, ...");
+        Argument<string> eventTarget = Required("target", "Whose method to call: Canvas:UiHandler (a component), or an object address when one component has the method.");
+        Argument<string> eventMethod = Required("method", "A public void method, or a property to set (enabled, text).");
+        Option<string?> eventComponent = Text("--component", "The component with the event. Default: the one that has it.");
+        Option<string?> eventArg = Text("--arg", "The value passed to a method that takes one int, float, string, bool or object. Without it a method taking the event's own argument gets that.");
+        events.Subcommands.Add(Ops("add", "event add", "Call a method when the event fires.", [eventHolder, eventName, eventTarget, eventMethod, eventComponent, eventArg], r =>
+            new OpRequest(
+                Query("/event/add", ("object", r.GetValue(eventHolder)), ("event", r.GetValue(eventName)), ("target", r.GetValue(eventTarget)), ("method", r.GetValue(eventMethod)), ("component", r.GetValue(eventComponent)), ("arg", r.GetValue(eventArg))),
+                r.GetValue(eventHolder))));
+        Argument<string> eventFrom = Required("object", Address);
+        Argument<string> eventRemoved = Required("event", "The event field: onClick, ...");
+        Argument<string?> eventIndex = Optional("index", "Which call (ug event list); optional when the event has one.");
+        Option<string?> removeComponent = Text("--component", "The component with the event.");
+        events.Subcommands.Add(Ops("remove", "event remove", "Remove one call from an event.", [eventFrom, eventRemoved, eventIndex, removeComponent], r =>
+            new OpRequest(
+                Query("/event/remove", ("object", r.GetValue(eventFrom)), ("event", r.GetValue(eventRemoved)), ("index", r.GetValue(eventIndex)), ("component", r.GetValue(removeComponent))),
+                r.GetValue(eventFrom))));
+        yield return events;
+
         var prefabs = new Command("prefab", "Save an object as a prefab, apply or revert an instance's overrides, unpack an instance (`ug object create --prefab` instantiates).");
         Argument<string> prefabSource = Required("object", "Scene object to save: " + Address);
         Argument<string> prefabPath = Required("path", "Where to save it, like Assets/Prefabs/Crate.prefab. Refused when it exists.");

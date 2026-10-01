@@ -7,6 +7,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UIElements;
 
 namespace UnityGraph.Bridge
 {
@@ -115,6 +116,7 @@ namespace UnityGraph.Bridge
             RenderTexture texture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             RenderTexture previous = RenderTexture.active;
             var saved = cameras.ToDictionary(camera => camera, camera => camera.targetTexture);
+            List<Action> restore = what.StartsWith("Scene view", StringComparison.Ordinal) ? new List<Action>() : DrawOverlays(cameras[cameras.Count - 1]);
             Texture2D image = null;
             try
             {
@@ -138,10 +140,15 @@ namespace UnityGraph.Bridge
                 string full = Path.Combine(Path.GetDirectoryName(Application.dataPath), relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(full));
                 File.WriteAllBytes(full, png);
-                return Answer.Line(relative + "  " + width + "x" + height + "  " + Kilobytes(png.Length) + "  (" + what + (EditorApplication.isPlaying ? ", playing" : "") + ")");
+                return Answer.Line(relative + "  " + width + "x" + height + "  " + Kilobytes(png.Length) + "  (" + what + (EditorApplication.isPlaying ? ", playing" : "") + Undrawn(what) + ")");
             }
             finally
             {
+                foreach (Action undo in restore)
+                {
+                    undo();
+                }
+
                 foreach (KeyValuePair<Camera, RenderTexture> pair in saved)
                 {
                     if (pair.Key != null)
@@ -157,6 +164,57 @@ namespace UnityGraph.Bridge
                     UnityEngine.Object.DestroyImmediate(image);
                 }
             }
+        }
+
+        // UI Toolkit panels are drawn by the screen too, and Camera.Render has no way to include them: say so,
+        // so a shot without the UI is not read as a UI that is missing.
+        private static string Undrawn(string what)
+        {
+            if (what.StartsWith("Scene view", StringComparison.Ordinal))
+            {
+                return "";
+            }
+
+            int documents = UnityEngine.Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Count(d => d.isActiveAndEnabled);
+            return documents == 0 ? "" : ", " + Answer.Count(documents, "UI Toolkit document", "UI Toolkit documents") + " not drawn";
+        }
+
+        // Screen Space - Overlay canvases are drawn by the screen, not by any camera, so Camera.Render leaves
+        // them out. For the render each root overlay canvas is pointed at the last camera and put back after
+        // (nothing is registered with Undo or marked dirty). Returns the actions that put them back.
+        private static List<Action> DrawOverlays(Camera camera)
+        {
+            var restore = new List<Action>();
+            foreach (Canvas canvas in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                if (!canvas.isRootCanvas || canvas.renderMode != RenderMode.ScreenSpaceOverlay || !canvas.gameObject.scene.IsValid() || !canvas.gameObject.scene.isLoaded)
+                {
+                    continue;
+                }
+
+                Canvas held = canvas;
+                float distance = held.planeDistance;
+                Camera before = held.worldCamera;
+                held.renderMode = RenderMode.ScreenSpaceCamera;
+                held.worldCamera = camera;
+                held.planeDistance = Mathf.Min(camera.nearClipPlane + 0.5f, (camera.nearClipPlane + camera.farClipPlane) / 2);
+                restore.Add(() =>
+                {
+                    if (held != null)
+                    {
+                        held.worldCamera = before;
+                        held.renderMode = RenderMode.ScreenSpaceOverlay;
+                        held.planeDistance = distance;
+                    }
+                });
+            }
+
+            if (restore.Count > 0)
+            {
+                Canvas.ForceUpdateCanvases();
+            }
+
+            return restore;
         }
 
         // game.png, scene.png, cam-Player-Camera.png: the file name for a view, kept to characters every file system takes.

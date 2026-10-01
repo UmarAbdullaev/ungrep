@@ -100,6 +100,28 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void An_overlay_canvas_is_put_back_after_the_game_shot()
+        {
+            if (!HasGraphics)
+            {
+                Assert.Ignore("no graphics device (-nographics): the PNG is tested where one exists");
+            }
+
+            new GameObject("Eye").AddComponent<Camera>();
+            var canvas = new GameObject("Hud", typeof(Canvas)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            UnityEditor.SceneManagement.EditorSceneManager.MarkAllScenesDirty();
+            UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
+
+            StringAssert.Contains("(Game view, 1 camera)", Ask("/shot", "view", "game", "width", "128", "height", "96"));
+
+            Assert.AreEqual(RenderMode.ScreenSpaceOverlay, canvas.renderMode);
+            Assert.IsNull(canvas.worldCamera);
+            Assert.AreEqual(100f, canvas.planeDistance);
+            Assert.IsFalse(canvas.gameObject.scene.isDirty, "a shot leaves the scene as it was");
+        }
+
+        [Test]
         public void A_camera_address_renders_that_camera_only()
         {
             if (!HasGraphics)

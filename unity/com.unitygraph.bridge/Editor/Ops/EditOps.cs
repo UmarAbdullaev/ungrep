@@ -460,7 +460,7 @@ namespace UnityGraph.Bridge
 
         // Resolves the object and runs the edit: in the loaded scenes as one undo group; inside a
         // prefab asset on its loaded contents, written when the edit worked (Safety rule 3).
-        private static Reply Edit(string command, string address, Func<GameObject, Reply> edit)
+        internal static Reply Edit(string command, string address, Func<GameObject, Reply> edit)
         {
             if (string.IsNullOrWhiteSpace(address))
             {

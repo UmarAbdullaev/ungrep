@@ -200,6 +200,9 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_root, "Assets", "Art", "Icons.meta")));
         Assert.Equal("Assets/Art/Icons already exists: ug does not overwrite it\n", Ug(log, "asset", "folder", "Assets/Art/Icons"));
 
+        File.WriteAllText(
+            Path.Combine(_root, "Assets", "Scripts", "Alarm.cs"),
+            "namespace BridgeHost { public class Alarm : UnityEngine.MonoBehaviour { public UnityEngine.Events.UnityEvent raised; public int rings; public void Ring() { rings++; } } }\n");
         File.WriteAllText(Path.Combine(_root, "Assets", "Scripts", "Wave.cs"), "namespace BridgeHost { public class Wave : UnityEngine.ScriptableObject { public int count = 3; } }\n");
         Assert.Matches(@"^compiled in \d+\.\d s: 0 errors\n$", Ug(log, "compile"));
         Assert.Equal("created folder Assets/Data  (written Assets/Data; not undoable)\n", Ug(log, "asset", "folder", "Assets/Data"));
@@ -234,6 +237,17 @@ public sealed class EditorEndToEndTests : IDisposable
         Assert.Contains("isReadable: 1", File.ReadAllText(dot + ".meta"), StringComparison.Ordinal);
         Assert.Contains("isReadable", Ug(log, "inspect", "Assets/Art/Icons/Dot.png", "--importer"), StringComparison.Ordinal);
         Assert.Equal("no property _MainTex on Assets/Art/Ink.mat (shader Unlit/Color: _Color)\n", Ug(log, "set", "Assets/Art/Ink.mat", "_MainTex", "Assets/Art/Icons/Dot.png"));
+        Ug(log, "save");
+
+        // UnityEvent calls and component references (UI tools): wire an event, list it, remove it, and
+        // point a field at a component by address; the scene is saved clean again after.
+        Assert.StartsWith("created Bell", Ug(log, "object", "create", "Bell"), StringComparison.Ordinal);
+        Ug(log, "component", "add", "Bell", "Alarm");
+        Assert.Equal("Bell  Alarm.raised  + Bell:Alarm.Ring()  (Main.unity modified, not saved)\n", Ug(log, "event", "add", "Bell", "raised", "Bell:Alarm", "Ring"));
+        Assert.Equal("Bell  Alarm.raised\n  0  Bell:Alarm.Ring()\n", Ug(log, "event", "list", "Bell"));
+        Assert.Equal("Bell  Alarm.raised  - Bell:Alarm.Ring()  (Main.unity modified, not saved)\n", Ug(log, "event", "remove", "Bell", "raised"));
+        Assert.Equal("Level/Spawn  Turret.target  null -> Bell  (Main.unity modified, not saved)\n", Ug(log, "set", "Level/Spawn", "target", "Bell:Transform", "--component", "Turret"));
+        Ug(log, "object", "delete", "Bell");
         Ug(log, "save");
 
         string inkGuid = MetaGuid("Assets/Art/Ink.mat");

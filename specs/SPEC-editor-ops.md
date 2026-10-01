@@ -24,7 +24,7 @@ In:
   editing, prefabs, assets, project data, screenshots and API lookup.
 - CLI: `ug scene`, `ug scene open|new|close|active`, `ug save`, `ug play|stop|pause`, `ug tree`,
   `ug inspect`, `ug find --live`, `ug object create|delete|rename|move|active|duplicate`,
-  `ug component add|remove`, `ug set`, `ug undo|redo`, `ug select`, `ug prefab ...`,
+  `ug component add|remove`, `ug set`, `ug event list|add|remove`, `ug undo|redo`, `ug select`, `ug prefab ...`,
   `ug asset ...`, `ug project`, `ug package list|add|remove`, `ug shot`, `ug api`, `ug docs`,
   `ug perf`, menu items through `ug run`, and editor commands inside `ug batch`.
 - The `unity` skill: the commands and when to use them.
@@ -46,7 +46,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `create_script`, `script_apply_edits`, `apply_text_edits`, `delete_script`, `get_sha`, `find_in_file` | Claude's Write, Edit, Grep; `ug compile` after. Not duplicated. |
 | `find_gameobjects` | `ug find` (graph, editor closed) and `ug find --live` (name, tag, layer, component) |
 | `manage_scene` | `ug scene` and its subcommands; `ug object move --scene` |
-| `manage_gameobject`, `manage_components` | `ug object`, `ug component`, `ug set` |
+| `manage_gameobject`, `manage_components` | `ug object`, `ug component`, `ug set`, `ug event` (UnityEvent calls such as `Button.onClick`) |
 | `manage_editor` | `ug play|stop|pause`, `ug undo|redo`, `ug select`, `ug project` (tags, layers) |
 | `execute_menu_item` | `ug run <menu path>` (editor-link's runner already calls `ExecuteMenuItem`) |
 | `manage_prefabs` | `ug prefab create|apply|revert|unpack`, prefab-content addresses; `instantiate` is `ug object create --prefab`, no second command |
@@ -78,6 +78,13 @@ candidates as addresses, or `not found: Playr` with near names. Components are n
 (`Rigidbody`, `PlayerController`, full name when two types share a name), `#n` for the n-th of
 the same type on one object.
 
+A component is addressed as `<object>:<Component>` (`Canvas:UiHandler`, `Level/Enemy#1:Transform`,
+`Main:Player:Rigidbody`; the part after the last `:` is the component). It is accepted where a
+reference is set: `ug set Spawner target Level/Enemy#1:Transform` fills a `Transform` field,
+and a field typed `Object` (like `UnityEvent`'s `m_Target`) gets the component, not its game
+object. A game object address in a component-typed field still means that object's component of
+the field's type. Reads print a component held in an `Object` field the same way, `Canvas:UiHandler`.
+
 ## Endpoints
 
 All `GET` with query parameters, token and origin checks as in editor-link, answered on the main
@@ -102,6 +109,9 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/object/active?object=&value=` | `SetActive`. |
 | `/component/add?object=&type=` | Refused for types that are not components or not found. |
 | `/component/remove?object=&component=` | Refused when another component requires it. |
+| `/event/list?object=&event=&component=` | The persistent calls of the UnityEvents on an object (`Button.onClick`, a script's `UnityEvent` fields): `addr  Comp.event`, then `  0  Target:Comp.Method(arg)` per call, `(event argument)` for a dynamic call, `off` or `editor and runtime` when the call state is not runtime only. Without `event`, every event that has calls; with it, that event (also when empty). `component` when two components have the event. |
+| `/event/add?object=&event=&target=&method=&arg=&component=` | Appends one call through `SerializedObject` (one Undo group, `ug event add`, RuntimeOnly state as in the inspector). `target` is a component address (`Canvas:UiHandler`) or a game object address (the component with the method; the game object itself for `SetActive`). `method` is a public instance `void` method with no argument, or one `int`, `float`, `string`, `bool` or `Object` argument (`arg` is then required), or the event's own argument type (taken from the event when `arg` is absent); a property is `set_<name>` or just `<name>`. Inside a prefab asset the target must be in the same prefab (`Assets/X.prefab:Obj:Comp`); the asset is written at once. Refusals name the methods the target has. |
+| `/event/remove?object=&event=&index=&component=` | Removes one call (the only one, or `index`; several without `index` is refused with the count). |
 | `/set?object=&component=&field=&value=` | Sets one serialized field through `SerializedObject`. Without `component`, the field is looked up on the game object (name, tag, layer, active, static) and then on its components; two components with the field is ambiguous. |
 
 Added for parity (O6–O9; same rules, same answer shape):
@@ -118,7 +128,7 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/project` | Unity version and render pipeline, tags, layers (Unity's physics layers, as `index name`), sorting layers, build scenes (enabled ones with their build index). Read-only. |
 | `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`. The answer waits for the request across editor updates (the route returns a poll that gives null until the request has finished; the connection stays open) and gives the resolved `name  version  source` (`local`, `git`, `registry`; the location for local and git). `list` reads the local cache (offline) and shows the manifest's direct dependencies, counting `com.unity.modules.*` in one line. `id` is a name, `name@version`, a git URL or `file:` path. Refused while compiling or importing and in play mode (a package change reloads scripts); `remove` refuses `com.unitygraph.bridge` (removing it would end the connection). Failures answer `could not add <id>: <Unity's message>`. |
 | `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit, `File/Build...` and `Build/...` menu items (matched case-insensitively, spaces around `/` ignored): `did not run File/Quit: refused, it would close the editor (ug does not quit Unity)`. The refusal is in the bridge's runner, so nothing is executed. |
-| `/shot?view=game\|scene\|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
+| `/shot?view=game\|scene\|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back; root Screen Space - Overlay canvases are pointed at the last camera for the render, since no camera draws them, and put back after, without an Undo entry or a dirty flag; UI Toolkit documents cannot be drawn this way, so the answer ends `, N UI Toolkit documents not drawn` and a blank-looking shot is not read as a missing UI); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
 | `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies: `Transform`, `UnityEngine.Transform`, `Physics.Raycast` (split at the last dot when no type has that name); short names match case-sensitively first, Unity's namespaces win over System's, an ambiguous name lists its candidates. The type view is under 300 tokens for the common types (kind, base, assembly, constructors, then property, method, static and event names, longest lists cut with `+N more`); `member` lists overloads with parameter names, `out`/`ref`/`params` and default values. Members inherited from a base say `(from Object)`; obsolete ones are left out. When reflection finds nothing the answer is `{"error":..., "online":[page addresses]}`, or `{"local":"<file>"}` when the Hub's Documentation module has the page. |
 | `/api?page=Manual/<page>\|ScriptReference/<page>\|<package>[@version]/<path>` | Names a documentation page (same answer shape: `local` file, else `error` and `online`); `ug docs` uses it. Bare `<page>` means `Manual/<page>`. The package version is the installed one's major.minor. The bridge never opens a connection: fetching, trimming and caching are the client's (rule 11). |
 | `/stats` (`ug perf`) | Lines: play state; `render` (draw calls, batches, triangles, set-pass calls, render ms from `UnityStats`, which only counts in play mode, else `only counted in play mode (ug play, then ug perf)`); memory (allocated, reserved, scripts heap, graphics driver, MB); objects (game objects, active, components in the loaded scenes); assets (files under `Assets/` with the main kinds counted). Read-only. |
@@ -184,6 +194,9 @@ Player  PlayerController  Assets/Scripts/Player/PlayerController.cs
 
 $ ug set Player speed 7.5 --component PlayerController
 Player  PlayerController.speed  5 -> 7.5  (Main.unity modified, not saved)
+
+$ ug event add Canvas/Button onClick Canvas:UiHandler OnPlay
+Canvas/Button  Button.onClick  + Canvas:UiHandler.OnPlay()  (UiTest.unity modified, not saved)
 
 $ ug object create Spawn --parent Level --prefab Assets/Prefabs/Spawner.prefab
 created Level/Spawn (Spawner prefab instance)  (Main.unity modified, not saved)
@@ -279,7 +292,10 @@ a fresh process's time is .NET start-up.
   a graphics device exists: 3 tests skip in batch mode); `ug api Transform` in under 300 tokens,
   `Physics.Raycast`, a member, an unknown type (the fake fetch stands in for docs.unity3d.com: no
   test uses the network); `ug perf` in edit and play mode; `ug batch` with a stop at a refusal and
-  `ug undo` reverting the steps. Token counts of `ug api <Type>` (bytes / 4, measured by the
+  `ug undo` reverting the steps. UI (post-O10): `ug event add|remove|list` (void, argument, event
+  argument, GameObject target, prefab asset, refusals) and component references in `ug set`, each
+  in EditMode tests, plus a UI scene built with `ug` and shot in the real editor (the overlay canvas
+  is in the picture, the canvas settings and the dirty flag are as before). Token counts of `ug api <Type>` (bytes / 4, measured by the
   EditMode tests): Transform 207, GameObject 190, Rigidbody 214, Rigidbody2D 212, Camera 246,
   Collider 109, Vector3 164, Physics 257, Time 156, MonoBehaviour 88, Mathf 171, Input 227.
 

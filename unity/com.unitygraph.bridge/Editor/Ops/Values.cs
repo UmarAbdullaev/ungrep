@@ -199,7 +199,11 @@ namespace UnityGraph.Bridge
                 case SerializedPropertyType.Color:
                     return Numbers(p.colorValue.r, p.colorValue.g, p.colorValue.b, p.colorValue.a);
                 case SerializedPropertyType.ObjectReference:
-                    return Reference(p.objectReferenceValue, p.objectReferenceInstanceIDValue);
+                    string reference = Reference(p.objectReferenceValue, p.objectReferenceInstanceIDValue);
+                    // A field typed plain Object (a UnityEvent target) names which component it holds.
+                    return p.objectReferenceValue is Component held && ReferenceType(p) == typeof(UnityEngine.Object)
+                        ? reference + ":" + Addresses.ComponentName(held)
+                        : reference;
                 case SerializedPropertyType.ExposedReference:
                     return Reference(p.exposedReferenceValue, 0);
                 case SerializedPropertyType.LayerMask:
@@ -545,12 +549,21 @@ namespace UnityGraph.Bridge
             found = Addresses.FindObject(text, out error);
             if (found == null)
             {
-                return null;
+                found = FindComponent(text, ref error);
+                if (found == null)
+                {
+                    return null;
+                }
             }
 
             if (wanted.IsInstanceOfType(found))
             {
                 return found;
+            }
+
+            if (found is Component owner && wanted == typeof(GameObject))
+            {
+                return owner.gameObject;
             }
 
             if (found is GameObject go && typeof(Component).IsAssignableFrom(wanted))
@@ -564,6 +577,26 @@ namespace UnityGraph.Bridge
 
             error = text + " has no " + wanted.Name;
             return null;
+        }
+
+        // `Canvas:UiHandler` or `Main:Canvas/Button:Button#2`: a component of the object named before the last colon.
+        private static Component FindComponent(string text, ref string error)
+        {
+            int colon = text.LastIndexOf(':');
+            if (colon <= 0 || colon == text.Length - 1)
+            {
+                return null;
+            }
+
+            GameObject owner = Addresses.Find(text.Substring(0, colon), out _);
+            if (owner == null)
+            {
+                return null;
+            }
+
+            Component component = Addresses.Component(owner, text.Substring(colon + 1), out string problem);
+            error = component == null ? problem : null;
+            return component;
         }
 
         private static string ParseLayerMask(SerializedProperty p, string text)
@@ -644,7 +677,7 @@ namespace UnityGraph.Bridge
             return null;
         }
 
-        private static FieldInfo FieldOf(SerializedProperty p)
+        internal static FieldInfo FieldOf(SerializedProperty p)
         {
             Type type = p.serializedObject.targetObject.GetType();
             FieldInfo field = null;
@@ -693,7 +726,7 @@ namespace UnityGraph.Bridge
             return rounded == 360f || rounded == -0f ? 0f : rounded;
         }
 
-        private static string Quote(string text) => "\"" + text.Replace("\n", "\\n") + "\"";
+        internal static string Quote(string text) => "\"" + text.Replace("\n", "\\n") + "\"";
 
         private static string CleanType(string type)
         {
