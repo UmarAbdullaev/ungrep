@@ -72,9 +72,15 @@ namespace UnityGraph.Bridge
                 { "/api", (r, c) => Checked(() => ApiOps.Api(r)) },
                 { "/stats", (r, c) => Checked(StatsOps.Stats) },
 
-                // Play input: uGUI elements and clicks (SPEC-play-input).
+                // Play input: uGUI elements and clicks, device actions (SPEC-play-input).
                 { "/ui", (r, c) => Checked(() => PlayInput.UiList(r)) },
                 { "/ui/click", (r, c) => Deferred(() => PlayInput.UiClick(r)) },
+                { "/input/press", (r, c) => Deferred(() => PlayInput.Press(r)) },
+                { "/input/stick", (r, c) => Deferred(() => PlayInput.Stick(r)) },
+                { "/input/tap", (r, c) => Deferred(() => PlayInput.Tap(r)) },
+                { "/input/swipe", (r, c) => Deferred(() => PlayInput.Swipe(r)) },
+                { "/input/wait", (r, c) => Deferred(() => PlayInput.Wait(r)) },
+                { "/input/step", (r, c) => Deferred(() => PlayInput.Step(r)) },
             };
 
         /// <summary>The handler for an editor-ops request, or null for a path that is not one.</summary>

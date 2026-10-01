@@ -14,7 +14,7 @@ Open editor (bridge; "Unity not reachable" answers come from Editor.log, check t
 - edit: `object`, `component`, `set` (also structs, lists, curves, gradients), `event`, `prefab`, `undo`, `redo`, `select`, `save`, `play`, `stop`, `pause`
 - assets and project: `asset`, `project`, `package`
 - loop: `console` (`--after <id>` for new only), `test` (`--mode`, `--filter`), `log` (last play session), `play --for <s>` (play, stop, log); a Stop hook reports compile errors
-- play-test (play mode): `ui` lists clickable uGUI elements, `click <label|addr|x,y> [--value v]`
+- play-test (play mode): `ui` lists uGUI elements; `click <label|addr|x,y> [--value v]`, `press <key>`, `stick left 1,0`, `tap|swipe x,y`, `wait <s>`, `play --step` (paused)
 - look up: `shot`, `api <Type>`, `docs <page>`
 - `batch "step" "step"` runs many of these in one call.
 Address objects as `Level/Enemy`, `Enemy#2`, `Main:Level/Enemy`, `Assets/X.prefab:Child`; a component as `Object:Component`.

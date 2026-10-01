@@ -89,9 +89,24 @@ internal static partial class EditorCommands
         return answer.Finish("ug log");
     }
 
-    // `ug play`; with --for the editor plays that many seconds, stops, and the log digest follows.
-    private static (int ExitCode, string Text) Play(string root, UnityGraphConfig config, int timeout, int? seconds)
+    // `ug play`; with --for the editor plays that many seconds, stops, and the log digest follows; with --step a paused editor advances frames.
+    private static (int ExitCode, string Text) Play(string root, UnityGraphConfig config, int timeout, int? seconds, int? step = null)
     {
+        if (step != null && seconds != null)
+        {
+            return (1, "--step and --for cannot be used together\n");
+        }
+
+        if (step is < 1 or > 600)
+        {
+            return (1, "--step must be 1 to 600 frames\n");
+        }
+
+        if (step is { } frames)
+        {
+            return Input(root, config, "play --step", Query("/input/step", ("frames", frames.ToString(CultureInfo.InvariantCulture))), frames * 0.2);
+        }
+
         if (seconds is < 1 or > 600)
         {
             return (1, "--for must be 1 to 600 seconds\n");

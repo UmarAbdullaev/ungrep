@@ -97,6 +97,8 @@ namespace UnityGraph.Bridge
 
         private static void Stop()
         {
+            InputQueue.Abort("assemblies reloaded");
+            PlayInput.Devices?.Reset();
             EditorApplication.update -= Update;
             EditorApplication.playModeStateChanged -= OnPlayModeChanged;
             EditorApplication.pauseStateChanged -= OnPauseChanged;
@@ -133,6 +135,7 @@ namespace UnityGraph.Bridge
             SceneOps.OnPlayModeChanged(change, _console.LastId);
             _playLog.OnPlayModeChanged(change, DateTime.UtcNow, _console.LastId);
             _playLog.Persist();
+            InputQueue.OnPlayModeChanged(change);
         }
 
         private static void OnPauseChanged(PauseState state)

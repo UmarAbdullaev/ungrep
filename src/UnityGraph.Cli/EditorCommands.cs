@@ -386,8 +386,9 @@ internal static partial class EditorCommands
 
         Option<int> playTimeout = Seconds();
         var playFor = new Option<int?>("--for") { Description = "Stay in play mode this many seconds (1 to 600), then stop and print the ug log digest." };
-        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log.", [playTimeout, playFor], (root, config, r) =>
-            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor)));
+        var playStep = new Option<int?>("--step") { Description = "While paused, advance this many frames (1 to 600, default 1) and print what changed.", Arity = ArgumentArity.ZeroOrOne };
+        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log; --step advances paused frames.", [playTimeout, playFor, playStep], (root, config, r) =>
+            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor), r.GetResult(playStep) == null ? null : r.GetValue(playStep) ?? 1));
         Option<int> stopTimeout = Seconds();
         yield return Ops("stop", "stop", "Leave play mode; says how long it played and what it logged.", [stopTimeout], r =>
             new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(stopTimeout))) });

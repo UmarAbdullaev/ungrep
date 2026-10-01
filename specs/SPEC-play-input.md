@@ -133,9 +133,11 @@ the press (`wasPressedThisFrame` needs a frame between down and up).
 - Keyboard: a `UnityEngine.InputSystem.Key` name, case-insensitive: `Space`, `A`, `Enter`,
   `LeftShift`, `UpArrow`, `Digit1`. Aliases: `Esc`, `Return`, `Shift`, `Ctrl`, `Alt`, `Up`, `Down`,
   `Left`, `Right`, and a bare digit `1` for `Digit1`.
-- Gamepad: `pad:` and `south`, `east`, `west`, `north` (also `a`, `b`, `x`, `y`), `start`, `select`,
+- Gamepad: `pad:<name>`, with `south`, `east`, `west`, `north`, `a`, `b`, `x`, `y`, `start`, `select`,
   `lshoulder`, `rshoulder`, `ltrigger`, `rtrigger` (pressed fully), `up`, `down`, `left`, `right` (the
-  d-pad), `lstick`, `rstick` (stick presses).
+  d-pad), `lstick`, `rstick` (stick presses). The names that are not also keyboard names work
+  without the prefix (`south`, `start`, `ltrigger`); `a`, `x`, `up` and the like need `pad:`.
+- Mouse: `mouse:left`, `mouse:right`, `mouse:middle`, a button down at the pointer's current place.
 - Unknown name: `no key or button Spaec; near: Space` (up to 5 near names, else the first 5 of the
   keyboard list and `pad:` hint).
 
@@ -232,7 +234,7 @@ requests, the action queue, the digest and the refusals; `UnityGraph.Bridge.Edit
 (`versionDefines`: `com.unity.ugui` gives `UG_UGUI`) lists and clicks; `UnityGraph.Bridge.Editor.InputSystem`
 (`com.unity.inputsystem` gives `UG_INPUT_SYSTEM`) drives devices. Each registers an interface the
 core calls (`IUiInput`, `IDeviceInput`); when one is missing the core answers the refusal. The
-Input System code is compiled out unless `ENABLE_INPUT_SYSTEM` is also defined (Project Settings,
+requests refuse unless `ENABLE_INPUT_SYSTEM` is also defined (Project Settings,
 Player, Active Input Handling set to Input System or Both): in a legacy project the answer is
 `this project reads the old Input Manager (Player settings, Active Input Handling): ug press needs
 the Input System or Both; ug click still works`. A project without the package:
