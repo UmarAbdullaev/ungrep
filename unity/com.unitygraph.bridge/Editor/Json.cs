@@ -8,8 +8,10 @@ using System.Text;
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Ugui")]
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.InputSystem")]
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Urp")]
+[assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Cinemachine")]
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Ugui.Tests")]
 [assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.InputSystem.Tests")]
+[assembly: InternalsVisibleTo("UnityGraph.Bridge.Editor.Cinemachine.Tests")]
 
 namespace UnityGraph.Bridge
 {

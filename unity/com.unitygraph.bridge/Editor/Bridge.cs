@@ -142,6 +142,7 @@ namespace UnityGraph.Bridge
             _playLog.OnPlayModeChanged(change, DateTime.UtcNow, _console.LastId);
             _playLog.Persist();
             InputQueue.OnPlayModeChanged(change);
+            CameraOps.OnPlayModeChanged();
         }
 
         private static void OnPauseChanged(PauseState state)

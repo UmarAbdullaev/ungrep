@@ -50,6 +50,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
             "file:" + Path.Combine(repo, "unity", "com.unitygraph.bridge").Replace('\\', '/'),
             StringComparison.Ordinal));
         bool input = PrepareInput(manifest);
+        bool cinemachine = PrepareCinemachine(manifest);
         string log = Path.Combine(_root, "editor.log");
 
         var clock = Stopwatch.StartNew();
@@ -419,6 +420,11 @@ public sealed partial class EditorEndToEndTests : IDisposable
             Report("fresh-process ug object active (an edit), median of 5", Median(ug, 5, i => ["object", "active", "Crate", i % 2 == 0 ? "false" : "true"]));
             Report("fresh-process ug eval (an expression), median of 5", Median(ug, 5, i => ["eval", "Selection.count + " + i.ToString(CultureInfo.InvariantCulture)]));
             Report("fresh-process ug eval --check, median of 5", Median(ug, 5, _ => ["eval", "--check", "Selection.count"]));
+        }
+
+        if (cinemachine)
+        {
+            CameraCommands(log);
         }
 
         int pid = _unity.Id;

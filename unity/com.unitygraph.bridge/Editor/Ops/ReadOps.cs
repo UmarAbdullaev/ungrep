@@ -276,7 +276,7 @@ namespace UnityGraph.Bridge
             return lines;
         }
 
-        private static List<string> Fields(UnityEngine.Object target, string head)
+        internal static List<string> Fields(UnityEngine.Object target, string head)
         {
             var lines = new List<string> { head };
             using (var serialized = new SerializedObject(target))

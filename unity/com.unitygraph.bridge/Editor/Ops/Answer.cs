@@ -51,19 +51,32 @@ namespace UnityGraph.Bridge
             return Lines(all);
         }
 
-        /// <summary>Runs an edit as one undo group named `ug <name>`, so one Ctrl+Z in the editor reverts it.</summary>
+        /// <summary>
+        /// Runs an edit as one undo group named `ug <name>`, so one Ctrl+Z in the editor reverts it. An
+        /// error reverts what the edit recorded and gives the empty group back the previous name: an empty
+        /// group still lists under its name, so ug undo would print it and undo the edit before.
+        /// </summary>
         public static Reply Undoable(string name, Func<Reply> edit)
         {
+            string previous = Undo.GetCurrentGroupName();
             Undo.IncrementCurrentGroup();
             int group = Undo.GetCurrentGroup();
             GroupName = "ug " + name;
             Undo.SetCurrentGroupName(GroupName);
+            Reply reply = null;
             try
             {
-                return edit();
+                reply = edit();
+                return reply;
             }
             finally
             {
+                if (reply == null || IsError(reply))
+                {
+                    Undo.RevertAllInCurrentGroup();
+                    Undo.SetCurrentGroupName(previous);
+                }
+
                 Undo.CollapseUndoOperations(group);
             }
         }

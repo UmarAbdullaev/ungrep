@@ -531,6 +531,7 @@ internal static partial class EditorCommands
         yield return packages;
 
         yield return ShotCommand();
+        yield return CameraCommand();
 
         Argument<string> apiType = Required("type", "Type or Type.member: Transform, Physics.Raycast, UnityEngine.Rigidbody.");
         Argument<string?> apiMember = Optional("member", "A member of the type: its signatures, overloads and defaults.");

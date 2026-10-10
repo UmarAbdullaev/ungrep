@@ -148,6 +148,77 @@ public sealed class EditorOpsCommandTests : IDisposable
         Assert.Equal(["/status", "/status", "/status", "/status", "/status", "/shot?width=640"], _bridge.Requests);
     }
 
+    [Theory]
+    [InlineData("/camera", "camera")]
+    [InlineData("/camera?all=true", "camera", "--all")]
+    [InlineData("/camera?all=true", "camera", "list", "--all")]
+    [InlineData("/camera/create", "camera", "create")]
+    [InlineData("/camera/create?name=Close%20Up&preset=third-person&follow=Player&look-at=Enemy&priority=20&fov=40.5&parent=Rig&at=0%2C2%2C-4",
+        "camera", "create", "Close Up", "--preset", "third-person", "--follow", "Player", "--look-at", "Enemy", "--priority", "20", "--fov", "40.5", "--parent", "Rig", "--at", "0,2,-4")]
+    [InlineData("/camera/priority?camera=FollowCam&priority=30", "camera", "priority", "FollowCam", "30")]
+    [InlineData("/camera/body?camera=FollowCam&n=0", "camera", "body", "FollowCam")]
+    [InlineData("/camera/body?camera=Rig%2FCam&type=ThirdPersonFollow&n=2&a0=CameraDistance%3D5&a1=ShoulderOffset%3D0.8%2C-0.4%2C0&follow=Player",
+        "camera", "body", "Rig/Cam", "ThirdPersonFollow", "CameraDistance=5", "ShoulderOffset=0.8,-0.4,0", "--follow", "Player")]
+    [InlineData("/camera/aim?camera=FollowCam&n=1&a0=Damping%3D1%2C1&look-at=none", "camera", "aim", "FollowCam", "Damping=1,1", "--look-at", "none")]
+    [InlineData("/camera/aim?camera=FollowCam&type=none&n=0", "camera", "aim", "FollowCam", "none")]
+    [InlineData("/camera/noise?camera=FollowCam", "camera", "noise", "FollowCam")]
+    [InlineData("/camera/noise?camera=FollowCam&profile=6D%20Shake&amplitude=2&frequency=0.5", "camera", "noise", "FollowCam", "6D Shake", "--amplitude", "2", "--frequency", "0.5")]
+    [InlineData("/camera/blend", "camera", "blend")]
+    [InlineData("/camera/blend?style=Cut&time=0.5&from=any&to=CloseUp&brain=Main%20Camera",
+        "camera", "blend", "--style", "Cut", "--time", "0.5", "--from", "any", "--to", "CloseUp", "--brain", "Main Camera")]
+    [InlineData("/camera/force?camera=CloseUp", "camera", "force", "CloseUp")]
+    [InlineData("/camera/force?camera=CloseUp&brain=Main%20Camera", "camera", "force", "CloseUp", "--brain", "Main Camera")]
+    [InlineData("/camera/release", "camera", "release")]
+    [InlineData("/camera/brain", "camera", "brain")]
+    [InlineData("/camera/brain?camera=Main%20Camera&style=EaseIn&time=1", "camera", "brain", "Main Camera", "--style", "EaseIn", "--time", "1")]
+    public void Camera_commands_send_their_requests(string request, params string[] args)
+    {
+        _bridge.Publish(_root, bridge: "0.6.0");
+        _bridge.Handle = path => path == "/status"
+            ? (200, FakeBridge.Status("idle", 3))
+            : (200, "{\"lines\":[\"CloseUp  priority 10 -> 30  (Main.unity modified, not saved)\",\"live: CloseUp (brain Main Camera)\"]}");
+
+        var (exitCode, output) = Run(args);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("CloseUp  priority 10 -> 30  (Main.unity modified, not saved)\nlive: CloseUp (brain Main Camera)\n", output);
+        Assert.Equal(["/status", request], _bridge.Requests);
+    }
+
+    [Theory]
+    [InlineData("camera", "camera")]
+    [InlineData("camera list", "camera", "list")]
+    [InlineData("camera create", "camera", "create", "--preset", "follow")]
+    [InlineData("camera priority", "camera", "priority", "FollowCam", "3")]
+    [InlineData("camera body", "camera", "body", "FollowCam", "Follow")]
+    [InlineData("camera aim", "camera", "aim", "FollowCam")]
+    [InlineData("camera noise", "camera", "noise", "FollowCam", "none")]
+    [InlineData("camera blend", "camera", "blend", "--style", "Cut")]
+    [InlineData("camera force", "camera", "force", "FollowCam")]
+    [InlineData("camera release", "camera", "release")]
+    [InlineData("camera brain", "camera", "brain")]
+    public void A_bridge_before_cameras_refuses_each_camera_command(string command, params string[] args)
+    {
+        _bridge.Publish(_root, bridge: "0.5.0");
+        _bridge.Handle = _ => (200, FakeBridge.Status("idle", 3));
+
+        Assert.Equal("bridge 0.5.0 is too old for ug " + command + ": run ug bridge install again\n", Run(args).Output);
+        Assert.Equal(["/status"], _bridge.Requests);
+    }
+
+    [Fact]
+    public void A_camera_refusal_prints_the_bridges_reason()
+    {
+        _bridge.Publish(_root, bridge: "0.6.0");
+        _bridge.Handle = path => path == "/status"
+            ? (200, FakeBridge.Status("idle", 3))
+            : (200, "{\"error\":\"Cinemachine 2.10.7 is installed; ug camera knows Cinemachine 3.x only: ug set and ug component edit 2.x cameras\"}");
+
+        Assert.Equal(
+            "Cinemachine 2.10.7 is installed; ug camera knows Cinemachine 3.x only: ug set and ug component edit 2.x cameras\n",
+            Run("camera", "priority", "VCam", "5").Output);
+    }
+
     [Fact]
     public void A_refusal_prints_the_bridges_reason()
     {

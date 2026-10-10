@@ -1,0 +1,34 @@
+{
+    "name": "UnityGraph.Bridge.Editor.Cinemachine",
+    "rootNamespace": "UnityGraph.Bridge",
+    "references": [
+        "UnityGraph.Bridge.Editor",
+        "Unity.Cinemachine",
+        "Unity.Splines",
+        "Unity.Mathematics"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UG_CINEMACHINE"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.cinemachine",
+            "expression": "[3.0.0,4.0.0)",
+            "define": "UG_CINEMACHINE"
+        },
+        {
+            "name": "com.unity.modules.physics",
+            "expression": "1.0.0",
+            "define": "UG_PHYSICS"
+        }
+    ],
+    "noEngineReferences": false
+}

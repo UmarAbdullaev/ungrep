@@ -67,4 +67,120 @@ internal static partial class EditorCommands
 
         static string? Text(IFormattable? number) => number?.ToString(null, CultureInfo.InvariantCulture);
     }
+
+    // `ug camera` (specs/SPEC-camera.md): plain cameras and Cinemachine 3; every edit answers once the brain has picked.
+    private static Command CameraCommand()
+    {
+        const string Camera = "The camera's object address in the loaded scenes: FollowCam, Rig/CloseUp, Main Camera.";
+        const string Brain = "The camera holding the CinemachineBrain. Default: the only active brain, else the main camera's.";
+        Option<bool> all = Flag("--all", "Every camera, not the first 30.");
+        Command camera = Ops("camera", "camera", "Cameras and Cinemachine: each camera's priority, pipeline and targets, the brains, and which camera is live.", [all], r =>
+            Request("/camera", null, ("all", True(r.GetValue(all)))));
+
+        Option<bool> listAll = Flag("--all", "Every camera, not the first 30.");
+        camera.Subcommands.Add(Ops("list", "camera list", "The same as ug camera.", [listAll], r =>
+            Request("/camera", null, ("all", True(r.GetValue(listAll))))));
+
+        Argument<string?> name = Optional("name", "Name of the new camera. Default: CinemachineCamera, or Camera for --preset plain.");
+        Option<string?> preset = Text("--preset", "static (default with Cinemachine), follow, third-person, freelook, dolly, top-down, side-scroller, or plain (a Unity Camera; the default without Cinemachine).");
+        Option<string?> follow = Text("--follow", "The object the camera follows (Target.TrackingTarget).");
+        Option<string?> lookAt = Text("--look-at", "The object the camera looks at, when not the follow target.");
+        var priority = new Option<int?>("--priority") { Description = "Cinemachine priority; a plain camera's depth." };
+        var fov = new Option<double?>("--fov") { Description = "Vertical field of view in degrees, 1 to 179. Default: the main camera's." };
+        Option<string?> parent = Text("--parent", "Create under this object. Default: the active scene's root.");
+        Option<string?> at = Text("--at", "x,y,z world position. Default: where the main camera stands.");
+        camera.Subcommands.Add(Ops("create", "camera create", "Create a camera from a preset (Cinemachine's GameObject menu); adds a CinemachineBrain to the main camera when there is none.",
+            [name, preset, follow, lookAt, priority, fov, parent, at], r =>
+            Request("/camera/create", r.GetValue(parent),
+                ("name", r.GetValue(name)),
+                ("preset", r.GetValue(preset)),
+                ("follow", r.GetValue(follow)),
+                ("look-at", r.GetValue(lookAt)),
+                ("priority", Invariant(r.GetValue(priority))),
+                ("fov", Invariant(r.GetValue(fov))),
+                ("parent", r.GetValue(parent)),
+                ("at", r.GetValue(at)))));
+
+        Argument<string> prioritized = Required("camera", Camera);
+        Argument<string> value = Required("priority", "A whole number: Cinemachine's Priority (higher is live), or a plain camera's depth (higher draws later).");
+        camera.Subcommands.Add(Ops("priority", "camera priority", "Set a Cinemachine camera's priority or a plain camera's depth.", [prioritized, value], r =>
+            Request("/camera/priority", r.GetValue(prioritized), ("camera", r.GetValue(prioritized)), ("priority", r.GetValue(value)))));
+
+        camera.Subcommands.Add(Stage("body", "--follow", "The object to follow (Target.TrackingTarget), or none."));
+        camera.Subcommands.Add(Stage("aim", "--look-at", "The object to look at, follow (the follow target), or none."));
+
+        Argument<string> noisy = Required("camera", Camera);
+        Argument<string?> profile = Optional("profile", "A noise profile's name (6D Shake, Handheld_normal_mild) or asset path; none removes the noise.");
+        var amplitude = new Option<double?>("--amplitude") { Description = "AmplitudeGain, 0 to 1000." };
+        var frequency = new Option<double?>("--frequency") { Description = "FrequencyGain, 0 to 1000." };
+        camera.Subcommands.Add(Ops("noise", "camera noise", "Set a camera's noise (CinemachineBasicMultiChannelPerlin); with nothing, show it and the profiles.", [noisy, profile, amplitude, frequency], r =>
+            Request("/camera/noise", r.GetValue(noisy),
+                ("camera", r.GetValue(noisy)),
+                ("profile", r.GetValue(profile)),
+                ("amplitude", Invariant(r.GetValue(amplitude))),
+                ("frequency", Invariant(r.GetValue(frequency))))));
+
+        Option<string?> style = Text("--style", "Cut, EaseInOut, EaseIn, EaseOut, HardIn, HardOut, Linear or Custom.");
+        var time = new Option<double?>("--time") { Description = "Blend seconds, 0 to 3600." };
+        Option<string?> from = Text("--from", "With --to: a custom blend from this camera's name (any: every camera).");
+        Option<string?> to = Text("--to", "With --from: the camera blended to (any: every camera).");
+        Option<string?> blendBrain = Text("--brain", Brain);
+        camera.Subcommands.Add(Ops("blend", "camera blend", "Set the brain's default blend, or one entry of its custom blends asset; with nothing, show them.", [style, time, from, to, blendBrain], r =>
+            Request("/camera/blend", null,
+                ("style", r.GetValue(style)),
+                ("time", Invariant(r.GetValue(time))),
+                ("from", r.GetValue(from)),
+                ("to", r.GetValue(to)),
+                ("brain", r.GetValue(blendBrain)))));
+
+        Argument<string> forced = Required("camera", Camera);
+        Option<string?> forceBrain = Text("--brain", Brain);
+        camera.Subcommands.Add(Ops("force", "camera force", "Make a camera live now, whatever the priorities, until ug camera release (changes no data).", [forced, forceBrain], r =>
+            Request("/camera/force", null, ("camera", r.GetValue(forced)), ("brain", r.GetValue(forceBrain)))));
+
+        Option<string?> releaseBrain = Text("--brain", Brain);
+        camera.Subcommands.Add(Ops("release", "camera release", "End ug camera force: the brain goes back to priorities.", [releaseBrain], r =>
+            Request("/camera/release", null, ("brain", r.GetValue(releaseBrain)))));
+
+        Argument<string?> holder = Optional("camera", "The Unity camera for the brain. Default: the main camera.");
+        Option<string?> brainStyle = Text("--style", "Set the default blend style.");
+        var brainTime = new Option<double?>("--time") { Description = "Set the default blend seconds, 0 to 3600." };
+        camera.Subcommands.Add(Ops("brain", "camera brain", "Make sure a CinemachineBrain is on the camera and print its settings.", [holder, brainStyle, brainTime], r =>
+            Request("/camera/brain", r.GetValue(holder), ("camera", r.GetValue(holder)), ("style", r.GetValue(brainStyle)), ("time", Invariant(r.GetValue(brainTime))))));
+        return camera;
+
+        // body and aim: a stage type (or none), then field=value pairs, after the camera.
+        static Command Stage(string stage, string targetOption, string targetDescription)
+        {
+            Argument<string> staged = Required("camera", Camera);
+            var values = new Argument<string[]>("values")
+            {
+                Description = "The " + stage + " type (" + (stage == "body" ? "Follow, ThirdPersonFollow, OrbitalFollow, PositionComposer, ..." : "RotationComposer, HardLookAt, PanTilt, ...")
+                    + ") or none, then field=value pairs in ug set's grammar: CameraDistance=5, ShoulderOffset=0.8,-0.4,0.",
+                Arity = ArgumentArity.ZeroOrMore,
+            };
+            Option<string?> target = Text(targetOption, targetDescription);
+            return Ops(stage, "camera " + stage, "Swap, remove or tune the camera's " + (stage == "body" ? "Body (position)" : "Aim (rotation)") + " stage; with nothing, show it, its fields and the types.",
+                [staged, values, target], r =>
+                {
+                    string[] given = r.GetValue(values) ?? [];
+                    string? type = given.Length > 0 && !given[0].Contains('=', StringComparison.Ordinal) ? given[0] : null;
+                    string[] pairs = type == null ? given : given[1..];
+                    var parameters = new List<(string Name, string? Value)> { ("camera", r.GetValue(staged)), ("type", type), ("n", pairs.Length.ToString(CultureInfo.InvariantCulture)) };
+                    parameters.AddRange(pairs.Select((pair, i) => ("a" + i.ToString(CultureInfo.InvariantCulture), (string?)pair)));
+                    parameters.Add((targetOption[2..], r.GetValue(target)));
+                    return Request("/camera/" + stage, r.GetValue(staged), [.. parameters]);
+                });
+        }
+
+        static OpRequest Request(string path, string? edit, params (string Name, string? Value)[] parameters) =>
+            new(Query(path, parameters), edit) { Camera = true };
+
+        static Argument<string> Required(string name, string description) => new(name) { Description = description };
+        static Argument<string?> Optional(string name, string description) => new(name) { Description = description, Arity = ArgumentArity.ZeroOrOne };
+        static Option<string?> Text(string name, string description) => new(name) { Description = description };
+        static Option<bool> Flag(string name, string description) => new(name) { Description = description };
+        static string? True(bool flag) => flag ? "true" : null;
+        static string? Invariant(IFormattable? number) => number?.ToString(null, CultureInfo.InvariantCulture);
+    }
 }

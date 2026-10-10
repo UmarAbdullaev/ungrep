@@ -34,6 +34,7 @@ namespace UnityGraph.Bridge.Tests
             new GameObject("Eye").AddComponent<Camera>();
             Directory.CreateDirectory(Path.GetDirectoryName(ShotFile("game.png")));
             File.Delete(ShotFile("game.png"));
+            File.Delete(ShotFile("camera-Eye.png"));
 
             Assert.AreEqual(Err(NoDevice), Ask("/shot", "view", "game"));
             Assert.AreEqual(Err(NoDevice), Ask("/shot"));
@@ -203,8 +204,8 @@ namespace UnityGraph.Bridge.Tests
                 Assert.Ignore("this Unity has a graphics device");
             }
 
-            Assert.AreEqual(Err(NoDevice), Ask("/shot", "from", "0,1,-5", "look", "Player"));
-            Assert.AreEqual(Err(NoDevice), Ask("/shot", "view", "Player", "angles", "true"));
+            Assert.AreEqual(Err(NoDevice), Ask("/shot", "from", "0,1,-5", "look", "Level/Player"));
+            Assert.AreEqual(Err(NoDevice), Ask("/shot", "view", "Level/Player", "angles", "true"));
             Assert.AreEqual(Err(NoDevice), Ask("/shot", "view", "0,0,0", "orbit", "4"));
             Assert.IsFalse(LeftOver());
         }

@@ -456,7 +456,7 @@ namespace UnityGraph.Bridge
             return Answer.Line("selected " + Shown(target));
         }
 
-        private const string SlashName = "names with / cannot be addressed by ug: pick another name";
+        internal const string SlashName = "names with / cannot be addressed by ug: pick another name";
 
         // Resolves the object and runs the edit: in the loaded scenes as one undo group; inside a
         // prefab asset on its loaded contents, written when the edit worked (Safety rule 3).
@@ -708,7 +708,7 @@ namespace UnityGraph.Bridge
             return null;
         }
 
-        private static Reply SetSerialized(UnityEngine.Object target, string field, string value, string prefix)
+        internal static Reply SetSerialized(UnityEngine.Object target, string field, string value, string prefix)
         {
             var serialized = new SerializedObject(target);
             SerializedProperty p = Values.Find(serialized, field, out string error);

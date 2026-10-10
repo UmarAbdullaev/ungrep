@@ -26,12 +26,13 @@ In:
   `ug inspect`, `ug find --live`, `ug object create|delete|rename|move|active|duplicate`,
   `ug component add|remove`, `ug set`, `ug event list|add|remove`, `ug undo|redo`, `ug select`, `ug prefab ...`,
   `ug asset ...`, `ug project`, `ug package list|add|remove`, `ug shot`, `ug api`, `ug docs`,
-  `ug perf`, menu items through `ug run`, and editor commands inside `ug batch`.
+  `ug perf`, `ug camera ...` (cameras and Cinemachine 3, `SPEC-camera.md`), menu items through
+  `ug run`, and editor commands inside `ug batch`.
 - The `unity` skill: the commands and when to use them.
 - BridgeHost fixture scenes, prefab and ScriptableObject; EditMode tests; a `UG_UNITY` end to end.
 
 Out: hooks that edit anything (SPEC Boundaries: never from a hook); building players; animation,
-timeline and shader graph editing; ProBuilder and Cinemachine (ask when wanted); script editing
+timeline and shader graph editing; ProBuilder (ask when wanted); script editing
 (Claude's own Write and Edit do it, then `ug compile`); editing package contents in `Packages/`
 or vendored folders; Unity's own CLI adapter.
 
@@ -53,6 +54,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
 | `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API (no `search`/`resolve`: `add` resolves, and browsing a registry is a network use rule 10 does not cover) |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
+| `manage_camera` (every other action: `ensure_brain`, `get_brain_status`, `create_camera`, `set_target`, `set_priority`, `set_lens`, `set_body`, `set_aim`, `set_noise`, `add_extension`, `remove_extension`, `list_cameras`, `set_blend`, `force_camera`, `release_override`, `ping`) | `ug camera [list]|create|priority|body|aim|noise|blend|force|release|brain` (O13); action by action, with lens and extensions through `ug set` and `ug component`, in `SPEC-camera.md`, Unity MCP parity |
 | `manage_scene` `screenshot` (every mode) and `scene_view_frame`; `manage_camera` `screenshot`, `screenshot_multiview` | `ug shot` viewpoints (O11, see Viewpoints): `camera` is `ug shot <camera>` (or `--camera` for a temporary camera's settings); `capture_source` `game_view`/`scene_view` is `ug shot game`/`scene`; `view_target` is `--look` (game), `--frame` (scene) or the target of `--angles`/`--orbit`; `view_position` is `--from`; `view_rotation` is `--rotation` (MCP lets it override `view_target`; `ug` refuses the pair, since one of them would be ignored); an instance ID for `camera` or `view_target` is an address (`ug` names objects by path, Addressing objects; `ug find --live` gives the path); `batch: "surround"` and `screenshot_multiview` are `--angles`; `batch: "orbit"` with `orbit_angles`, `orbit_elevations`, `orbit_distance`, `orbit_fov` is `--orbit N --elevations --distance --fov`; `max_resolution` is `--width`/`--height` (one tile of a sheet, as MCP's cap is per tile); `include_image` is Claude reading the PNG (the answer gives its path, never base64); `scene_view_frame` (`scene_view_target`) is `ug shot scene --frame <object> --keep` |
 | `manage_graphics`, `manage_physics`, `manage_profiler` | `ug perf` (render, memory, profiler counters; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
 | `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |

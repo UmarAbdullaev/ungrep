@@ -77,6 +77,18 @@ namespace UnityGraph.Bridge
                 { "/api", (r, c) => Checked(() => ApiOps.Api(r)) },
                 { "/stats", (r, c) => Checked(StatsOps.Stats) },
 
+                // Cameras and Cinemachine (specs/SPEC-camera.md): edits answer after the brain has run.
+                { "/camera", (r, c) => Checked(() => CameraOps.List(r)) },
+                { "/camera/create", (r, c) => Deferred(() => CameraOps.Create(r)) },
+                { "/camera/priority", (r, c) => Deferred(() => CameraOps.Priority(r)) },
+                { "/camera/body", (r, c) => Deferred(() => CameraOps.Body(r)) },
+                { "/camera/aim", (r, c) => Deferred(() => CameraOps.Aim(r)) },
+                { "/camera/noise", (r, c) => Deferred(() => CameraOps.Noise(r)) },
+                { "/camera/blend", (r, c) => Deferred(() => CameraOps.Blend(r)) },
+                { "/camera/force", (r, c) => Deferred(() => CameraOps.Force(r)) },
+                { "/camera/release", (r, c) => Deferred(() => CameraOps.Release(r)) },
+                { "/camera/brain", (r, c) => Deferred(() => CameraOps.Brain(r)) },
+
                 // Play input: uGUI elements and clicks, device actions (SPEC-play-input).
                 { "/ui", (r, c) => Checked(() => PlayInput.UiList(r)) },
                 { "/ui/click", (r, c) => Deferred(() => PlayInput.UiClick(r)) },

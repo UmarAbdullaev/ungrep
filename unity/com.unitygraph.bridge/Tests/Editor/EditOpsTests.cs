@@ -164,6 +164,16 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void A_refused_edit_leaves_the_undo_history_and_its_names_as_they_were()
+        {
+            Ask("/object/rename", "object", "Level/Player", "name", "Hero");
+            StringAssert.StartsWith("{\"error\":\"no field nothing", Ask("/set", "object", "Level/Hero", "field", "nothing", "value", "1"));
+
+            Assert.AreEqual(Lines("undid ug object rename"), Ask("/undo"));
+            Assert.AreEqual("Player", Find("Level/Player").name);
+        }
+
+        [Test]
         public void Undo_redo_and_selection()
         {
             Ask("/object/rename", "object", "Level/Player", "name", "Hero");
