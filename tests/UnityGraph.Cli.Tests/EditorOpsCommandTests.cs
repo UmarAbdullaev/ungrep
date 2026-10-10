@@ -113,6 +113,41 @@ public sealed class EditorOpsCommandTests : IDisposable
         Assert.Equal(["/status", request], _bridge.Requests);
     }
 
+    [Theory]
+    [InlineData("/shot?from=0%2C10%2C-10&look=Enemy", "shot", "--from", "0,10,-10", "--look", "Enemy")]
+    [InlineData("/shot?view=Main%20Camera&rotation=30%2C45%2C0&fov=40.5", "shot", "Main Camera", "--rotation", "30,45,0", "--fov", "40.5")]
+    [InlineData("/shot?look=1%2C0%2C2&camera=Rig%2FCam", "shot", "--look", "1,0,2", "--camera", "Rig/Cam")]
+    [InlineData("/shot?view=scene&frame=Player&keep=true", "shot", "scene", "--frame", "Player", "--keep")]
+    [InlineData("/shot?view=Player&width=200&height=150&angles=true", "shot", "Player", "--angles", "--width", "200", "--height", "150")]
+    [InlineData("/shot?view=Player&angles=true&distance=4.5", "shot", "Player", "--angles", "--distance", "4.5")]
+    [InlineData("/shot?view=Player&orbit=", "shot", "Player", "--orbit")]
+    [InlineData("/shot?view=0%2C1%2C0&orbit=4&elevations=0%2C45", "shot", "0,1,0", "--orbit", "4", "--elevations", "0,45")]
+    public void Shot_viewpoints_and_sheets_send_their_options(string request, params string[] args)
+    {
+        _bridge.Publish(_root, bridge: "0.6.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"Library/unitygraph/shots/view.png  960x540  80 KB  (from 0, 10, -10)\"]}");
+
+        var (exitCode, output) = Run(args);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("Library/unitygraph/shots/view.png  960x540  80 KB  (from 0, 10, -10)\n", output);
+        Assert.Equal(["/status", request], _bridge.Requests);
+    }
+
+    [Fact]
+    public void A_bridge_before_shot_cameras_refuses_the_new_options_and_takes_plain_shots()
+    {
+        _bridge.Publish(_root, bridge: "0.5.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"Library/unitygraph/shots/game.png\"]}");
+
+        Assert.Equal("bridge 0.5.0 is too old for ug shot --angles: run ug bridge install again\n", Run("shot", "Player", "--angles").Output);
+        Assert.Equal("bridge 0.5.0 is too old for ug shot --orbit: run ug bridge install again\n", Run("shot", "Player", "--orbit", "--width", "100").Output);
+        Assert.Equal("bridge 0.5.0 is too old for ug shot --from: run ug bridge install again\n", Run("shot", "--from", "1,2,3").Output);
+        Assert.Equal("bridge 0.5.0 is too old for ug shot --frame: run ug bridge install again\n", Run("shot", "scene", "--frame", "Player", "--keep").Output);
+        Assert.Equal("Library/unitygraph/shots/game.png\n", Run("shot", "--width", "640").Output);
+        Assert.Equal(["/status", "/status", "/status", "/status", "/status", "/shot?width=640"], _bridge.Requests);
+    }
+
     [Fact]
     public void A_refusal_prints_the_bridges_reason()
     {

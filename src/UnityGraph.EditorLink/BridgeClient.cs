@@ -29,6 +29,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge that runs code: `/run` with arguments and `/eval` (SPEC-editor-link, Running code).</summary>
     public const string MinimumCodeBridge = "0.5.0";
 
+    /// <summary>The oldest bridge with camera requests: `ug shot` viewpoints and sheets, `/camera/...` (SPEC-editor-ops, SPEC-camera).</summary>
+    public const string MinimumCameraBridge = "0.6.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -64,6 +67,9 @@ public sealed class BridgeClient : IDisposable
 
     /// <summary>Whether the bridge runs code with arguments (`ug run`, `ug eval`).</summary>
     public bool HasCode => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumCodeBridge);
+
+    /// <summary>Whether the bridge places shot cameras and answers the camera requests.</summary>
+    public bool HasCameras => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumCameraBridge);
 
     /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);

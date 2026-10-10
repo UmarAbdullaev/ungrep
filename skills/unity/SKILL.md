@@ -16,9 +16,9 @@ Open editor (bridge; "Unity not reachable" answers are from Editor.log: check ag
 - assets and project: `asset`, `project`, `package`
 - loop: `console` (`--after <id>` for new only), `test`, `log` (last play session), `play --for <s>`; a Stop hook reports compile errors
 - play-test (each action prints what changed; `--shot` adds a picture): `ui` lists uGUI elements; `click <label|addr|x,y> [--value v]`, `press <key>`, `stick left 1,0`, `tap|swipe x,y`, `wait <s>`, `play --step` (paused)
-- look up: `shot`, `api <Type>`, `docs <page>`
+- look up: `shot [<obj> --angles]`, `api <Type>`, `docs <page>`
 - `batch "step" "step"`: many in one call.
-Addresses: `Level/Enemy`, `Enemy#2`, `Main:Level/Enemy`, `Assets/X.prefab:Child`; components `Object:Component`.
+Addresses: `Enemy#2`, `Main:Level/Enemy`, `Assets/X.prefab:Child`; components `Object:Component`.
 
 Rules:
 - Closed scenes and prefabs: the graph. Live or unsaved values and every edit: the editor.

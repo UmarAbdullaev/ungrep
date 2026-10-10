@@ -199,6 +199,12 @@ internal static partial class EditorCommands
         /// <summary>A request that runs code (`ug run`, `ug eval`): needs bridge 0.5.0.</summary>
         public bool Code { get; init; }
 
+        /// <summary>A camera request (`ug shot` viewpoints and sheets, `ug camera`): needs bridge 0.6.0.</summary>
+        public bool Camera { get; init; }
+
+        /// <summary>The option that needs the newer bridge, named in the refusal: `ug shot --angles`.</summary>
+        public string? Option { get; init; }
+
         /// <summary>Added to the message when Unity does not answer in time.</summary>
         public string? NoAnswer { get; init; }
 
@@ -270,9 +276,9 @@ internal static partial class EditorCommands
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
 
-        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode))
+        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras))
         {
-            return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
+            return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + (request.Option == null ? "" : " " + request.Option) + ": run ug bridge install again\n");
         }
 
         var clock = Stopwatch.StartNew();
@@ -524,11 +530,7 @@ internal static partial class EditorCommands
             new OpRequest(Query("/package/remove", ("name", r.GetValue(packageName)))) { Timeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(removeTimeout))) }));
         yield return packages;
 
-        Argument<string?> shotView = Optional("view", "game (default), scene, or a camera's object address.");
-        Option<int?> shotWidth = new("--width") { Description = "Pixels, 64 to 2048. Default: 960." };
-        Option<int?> shotHeight = new("--height") { Description = "Pixels, 64 to 2048. Default: 540." };
-        yield return Ops("shot", "shot", "Save a picture of the game view, the scene view or one camera to Library/unitygraph/shots/ and print its path.", [shotView, shotWidth, shotHeight], r =>
-            new OpRequest(Query("/shot", ("view", r.GetValue(shotView)), ("width", Number(r.GetValue(shotWidth))), ("height", Number(r.GetValue(shotHeight))))));
+        yield return ShotCommand();
 
         Argument<string> apiType = Required("type", "Type or Type.member: Transform, Physics.Raycast, UnityEngine.Rigidbody.");
         Argument<string?> apiMember = Optional("member", "A member of the type: its signatures, overloads and defaults.");

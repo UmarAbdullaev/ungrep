@@ -53,6 +53,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
 | `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API (no `search`/`resolve`: `add` resolves, and browsing a registry is a network use rule 10 does not cover) |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
+| `manage_scene` `screenshot` (every mode) and `scene_view_frame`; `manage_camera` `screenshot`, `screenshot_multiview` | `ug shot` viewpoints (O11, see Viewpoints): `camera` is `ug shot <camera>` (or `--camera` for a temporary camera's settings); `capture_source` `game_view`/`scene_view` is `ug shot game`/`scene`; `view_target` is `--look` (game), `--frame` (scene) or the target of `--angles`/`--orbit`; `view_position` is `--from`; `view_rotation` is `--rotation` (MCP lets it override `view_target`; `ug` refuses the pair, since one of them would be ignored); an instance ID for `camera` or `view_target` is an address (`ug` names objects by path, Addressing objects; `ug find --live` gives the path); `batch: "surround"` and `screenshot_multiview` are `--angles`; `batch: "orbit"` with `orbit_angles`, `orbit_elevations`, `orbit_distance`, `orbit_fov` is `--orbit N --elevations --distance --fov`; `max_resolution` is `--width`/`--height` (one tile of a sheet, as MCP's cap is per tile); `include_image` is Claude reading the PNG (the answer gives its path, never base64); `scene_view_frame` (`scene_view_target`) is `ug shot scene --frame <object> --keep` |
 | `manage_graphics`, `manage_physics`, `manage_profiler` | `ug perf` (render, memory, profiler counters; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
 | `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |
 | `batch_execute` | `ug batch` with editor commands, one process and one connection |
@@ -130,7 +131,7 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/project` | Unity version and render pipeline, tags, layers (Unity's physics layers, as `index name`), sorting layers, build scenes (enabled ones with their build index). Read-only. |
 | `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`. The answer waits for the request across editor updates (the route returns a poll that gives null until the request has finished; the connection stays open) and gives the resolved `name  version  source` (`local`, `git`, `registry`; the location for local and git). `list` reads the local cache (offline) and shows the manifest's direct dependencies, counting `com.unity.modules.*` in one line. `id` is a name, `name@version`, a git URL or `file:` path. Refused while compiling or importing and in play mode (a package change reloads scripts); `remove` refuses `com.unitygraph.bridge` (removing it would end the connection). Failures answer `could not add <id>: <Unity's message>`. |
 | `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit, `File/Build...` and `Build/...` menu items (matched case-insensitively, spaces around `/` ignored): `did not run File/Quit: refused, it would close the editor (ug does not quit Unity)`. The refusal is in the bridge's runner, so nothing is executed. |
-| `/shot?view=game\|scene\|<camera address>&width=&height=` | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back; root Screen Space - Overlay canvases are pointed at the last camera for the render, since no camera draws them, and put back after, without an Undo entry or a dirty flag; UI Toolkit documents cannot be drawn this way, so the answer ends `, N UI Toolkit documents not drawn` and a blank-looking shot is not read as a missing UI); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
+| `/shot?view=game\|scene\|<camera address>&width=&height=` (bridge 0.6.0 adds `from`, `look`, `rotation`, `fov`, `frame`, `keep`, `angles`, `orbit`, `elevations`, `distance`, `camera`: Viewpoints) | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back; root Screen Space - Overlay canvases are pointed at the last camera for the render, since no camera draws them, and put back after, without an Undo entry or a dirty flag; UI Toolkit documents cannot be drawn this way, so the answer ends `, N UI Toolkit documents not drawn` and a blank-looking shot is not read as a missing UI); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
 | `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies: `Transform`, `UnityEngine.Transform`, `Physics.Raycast` (split at the last dot when no type has that name); short names match case-sensitively first, Unity's namespaces win over System's, an ambiguous name lists its candidates. The type view is under 300 tokens for the common types (kind, base, assembly, constructors, then property, method, static and event names, longest lists cut with `+N more`); `member` lists overloads with parameter names, `out`/`ref`/`params` and default values. Members inherited from a base say `(from Object)`; obsolete ones are left out. When reflection finds nothing the answer is `{"error":..., "online":[page addresses]}`, or `{"local":"<file>"}` when the Hub's Documentation module has the page. |
 | `/api?page=Manual/<page>\|ScriptReference/<page>\|<package>[@version]/<path>` | Names a documentation page (same answer shape: `local` file, else `error` and `online`); `ug docs` uses it. Bare `<page>` means `Manual/<page>`. The package version is the installed one's major.minor. The bridge never opens a connection: fetching, trimming and caching are the client's (rule 11). |
 | `/stats` (`ug perf`) | Lines: play state; `render` (draw calls, batches, triangles, set-pass calls, render ms from `UnityStats`, which only counts in play mode, else `only counted in play mode (ug play, then ug perf)`); memory (allocated, reserved, scripts heap, graphics driver, MB); objects (game objects, active, components in the loaded scenes); assets (files under `Assets/` with the main kinds counted). Read-only. |
@@ -154,6 +155,99 @@ object address, asset path or `null`, array size via `field.size`. Compound valu
 A problem in any part sets nothing (`pairs[1]: count: not a whole number: x`). Still refused:
 private fields without `[SerializeField]`, properties and statics (not serialized; `ug run`
 or a script change), and anything under `Packages/` or vendored code.
+
+## Viewpoints (O11, bridge 0.6.0)
+
+`ug shot` also renders from where Claude asks, not only through the cameras the scene has.
+
+```
+ug shot [game|<camera>] --from x,y,z [--look <object|x,y,z> | --rotation x,y,z] [--fov f]
+ug shot [game|<camera>] --look <object|x,y,z> [--fov f]
+ug shot scene --frame <object> [--keep]
+ug shot <object|x,y,z> --angles [--distance d] [--fov f] [--camera <camera>]
+ug shot <object|x,y,z> --orbit [N] [--elevations 0,30,-15] [--distance d] [--fov f] [--camera <camera>]
+```
+
+All take `--width`/`--height`. Request: `/shot?view=&from=&look=&rotation=&fov=&frame=&keep=&angles=&orbit=&elevations=&distance=&camera=&width=&height=`.
+
+- **Temporary camera.** `--from`, `--look`, `--rotation`, `--angles` and `--orbit` render through a camera made
+  for the request: `EditorUtility.CreateGameObjectWithHideFlags("ug shot camera", HideFlags.HideAndDontSave,
+  typeof(Camera))`, disabled (it never draws to the Game view by itself) and destroyed in a `finally`. Its
+  settings are `Camera.CopyFrom` of a source camera: `--camera`, else the camera the view names (viewpoints),
+  else `Camera.main`, else the enabled Game camera drawn last, else Unity's defaults; the answer names it
+  (`settings of Main Camera`). Under URP the source's `UniversalAdditionalCameraData` is copied too
+  (`EditorUtility.CopySerialized`: renderer, post-processing, anti-aliasing, volume layers) by the
+  sub-assembly `UnityGraph.Bridge.Editor.Urp` (`versionDefines` on `com.unity.render-pipelines.universal`),
+  with the camera stack emptied and the render type set to Base: a viewpoint shows the world from that
+  point, so URP overlay cameras (a weapon model, a UI camera) and overlay canvases are left out. HDRP's and
+  Post Processing v2's camera components are not copied (not tested; the plain copy still renders). Nothing
+  goes on the Undo stack and no scene is marked dirty (the tests check both); being HideAndDontSave, the
+  camera is never saved even if Unity dies mid-render.
+- **`--from x,y,z`** places it; **`--look <object|x,y,z>`** aims it at a point or at an object's centre
+  (the bounds of its renderers, else its colliders, else its position); **`--rotation x,y,z`** sets Euler
+  angles instead (with `--look` it is refused: both aim). `--look` alone keeps the source camera's position
+  (the three-quarter view of the target when there is no source camera), `--from` alone its rotation.
+  **`--fov`** 1 to 179 degrees (orthographic sources keep their size). File `view.png`.
+- **`ug shot scene --frame <object>`** frames the Scene view on the object as its F key does
+  (`SceneView.Frame(bounds, true)`), poses the Scene view's camera to match, renders it, and puts the
+  pivot, rotation and size back (`LookAtDirect`) and the camera's pose and clip planes, so the user's
+  view does not move. **`--keep`** leaves the Scene view framed: MCP's `scene_view_frame`. File
+  `scene.png`. Like `ug shot scene`, it renders the Scene view's camera: gizmos and the grid are drawn
+  by the Scene view window, not its camera, so they are not in the picture (Open points).
+- **`--angles`**: six views of an object or a point in one PNG, 3×2 tiles in this order: front, back,
+  left, right, top, three-quarter (azimuth 45°, elevation 30°). Front is the side the object faces (its
+  forward flattened to the horizontal; world +Z for a point or an object facing straight up); top looks
+  down with the front at the top of the tile. MCP's surround has bird_eye in place of three-quarter:
+  `--orbit 1 --elevations 60` is a high oblique view. File `angles-<target>.png`.
+- **`--orbit [N]`**: N azimuth steps (default 8, 1 to 36; 0° is the front, 90° the target's right) by
+  `--elevations` (default `0,30,-15` as MCP's, -89 to 89 each, at most 6), one row per elevation in the
+  given order. File `orbit-<target>.png`.
+- **Distance.** `--distance d` (sheets only), else fitted: the bounds' bounding sphere fills the
+  narrower of the vertical and horizontal field of view (radius / sin(fov / 2) × 1.05); an orthographic
+  source gets an orthographic size that fits instead. A point, or an object with no renderer or
+  collider, has no size: 10 units. The near plane moves in and the far plane out so the target is never
+  clipped.
+- **Sizes.** `--width`/`--height` (64 to 2048) are the picture, or one tile of a sheet (default tile
+  320×240 for `--angles`, 240×180 for `--orbit`). A sheet is at most 4096 pixels per side, else refused
+  with the tile width that fits. Each tile renders into one temporary render texture and is read into
+  the sheet's `Texture2D` with `ReadPixels` at its place, 2 px dark gaps between tiles; no image library.
+- **Answers** give the path, size, KB and what was drawn; a sheet adds its layout:
+
+  ```
+  $ ug shot Player --angles
+  Library/unitygraph/shots/angles-Player.png  964x482  180.2 KB  (Player, 6 views of 320x240, distance 4.2, settings of Main Camera)
+    rows: front, back, left | right, top, three-quarter
+  $ ug shot Player --orbit 4 --elevations 0,45
+  Library/unitygraph/shots/orbit-Player.png  966x362  120.5 KB  (Player, 4 azimuths x 2 elevations of 240x180, distance 4.2, settings of Main Camera)
+    columns: azimuth 0, 90, 180, 270 (0 = front, 90 = right); rows: elevation 0, 45
+  $ ug shot --from 0,10,-10 --look Enemy
+  Library/unitygraph/shots/view.png  960x540  95.1 KB  (from 0, 10, -10 looking at Enemy, settings of Main Camera)
+  ```
+- **Refusals** (checked before the graphics-device check, so they answer under `-nographics` too): `scene`
+  with `--from`, `--look`, `--rotation`, `--angles` or `--orbit` (the Scene view moves only with
+  `--frame`); `--frame` without `scene`; `--keep` without `--frame`; `--angles` with `--orbit`; a sheet
+  without a target or with `game`/`scene`; `--elevations` or `--distance` without a sheet; `--fov`,
+  `--distance` (above 0) or a count out of range; a vector that is not three numbers; `--from` on the
+  `--look` point; two different cameras (`--camera` and a camera view); a sheet over 4096 pixels.
+- **Older bridge.** A bridge before 0.6.0 ignores parameters it does not know and would answer a plain
+  Game view, so `ug` refuses the new options on it (`bridge 0.5.0 is too old for ug shot --angles: run
+  ug bridge install again`).
+- **Play mode** works the same: the camera is made and destroyed between two frames of the game.
+
+Measured on purge-squad (2026-10-11, Unity 6000.3.14f1 open with its window, URP 17.3.0, bridge
+0.6.0 copied in; fresh `ug` process, wall clock, answer bytes): plain `ug shot` 254 ms, 74 B;
+`--from 0,12,-12 --look Player` 273 ms, 113 B; `--look Player` 216 ms, 115 B; `Player --angles`
+252 ms, 185 B (964x482, 142 KB); `Player --orbit` (8 × 3 tiles) 423 ms, 255 B (1934x544,
+387 KB); `--orbit 4 --elevations 0,45` 238 ms, 230 B; `0,0,0 --angles --distance 30` 247 ms,
+189 B; `scene --frame Player` 256 ms, 81 B, Scene view pivot, rotation and size the same after,
+and with `--keep` 222 ms, 94 B, left framed on the player. In play mode `Player --angles` 655 ms.
+One call each where MCP's surround or orbit is also one call; the answers are paths, never base64.
+The sheet reads correctly: the face in the front tile, the left and right sides matching the
+model's colours, the top with the front up. URP, checked with `ug eval` through the shot camera:
+with the source's post-processing off, SMAA, dithering on and volume mask 32, the shot camera's
+`UniversalAdditionalCameraData` had the same, render type Base, and was HideAndDontSave. The scene
+stayed unmodified after every shot, the editor's undo records stayed at 0, and the viewpoint and
+sheet pictures leave out the overlay HUD that `ug shot` (game) draws.
 
 ## Safety rules
 
@@ -315,6 +409,17 @@ a fresh process's time is .NET start-up.
   is in the picture, the canvas settings and the dirty flag are as before). Token counts of `ug api <Type>` (bytes / 4, measured by the
   EditMode tests): Transform 207, GameObject 190, Rigidbody 214, Rigidbody2D 212, Camera 246,
   Collider 109, Vector3 164, Physics 257, Time 156, MonoBehaviour 88, Mathf 171, Input 227.
+  Viewpoints (O11): every refusal in EditMode tests (they run before the device check, so they
+  pass under `-nographics`); with a device, a viewpoint and its rotation read back by pixel (a blue
+  unlit cube on a red-clearing source camera), `--look` alone from the source's place and with no
+  camera at all, `--angles` (six tiles, each with the cube in the middle and background in the
+  corner, the gap colour between), `--orbit` (layout, point target, `--distance`), and the trace
+  test: after a viewpoint and a sheet the saved scene is not dirty, has the same roots, no `ug shot
+  camera` is left, and one `Undo.PerformUndo` reverts the edit made before the shot. The batch-mode
+  editor has no Scene view, so `--frame` is checked there for its refusal and live in purge-squad.
+  URP's camera data copy is checked live in purge-squad only (BridgeHost is built-in; no package is
+  added for it). CLI tests: each option's request and the old-bridge refusal; the `UG_UNITY` end to
+  end adds two refusals and a sheet refused for want of a device.
 
 ## Boundaries
 
@@ -332,3 +437,7 @@ a fresh process's time is .NET start-up.
    `ug refs` answer can feed `ug inspect` directly.
 2. Whether `ug play --for <s>` (play, wait, stop, digest) belongs here or in unity-loop's
    `ug log`.
+3. Gizmos, icons and the grid in `ug shot scene`: the Scene view window draws them around its
+   camera's render, so a camera render leaves them out. Getting them means repainting the window
+   and reading its pixels back (an internal grab or a screen read of a window that must be visible
+   and unobscured); not built until a task needs the handles in the picture.

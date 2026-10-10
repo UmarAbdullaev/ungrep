@@ -14,9 +14,10 @@ namespace UnityGraph.Bridge
     /// <summary>
     /// `/shot` (SPEC-editor-ops, Endpoints): renders the Game view's cameras, the Scene view or one
     /// camera to a PNG under Library/unitygraph/shots/. Claude reads the file only when it needs to
-    /// see. Nothing in the project changes; cameras get their target texture back.
+    /// see. Nothing in the project changes; cameras get their target texture back. Viewpoints and
+    /// sheets through a temporary camera are in ShotOps.Views.cs.
     /// </summary>
-    internal static class ShotOps
+    internal static partial class ShotOps
     {
         public const int DefaultWidth = 960;
         public const int DefaultHeight = 540;
@@ -25,6 +26,11 @@ namespace UnityGraph.Bridge
 
         public static Reply Shot(Request request)
         {
+            if (_viewOptions.Any(name => request.Get(name) != null))
+            {
+                return Views(request);
+            }
+
             string view = string.IsNullOrWhiteSpace(request.Get("view")) ? "game" : request.Get("view").Trim();
             int height = DefaultHeight;
             Reply refused = Size(request.Get("width"), DefaultWidth, "width", out int width);
@@ -53,10 +59,10 @@ namespace UnityGraph.Bridge
             }
             else if (view == "scene")
             {
-                SceneView sceneView = SceneView.lastActiveSceneView ?? SceneView.sceneViews.Cast<SceneView>().FirstOrDefault();
-                if (sceneView == null || sceneView.camera == null)
+                SceneView sceneView = OpenSceneView();
+                if (sceneView == null)
                 {
-                    return Answer.Error("no Scene view is open in the editor: open one (Window > General > Scene) or use ug shot game");
+                    return Answer.Error(NoSceneView);
                 }
 
                 cameras.Add(sceneView.camera);
@@ -64,23 +70,43 @@ namespace UnityGraph.Bridge
             }
             else
             {
-                GameObject target = Addresses.Find(view, out string error);
-                if (target == null)
+                Camera camera = CameraAt(view, out string error);
+                if (camera == null)
                 {
                     return Answer.Error(error);
                 }
 
-                Camera camera = target.GetComponent<Camera>();
-                if (camera == null)
-                {
-                    return Answer.Error(Addresses.Of(target) + " has no Camera component");
-                }
-
                 cameras.Add(camera);
-                what = "camera " + Addresses.Of(target);
+                what = "camera " + Addresses.Of(camera.gameObject);
             }
 
-            return NoGraphics() ?? Render(cameras, width, height, Name(view), what);
+            return NoGraphics() ?? Render(cameras, width, height, Name(view), what, view != "scene");
+        }
+
+        private const string NoSceneView = "no Scene view is open in the editor: open one (Window > General > Scene) or use ug shot game";
+
+        private static SceneView OpenSceneView()
+        {
+            SceneView sceneView = SceneView.lastActiveSceneView ?? SceneView.sceneViews.Cast<SceneView>().FirstOrDefault();
+            return sceneView == null || sceneView.camera == null ? null : sceneView;
+        }
+
+        // The Camera on the object at an address, or null with why not.
+        private static Camera CameraAt(string address, out string error)
+        {
+            GameObject target = Addresses.Find(address, out error);
+            if (target == null)
+            {
+                return null;
+            }
+
+            Camera camera = target.GetComponent<Camera>();
+            if (camera == null)
+            {
+                error = Addresses.Of(target) + " has no Camera component";
+            }
+
+            return camera;
         }
 
         // A batch-mode editor started with -nographics has no graphics device: nothing can be drawn.
@@ -111,12 +137,14 @@ namespace UnityGraph.Bridge
             Camera.allCameras.Where(camera => camera.enabled && camera.gameObject.scene.IsValid() && camera.targetTexture == null && camera.cameraType == CameraType.Game)
                 .OrderBy(camera => camera.depth);
 
-        private static Reply Render(List<Camera> cameras, int width, int height, string name, string what)
+        // `screen`: the picture is what the Game view shows, so overlay canvases are drawn and UI Toolkit documents
+        // that cannot be are counted; the Scene view and viewpoints show the world only.
+        private static Reply Render(List<Camera> cameras, int width, int height, string name, string what, bool screen)
         {
             RenderTexture texture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             RenderTexture previous = RenderTexture.active;
             var saved = cameras.ToDictionary(camera => camera, camera => camera.targetTexture);
-            List<Action> restore = what.StartsWith("Scene view", StringComparison.Ordinal) ? new List<Action>() : DrawOverlays(cameras[cameras.Count - 1]);
+            List<Action> restore = screen ? DrawOverlays(cameras[cameras.Count - 1]) : new List<Action>();
             Texture2D image = null;
             try
             {
@@ -130,17 +158,7 @@ namespace UnityGraph.Bridge
                 image = new Texture2D(width, height, TextureFormat.RGB24, false);
                 image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 image.Apply();
-                byte[] png = image.EncodeToPNG();
-                if (png == null || png.Length == 0)
-                {
-                    return Answer.Error("Unity could not encode the screenshot as a PNG");
-                }
-
-                string relative = "Library/unitygraph/shots/" + name + ".png";
-                string full = Path.Combine(Path.GetDirectoryName(Application.dataPath), relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(full));
-                File.WriteAllBytes(full, png);
-                return Answer.Line(relative + "  " + width + "x" + height + "  " + Kilobytes(png.Length) + "  (" + what + (EditorApplication.isPlaying ? ", playing" : "") + Undrawn(what) + ")");
+                return Save(image, name, what + (screen ? Undrawn() : ""));
             }
             finally
             {
@@ -166,15 +184,26 @@ namespace UnityGraph.Bridge
             }
         }
 
-        // UI Toolkit panels are drawn by the screen too, and Camera.Render has no way to include them: say so,
-        // so a shot without the UI is not read as a UI that is missing.
-        private static string Undrawn(string what)
+        // Encodes the picture, writes it under Library/unitygraph/shots/ and answers its path, size and what it shows.
+        private static Reply Save(Texture2D image, string name, string what)
         {
-            if (what.StartsWith("Scene view", StringComparison.Ordinal))
+            byte[] png = image.EncodeToPNG();
+            if (png == null || png.Length == 0)
             {
-                return "";
+                return Answer.Error("Unity could not encode the screenshot as a PNG");
             }
 
+            string relative = "Library/unitygraph/shots/" + name + ".png";
+            string full = Path.Combine(Path.GetDirectoryName(Application.dataPath), relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(full));
+            File.WriteAllBytes(full, png);
+            return Answer.Line(relative + "  " + image.width + "x" + image.height + "  " + Kilobytes(png.Length) + "  (" + what + (EditorApplication.isPlaying ? ", playing" : "") + ")");
+        }
+
+        // UI Toolkit panels are drawn by the screen too, and Camera.Render has no way to include them: say so,
+        // so a shot without the UI is not read as a UI that is missing.
+        private static string Undrawn()
+        {
             int documents = UnityEngine.Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Count(d => d.isActiveAndEnabled);
             return documents == 0 ? "" : ", " + Answer.Count(documents, "UI Toolkit document", "UI Toolkit documents") + " not drawn";
         }
@@ -217,15 +246,13 @@ namespace UnityGraph.Bridge
             return restore;
         }
 
-        // game.png, scene.png, cam-Player-Camera.png: the file name for a view, kept to characters every file system takes.
-        public static string Name(string view)
-        {
-            if (view == "game" || view == "scene")
-            {
-                return view;
-            }
+        // game.png, scene.png, camera-Player-Camera.png: the file name for a view, kept to characters every file system takes.
+        public static string Name(string view) => view == "game" || view == "scene" ? view : Name("camera-", view);
 
-            var name = new StringBuilder("camera-");
+        // angles-Player, orbit-0-1-0: the prefix and the view's characters that every file system takes, at most 60.
+        public static string Name(string prefix, string view)
+        {
+            var name = new StringBuilder(prefix);
             foreach (char c in view)
             {
                 name.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '-');

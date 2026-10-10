@@ -61,7 +61,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.5.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.6.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -309,7 +309,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.5.0  local", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.6.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
@@ -348,6 +348,11 @@ public sealed partial class EditorEndToEndTests : IDisposable
             "cannot take a screenshot: this Unity runs without a graphics device (started with -batchmode -nographics); open the editor normally\n",
             Ug(log, "shot"));
         Assert.StartsWith("width must be a whole number from 64 to 2048, not 10\n", Ug(log, "shot", "--width", "10"), StringComparison.Ordinal);
+
+        // Viewpoints and sheets (O11): checked before the device, then refused for want of one.
+        Assert.Equal("--look and --rotation both aim the camera: give one\n", Ug(log, "shot", "--look", "Level", "--rotation", "0,90,0"));
+        Assert.Equal("--angles needs an object or a point x,y,z to circle: ug shot Player --angles\n", Ug(log, "shot", "--angles"));
+        Assert.StartsWith("cannot take a screenshot: this Unity runs without a graphics device", Ug(log, "shot", "0,1,0", "--orbit", "4", "--elevations", "0,45"), StringComparison.Ordinal);
 
         clock.Restart();
         string api = Ug(log, "api", "Transform");
