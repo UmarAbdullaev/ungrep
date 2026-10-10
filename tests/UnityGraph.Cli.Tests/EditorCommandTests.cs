@@ -113,39 +113,67 @@ public sealed partial class EditorCommandTests : IDisposable
     }
 
     [Fact]
-    public void Run_reports_the_result()
+    public void Run_sends_each_argument_and_prints_the_lines()
     {
-        _bridge.Publish(_root);
+        _bridge.Publish(_root, bridge: "0.5.0");
         _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal)
-            ? (200, "{\"ran\":true,\"result\":\"hello\\nworld\",\"error\":null,\"frame\":null,\"ms\":3.4}")
-            : (200, FakeBridge.Status("idle", 1));
-
-        Assert.Equal("ran Tools.Hello in 3 ms\n  result: hello\n    world\n", Run("run", "Tools.Hello").Output);
-        Assert.Contains("/run?target=Tools.Hello", _bridge.Requests);
-    }
-
-    [Fact]
-    public void Run_reports_an_exception_with_its_frame()
-    {
-        _bridge.Publish(_root);
-        _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal)
-            ? (200, "{\"ran\":true,\"result\":null,\"error\":\"System.InvalidOperationException: boom\",\"frame\":\"Assets/Editor/Tools.cs:12\",\"ms\":4.2}")
+            ? (200, "{\"lines\":[\"ran Game.Tools.Spawn(int count, Vector3 at) in 12 ms\",\"  result: GameObject[3] [Enemy#1, Enemy#2, Enemy#3]\"]}")
             : (200, FakeBridge.Status("idle", 1));
 
         Assert.Equal(
-            "Tools.Boom threw after 4 ms: System.InvalidOperationException: boom\n  at Assets/Editor/Tools.cs:12\n",
+            "ran Game.Tools.Spawn(int count, Vector3 at) in 12 ms\n  result: GameObject[3] [Enemy#1, Enemy#2, Enemy#3]\n",
+            Run("run", "Tools.Spawn", "3", "0,1,0", "-1", "name=a b").Output);
+        Assert.Contains("/run?target=Tools.Spawn&n=4&a0=3&a1=0%2C1%2C0&a2=-1&a3=name%3Da%20b&timeout=60", _bridge.Requests);
+    }
+
+    [Fact]
+    public void Run_list_sends_the_filter_and_the_menu_switch()
+    {
+        _bridge.Publish(_root, bridge: "0.5.0");
+        _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal) ? (200, "{\"lines\":[\"Game.Tools  1 static method\"]}") : (200, FakeBridge.Status("idle", 1));
+
+        Run("run", "--list");
+        Run("run", "--list", "Tools.");
+        Run("run", "--list", "--menu", "Tools/");
+
+        Assert.Contains("/run?list=", _bridge.Requests);
+        Assert.Contains("/run?list=Tools.", _bridge.Requests);
+        Assert.Contains("/run?list=Tools%2F&menu=true", _bridge.Requests);
+    }
+
+    [Fact]
+    public void Run_prints_an_exception_as_a_refusal()
+    {
+        _bridge.Publish(_root, bridge: "0.5.0");
+        _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal)
+            ? (200, "{\"error\":\"Game.Tools.Boom() threw after 4.2 ms: InvalidOperationException: boom\\n  at Assets/Editor/Tools.cs:12\"}")
+            : (200, FakeBridge.Status("idle", 1));
+
+        Assert.Equal(
+            "Game.Tools.Boom() threw after 4.2 ms: InvalidOperationException: boom\n  at Assets/Editor/Tools.cs:12\n",
             Run("run", "Tools.Boom").Output);
     }
 
     [Fact]
-    public void Run_reports_a_target_the_bridge_refused()
+    public void Run_on_an_older_bridge_asks_for_a_reinstall()
     {
-        _bridge.Publish(_root);
-        _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal)
-            ? (200, "{\"ran\":false,\"result\":null,\"error\":\"no static method Tools.Nope without parameters\",\"frame\":null,\"ms\":0}")
-            : (200, FakeBridge.Status("idle", 1));
+        _bridge.Publish(_root, bridge: "0.4.0");
+        _bridge.Handle = _ => (200, FakeBridge.Status("idle", 1));
 
-        Assert.Equal("did not run Tools.Nope: no static method Tools.Nope without parameters\n", Run("run", "Tools.Nope").Output);
+        Assert.Equal("bridge 0.4.0 is too old for ug run: run ug bridge install again\n", Run("run", "Tools.Hello", "3").Output);
+        Assert.DoesNotContain(_bridge.Requests, r => r.StartsWith("/run", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_that_gets_no_answer_says_the_code_may_still_run()
+    {
+        _bridge.Publish(_root, bridge: "0.5.0");
+        _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal) ? (500, "{\"error\":\"stuck\"}") : (200, FakeBridge.Status("idle", 1));
+
+        Assert.EndsWith(
+            "; the code may still be running in the editor, and nothing stops it from outside\n",
+            Run("run", "Tools.Forever", "--timeout", "1").Output,
+            StringComparison.Ordinal);
     }
 
     [Fact]

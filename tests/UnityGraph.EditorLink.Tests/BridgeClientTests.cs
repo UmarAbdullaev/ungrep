@@ -104,7 +104,7 @@ public sealed class BridgeClientTests : IDisposable
         bridge.Handle = path => path.Split('?')[0] switch
         {
             "/status" => (200, FakeBridge.Status("idle", 3)),
-            "/run" => (200, "{\"ran\":true,\"result\":null,\"error\":\"System.InvalidOperationException: boom\",\"frame\":\"Assets/Editor/Tools.cs:12\",\"ms\":4.2}"),
+            "/run" => (200, "{\"lines\":[\"ran menu Tools/Build Lab & Go in 4.2 ms\"]}"),
             "/console" => (200, "{\"last\":9,\"entries\":[{\"id\":9,\"type\":\"error\",\"text\":\"x\",\"frame\":null,\"count\":2}]}"),
             "/tests" => (200, "{\"id\":\"run-1\"}"),
             "/tests/result" => (200, "{\"state\":\"finished\",\"passed\":3,\"failed\":1,\"skipped\":0,\"inconclusive\":0,\"seconds\":0.5,\"failures\":[{\"name\":\"A.B\",\"message\":\"m\",\"frame\":null}]}"),
@@ -113,14 +113,14 @@ public sealed class BridgeClientTests : IDisposable
         bridge.Publish(_root);
         using BridgeClient client = BridgeClient.Connect(_root, _ => true).Client!;
 
-        RunOutcome run = client.Run("Tools/Build Lab & Go", TimeSpan.FromSeconds(5));
+        OpAnswer run = client.Op("/run?target=" + Uri.EscapeDataString("Tools/Build Lab & Go") + "&n=0", TimeSpan.FromSeconds(5));
         ConsolePage page = client.Console(4, 10, "error,warning");
         ConsolePage all = client.Console(0, 50, null);
         string id = client.StartTests("EditMode", "Game.Tests");
         string unfiltered = client.StartTests("PlayMode", null);
         TestRunResult result = client.TestResult("run 1");
 
-        Assert.Equal(new RunOutcome(true, null, "System.InvalidOperationException: boom", "Assets/Editor/Tools.cs:12", 4.2), run);
+        Assert.Equal("ran menu Tools/Build Lab & Go in 4.2 ms", run.Lines!.Single());
         Assert.Equal(2, page.Entries.Single().Count);
         Assert.Equal(9, all.Last);
         Assert.Equal("run-1", id);
@@ -130,7 +130,7 @@ public sealed class BridgeClientTests : IDisposable
         Assert.Equal(
             [
                 "/status",
-                "/run?target=Tools%2FBuild%20Lab%20%26%20Go",
+                "/run?target=Tools%2FBuild%20Lab%20%26%20Go&n=0",
                 "/console?after=4&limit=10&types=error%2Cwarning",
                 "/console?after=0&limit=50",
                 "/tests?platform=EditMode&filter=Game.Tests",

@@ -101,7 +101,7 @@ namespace UnityGraph.Bridge
 
         // ---- finding the type ----
 
-        private static Type Resolve(string name, out string ambiguous)
+        internal static Type Resolve(string name, out string ambiguous)
         {
             ambiguous = null;
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -378,7 +378,7 @@ namespace UnityGraph.Bridge
 
         // ---- signatures ----
 
-        private static string Signature(MemberInfo member)
+        internal static string Signature(MemberInfo member)
         {
             switch (member)
             {
@@ -403,7 +403,7 @@ namespace UnityGraph.Bridge
             }
         }
 
-        private static string Parameters(ParameterInfo[] parameters) =>
+        internal static string Parameters(ParameterInfo[] parameters) =>
             string.Join(", ", parameters.Select(p =>
             {
                 string prefix = p.IsOut ? "out " : p.ParameterType.IsByRef ? (p.IsIn ? "in " : "ref ") : p.IsDefined(typeof(ParamArrayAttribute), false) ? "params " : "";
@@ -435,7 +435,7 @@ namespace UnityGraph.Bridge
             return Convert.ToString(value, CultureInfo.InvariantCulture);
         }
 
-        private static string TypeName(Type type)
+        internal static string TypeName(Type type)
         {
             if (type.IsByRef)
             {

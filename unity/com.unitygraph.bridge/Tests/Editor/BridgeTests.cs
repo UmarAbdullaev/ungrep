@@ -6,25 +6,9 @@ using System.Net;
 using System.Threading;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.TestTools;
 
 namespace UnityGraph.Bridge.Tests
 {
-    public static class RunTargets
-    {
-        public static int Calls;
-
-        public static string Hello() => "hello";
-
-        public static void Touch() => Calls++;
-
-        public static void Boom() => throw new InvalidOperationException("boom");
-
-        public static string Echo(string text) => text;
-
-        private static string Hidden() => "hidden";
-    }
-
     public class JsonTests
     {
         [Test]
@@ -179,60 +163,6 @@ namespace UnityGraph.Bridge.Tests
 
             StringAssert.StartsWith("{\"compile\":3,\"started\":\"2026-09-29T14:00:00.0000000Z\",", json);
             StringAssert.Contains("{\"assembly\":\"A\",\"file\":\"Assets/A.cs\",\"line\":1,\"column\":2,\"severity\":\"warning\",\"code\":\"CS0168\",\"text\":\"unused\"}", json);
-        }
-    }
-
-    public class MethodRunnerTests
-    {
-        private static bool TestsOnly(string assembly) => assembly == typeof(RunTargets).Assembly.GetName().Name;
-
-        [Test]
-        public void Runs_by_full_or_short_type_name()
-        {
-            MethodRunner.Outcome full = MethodRunner.Run("UnityGraph.Bridge.Tests.RunTargets.Hello", TestsOnly, "/p");
-            MethodRunner.Outcome shortName = MethodRunner.Run("RunTargets.Hidden", TestsOnly, "/p");
-            int calls = RunTargets.Calls;
-            MethodRunner.Outcome touched = MethodRunner.Run("RunTargets.Touch", TestsOnly, "/p");
-
-            Assert.IsTrue(full.Ran);
-            Assert.AreEqual("hello", full.Result);
-            Assert.AreEqual("hidden", shortName.Result);
-            Assert.IsTrue(touched.Ran);
-            Assert.IsNull(touched.Result);
-            Assert.AreEqual(calls + 1, RunTargets.Calls);
-        }
-
-        [Test]
-        public void An_exception_is_the_answer_not_a_failure()
-        {
-            MethodRunner.Outcome outcome = MethodRunner.Run("RunTargets.Boom", TestsOnly, "/p");
-
-            Assert.IsTrue(outcome.Ran);
-            Assert.AreEqual("System.InvalidOperationException: boom", outcome.Error);
-        }
-
-        [Test]
-        public void Refuses_what_it_cannot_run()
-        {
-            Assert.AreEqual("no static parameterless method Echo on UnityGraph.Bridge.Tests.RunTargets", MethodRunner.Run("RunTargets.Echo", TestsOnly, "/p").Error);
-            Assert.AreEqual("no type Nowhere in the project's assemblies", MethodRunner.Run("Nowhere.Run", TestsOnly, "/p").Error);
-            Assert.AreEqual("no type UnityEditor.EditorApplication in the project's assemblies", MethodRunner.Run("UnityEditor.EditorApplication.Exit", TestsOnly, "/p").Error);
-            Assert.AreEqual("target must be Type.Method or a menu path: Hello", MethodRunner.Run("Hello", TestsOnly, "/p").Error);
-            Assert.AreEqual("no target", MethodRunner.Run(" ", TestsOnly, "/p").Error);
-            LogAssert.ignoreFailingMessages = true; // Unity logs its own error for a missing menu item
-            Assert.AreEqual("no menu item Nowhere/At All", MethodRunner.Run("Nowhere/At All", TestsOnly, "/p").Error);
-        }
-
-        [Test]
-        public void Framework_assemblies_are_never_own()
-        {
-            Assert.IsTrue(MethodRunner.IsFramework("UnityEditor.CoreModule"));
-            Assert.IsTrue(MethodRunner.IsFramework("System.Core"));
-            Assert.IsTrue(MethodRunner.IsFramework("mscorlib"));
-            Assert.IsTrue(MethodRunner.IsFramework("Unity.TextMeshPro"));
-            Assert.IsTrue(MethodRunner.IsFramework("UnityGraph.Bridge.Editor"));
-            Assert.IsFalse(MethodRunner.IsFramework("Assembly-CSharp-Editor"));
-            Assert.IsFalse(MethodRunner.IsFramework("Game.Lab"));
         }
     }
 

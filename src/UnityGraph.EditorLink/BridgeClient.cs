@@ -26,6 +26,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge with the play-input requests: `/ui`, `/ui/click`, `/input/...` (SPEC-play-input).</summary>
     public const string MinimumInputBridge = "0.4.0";
 
+    /// <summary>The oldest bridge that runs code: `/run` with arguments and `/eval` (SPEC-editor-link, Running code).</summary>
+    public const string MinimumCodeBridge = "0.5.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -58,6 +61,9 @@ public sealed class BridgeClient : IDisposable
 
     /// <summary>Whether the bridge answers the play-input requests.</summary>
     public bool HasPlayInput => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumInputBridge);
+
+    /// <summary>Whether the bridge runs code with arguments (`ug run`, `ug eval`).</summary>
+    public bool HasCode => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumCodeBridge);
 
     /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
@@ -105,9 +111,6 @@ public sealed class BridgeClient : IDisposable
     public RefreshAnswer Refresh(TimeSpan timeout) => BridgeJson.Parse<RefreshAnswer>(Get("/refresh", timeout));
 
     public CompileResult LastCompile() => BridgeJson.Parse<CompileResult>(Get("/compile", RequestTimeout));
-
-    public RunOutcome Run(string target, TimeSpan timeout) =>
-        BridgeJson.Parse<RunOutcome>(Get("/run?target=" + Uri.EscapeDataString(target), timeout));
 
     public ConsolePage Console(long after, int limit, string? types)
     {

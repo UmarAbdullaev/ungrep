@@ -263,7 +263,7 @@ namespace UnityGraph.Bridge
             {
                 case SerializedPropertyType.Integer:
                 case SerializedPropertyType.ArraySize:
-                    if (!long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out long whole))
+                    if (!TryWhole(trimmed, out long whole))
                     {
                         return "not a whole number: " + text;
                     }
@@ -276,21 +276,15 @@ namespace UnityGraph.Bridge
                     p.longValue = whole;
                     return null;
                 case SerializedPropertyType.Boolean:
-                    if (trimmed == "true" || trimmed == "1")
+                    if (!TryBool(trimmed, out bool flag))
                     {
-                        p.boolValue = true;
-                        return null;
+                        return "not true or false: " + text;
                     }
 
-                    if (trimmed == "false" || trimmed == "0")
-                    {
-                        p.boolValue = false;
-                        return null;
-                    }
-
-                    return "not true or false: " + text;
+                    p.boolValue = flag;
+                    return null;
                 case SerializedPropertyType.Float:
-                    if (!double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out double number))
+                    if (!TryNumber(trimmed, out double number))
                     {
                         return "not a number: " + text;
                     }
@@ -317,12 +311,7 @@ namespace UnityGraph.Bridge
                     p.intValue = text[0];
                     return null;
                 case SerializedPropertyType.Enum:
-                    int index = Array.FindIndex(p.enumNames, n => string.Equals(n, trimmed, StringComparison.OrdinalIgnoreCase));
-                    if (index < 0)
-                    {
-                        index = Array.FindIndex(p.enumDisplayNames, n => string.Equals(n, trimmed, StringComparison.OrdinalIgnoreCase));
-                    }
-
+                    int index = EnumIndex(p.enumNames, p.enumDisplayNames, trimmed);
                     if (index < 0 && int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out int raw))
                     {
                         p.intValue = raw;
@@ -337,11 +326,17 @@ namespace UnityGraph.Bridge
                     p.enumValueIndex = index;
                     return null;
                 case SerializedPropertyType.LayerMask:
-                    return ParseLayerMask(p, trimmed);
+                    string maskProblem = ReadLayerMask(trimmed, out int mask);
+                    if (maskProblem == null)
+                    {
+                        p.intValue = mask;
+                    }
+
+                    return maskProblem;
                 case SerializedPropertyType.Color:
                     if (!TryColor(trimmed, out Color color))
                     {
-                        return "not a color (#ff8800, #ff8800cc or 1, 0.5, 0, 1): " + text;
+                        return ColorHelp + text;
                     }
 
                     p.colorValue = color;
@@ -412,48 +407,6 @@ namespace UnityGraph.Bridge
         public static string Number(double value) => value.ToString("G15", CultureInfo.InvariantCulture);
 
         public static string Numbers(params float[] values) => string.Join(", ", values.Select(Number));
-
-        public static bool TryNumbers(string text, int count, out float[] numbers)
-        {
-            string[] parts = text.Trim('(', ')', ' ').Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            numbers = new float[parts.Length];
-            if (parts.Length != count)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < parts.Length; i++)
-            {
-                if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out numbers[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public static bool TryColor(string text, out Color color)
-        {
-            if (text.StartsWith("#", StringComparison.Ordinal))
-            {
-                return ColorUtility.TryParseHtmlString(text, out color);
-            }
-
-            if (TryNumbers(text, 4, out float[] rgba))
-            {
-                color = new Color(rgba[0], rgba[1], rgba[2], rgba[3]);
-                return true;
-            }
-
-            if (TryNumbers(text, 3, out float[] rgb))
-            {
-                color = new Color(rgb[0], rgb[1], rgb[2], 1);
-                return true;
-            }
-
-            return ColorUtility.TryParseHtmlString(text, out color);
-        }
 
         /// <summary>A short name for what a serialized object is: an address, an asset path or a type.</summary>
         public static string TargetName(UnityEngine.Object target)
@@ -533,7 +486,8 @@ namespace UnityGraph.Bridge
             return p.objectReferenceValue == value ? null : "Unity refused " + text + " for a " + TypeLabel(p) + " field";
         }
 
-        private static UnityEngine.Object FindReference(string text, Type wanted, out string error)
+        /// <summary>The object an address, component address or asset path names, as <paramref name="wanted"/>; null with why not.</summary>
+        public static UnityEngine.Object FindReference(string text, Type wanted, out string error)
         {
             error = null;
             UnityEngine.Object found = null;
@@ -611,43 +565,7 @@ namespace UnityGraph.Bridge
             return component;
         }
 
-        private static string ParseLayerMask(SerializedProperty p, string text)
-        {
-            if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int bits))
-            {
-                p.intValue = bits;
-                return null;
-            }
-
-            if (text == "Nothing")
-            {
-                p.intValue = 0;
-                return null;
-            }
-
-            if (text == "Everything")
-            {
-                p.intValue = -1;
-                return null;
-            }
-
-            int mask = 0;
-            foreach (string name in text.Split(',').Select(n => n.Trim()).Where(n => n.Length > 0))
-            {
-                int layer = LayerMask.NameToLayer(name);
-                if (layer < 0)
-                {
-                    return "no layer " + name;
-                }
-
-                mask |= 1 << layer;
-            }
-
-            p.intValue = mask;
-            return null;
-        }
-
-        private static string LayerMaskText(int mask)
+        internal static string LayerMaskText(int mask)
         {
             if (mask == 0)
             {
@@ -676,7 +594,7 @@ namespace UnityGraph.Bridge
         {
             if (!TryNumbers(text, count, out float[] numbers))
             {
-                return "not " + count.ToString(CultureInfo.InvariantCulture) + " numbers like " + string.Join(", ", Enumerable.Range(1, count).Select(i => i.ToString(CultureInfo.InvariantCulture))) + ": " + text;
+                return NumbersHelp(count, text);
             }
 
             set(numbers);

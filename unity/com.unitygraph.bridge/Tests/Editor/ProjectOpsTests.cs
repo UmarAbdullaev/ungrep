@@ -60,11 +60,23 @@ namespace UnityGraph.Bridge.Tests
         }
     }
 
-    /// <summary>Menu items through `/run`'s runner: File/Quit, File/Exit and Build items are refused, others run.</summary>
+    /// <summary>Menu items through `/run`: File/Quit, File/Exit and Build items are refused, others run.</summary>
     public class MenuRefusalTests
     {
-        private static MethodRunner.Outcome Run(string target) =>
-            MethodRunner.Run(target, _ => false, Environment.CurrentDirectory);
+        // The answer's lines, or its error.
+        private static string Run(string target)
+        {
+            var request = new Request { Path = "/run" };
+            request.Query["target"] = target;
+            Reply reply = MethodRunner.Run(request, null)();
+            return reply.Lines != null ? string.Join("\n", reply.Lines) : JsonUtility.FromJson<ErrorBody>(reply.Body).error;
+        }
+
+        [Serializable]
+        private class ErrorBody
+        {
+            public string error;
+        }
 
         [TestCase("File/Quit", "refused, it would close the editor (ug does not quit Unity)")]
         [TestCase("File/Exit", "refused, it would close the editor (ug does not quit Unity)")]
@@ -74,14 +86,8 @@ namespace UnityGraph.Bridge.Tests
         [TestCase("File/Build And Run", "refused, it builds a player (ug does not build; use Unity's Build Profiles window)")]
         [TestCase("File/Build Settings...", "refused, it builds a player (ug does not build; use Unity's Build Profiles window)")]
         [TestCase("Build/Anything", "refused, it builds a player (ug does not build; use Unity's Build Profiles window)")]
-        public void Quit_and_build_items_are_refused_and_never_executed(string target, string reason)
-        {
-            MethodRunner.Outcome outcome = Run(target);
-
-            Assert.IsFalse(outcome.Ran);
-            Assert.AreEqual(reason, outcome.Error);
-            Assert.IsNull(outcome.Result);
-        }
+        public void Quit_and_build_items_are_refused_and_never_executed(string target, string reason) =>
+            Assert.AreEqual("did not run " + target.Trim() + ": " + reason, Run(target));
 
         [TestCase("File/Save Project")]
         [TestCase("File/Open Scene")]
@@ -92,14 +98,10 @@ namespace UnityGraph.Bridge.Tests
         [Test]
         public void A_harmless_menu_item_runs_and_a_missing_one_says_so()
         {
-            MethodRunner.Outcome ran = Run("Tools/BridgeHost/Log Hello");
-            Assert.IsTrue(ran.Ran, ran.Error);
-            Assert.IsNull(ran.Error);
+            StringAssert.StartsWith("ran Tools/BridgeHost/Log Hello in ", Run("Tools/BridgeHost/Log Hello"));
 
             LogAssert.Expect(LogType.Error, "ExecuteMenuItem failed because there is no menu named 'Tools/BridgeHost/Nope'");
-            MethodRunner.Outcome missing = Run("Tools/BridgeHost/Nope");
-            Assert.IsFalse(missing.Ran);
-            Assert.AreEqual("no menu item Tools/BridgeHost/Nope", missing.Error);
+            Assert.AreEqual("did not run Tools/BridgeHost/Nope: no menu item Tools/BridgeHost/Nope (ug run --list --menu lists them)", Run("Tools/BridgeHost/Nope"));
         }
     }
 }

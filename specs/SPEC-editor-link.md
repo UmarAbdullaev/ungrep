@@ -52,8 +52,8 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
 
 - **Access.** Every request carries `X-UG-Token: <token>`; a wrong or missing token is `401`.
   Requests with an `Origin` header (a browser) are `403`. Nothing is read from or written to
-  paths a request names. The only files the bridge writes are `bridge.json` and `compile.json`
-  in `Library/unitygraph/`.
+  paths a request names. The only files the bridge writes are `bridge.json`, `compile.json` and
+  `result.txt` (a cut `ug run`/`ug eval` result) in `Library/unitygraph/`.
 - **Threading.** The listener thread answers `/status` from a snapshot the main thread refreshes
   every editor update, so status works while the editor is busy importing. Every other request
   is queued to the main thread (`EditorApplication.update`) and answered from there.
@@ -74,7 +74,7 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
 | `GET /console?after=<id>&limit=<n>&types=<error,warning,log>` | Entries newer than `after`, oldest first: id, type, text, the stack trace's first own frame (`file:line`), repeat count for consecutive duplicates. Ring buffer of 2,000 entries since the editor started (entries before the bridge first loaded are not seen). |
 | `GET /tests?platform=EditMode&filter=<name>` | Starts a run through `TestRunnerApi`; answers a run id. |
 | `GET /tests/result?id=<id>` | `running`, or totals, duration and each failed test with message and first own frame. |
-| `GET /run?target=<Type.Method or menu path>` | Runs a static parameterless method of a project assembly (not `UnityEngine`/`UnityEditor`/`System`), or a menu item through `EditorApplication.ExecuteMenuItem` when the target contains `/`. Answers the result's `ToString()` (cut at 2 KB), or the exception type, message and first own frame, and the time taken. |
+| `GET /run?target=<Type.Method or menu path>` | Runs a static parameterless method of a project assembly (not `UnityEngine`/`UnityEditor`/`System`), or a menu item through `EditorApplication.ExecuteMenuItem` when the target contains `/`. Answers the result's `ToString()` (cut at 2 KB), or the exception type, message and first own frame, and the time taken. Bridge 0.5.0 replaces it: arguments, the editor-ops answer shape, see Running code. |
 
 "Own frame": the first stack frame whose file is under `Assets/` or an embedded package.
 
@@ -161,6 +161,147 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
   ignores it). `ug bridge remove` deletes that folder only. The `unity` skill tells Claude to
   ask the user before either, as both write into the project (SPEC Boundaries).
 
+## Running code (R1, X1; bridge 0.5.0)
+
+Requested 2026-10-10 (user): `ug run` takes arguments and `ug eval` runs any C#, closing MCP for
+Unity's `execute_custom_tool` and the execute-code calls behind 16.6% of purge-squad's context
+(SPEC Evidence). Both answer in one shape, work in edit and play mode, and are `ug batch` steps.
+
+### `ug run <Type.Method> [args...]`
+
+`GET /run?target=&n=&a0=&a1=...&timeout=` (and `list=`, `menu=` for `--list`) answers in the
+editor-ops shape (`{"lines":[...]}` or `{"error":...}`, SPEC-editor-ops Endpoints). The request
+is refused while compiling or importing (editor-ops rule 6), menu items too.
+
+```
+$ ug run Tools.Spawn 3 0,1,0
+ran Game.Tools.Spawn(int count, Vector3 at) in 12 ms
+  result: GameObject[3] [Level/Enemy#1, Level/Enemy#2, Level/Enemy#3]
+  log: Spawned 3 enemies  Assets/Editor/Tools.cs:14
+  changed: Main.unity modified, not saved
+
+$ ug run Tools.Spawn many
+did not run Tools.Spawn: count: not a whole number: many
+  static GameObject[] Spawn(int count, Vector3 at = default)
+
+$ ug run --list Tools.
+Game.Tools  3 static methods
+  static GameObject[] Enemies()
+  static GameObject[] Spawn(int count, Vector3 at = default)
+  static IEnumerator Wave(int size)
+```
+
+- **Target.** `Namespace.Type.Method` or `Type.Method`: a static method of any accessibility
+  (editor tools are often `private static`) in the project's own assemblies, those loaded from a
+  file under the project folder (`Library/ScriptAssemblies` for Assets, embedded, registry and git
+  packages; DLL plugins under `Assets/` or an embedded package, not a registry package's precompiled
+  DLLs: Unity Version Control alone has thousands of types), minus Unity's (`UnityEngine*`, `UnityEditor*`, `Unity.*`),
+  .NET's, test frameworks' and the bridge's. A name that only Unity or .NET has is refused with the
+  call to use instead (`UnityEditor.AssetDatabase is Unity's, not the project's: ug eval
+  "UnityEditor.AssetDatabase.Refresh()" calls it`). Instance methods, generic method definitions
+  and constructors: `ug eval`. A target with a `/` is a menu item, run as before with the File/Quit
+  and Build refusals; a menu item takes no arguments.
+- **Arguments** are read with `ug set`'s grammar. The text rules are one set of functions in
+  `Values` (numbers, booleans, enum names, vectors, colours, bounds, curves, gradients, hashes, layer
+  masks, references, `[a, b]` lists, `{a: 1}` fields) that `/set` applies to a `SerializedProperty`
+  and `/run` to a parameter's `System.Type`:
+
+  | Parameter type | Text |
+  |---|---|
+  | integers, `float`, `double`, `decimal` | invariant numbers; integers range-checked |
+  | `bool` | `true`, `false`, `1`, `0` |
+  | `string`, `char` | the argument as given; one character |
+  | enum | a name (case-insensitive) or its number; `[Flags]` names joined by `,` or `\|` |
+  | `Vector2/3/4`, `Vector2Int/3Int`, `Rect`, `RectInt`, `Quaternion` | numbers `1,2,3` (a quaternion is euler angles, as `ug inspect` prints it) |
+  | `Color`, `Color32` | `#ff8800`, `#ff8800cc`, `1,0.5,0,1` or `1,0.5,0` |
+  | `Bounds`, `AnimationCurve`, `Gradient`, `Hash128`, `LayerMask` | as `ug set` |
+  | `GameObject`, a component type, any `UnityEngine.Object` | object address, component address (`Canvas:UiHandler`), asset path (`Assets/X.mat`, `Assets/X.png:Sub`) or `null`; a game object address gives its component of the parameter's type |
+  | arrays, `List<T>`, `IList<T>`, `IReadOnlyList<T>`, `IEnumerable<T>`, `ICollection<T>` | `[a, b, c]`, `a, b, c` or `empty`, items by the element type; a `params` array also takes the remaining arguments one by one |
+  | `T?` | `null` or a `T` |
+  | `System.Type` | a type name: the project's types first, then Unity's, then .NET's (as `ug api` resolves) |
+  | a type with a static `Parse(string)`: `Guid`, `DateTime`, `TimeSpan`, `Version`, Newtonsoft `JObject`/`JToken` (what MCP for Unity custom tools take) | that `Parse`, the `(string, IFormatProvider)` overload with the invariant culture when there is one |
+  | other structs and classes with a parameterless constructor | `{count: 3, offset: 1,2,3}` or `count: 3`: public fields and settable properties by name |
+  | `object` | the text as a string |
+
+- **Overloads.** Candidates are the methods with that name. One fits when the argument count fits
+  (optional parameters may be left out and take their defaults, `out` parameters take no argument,
+  `params` takes any number) and every argument parses. Exactly one fit runs. Several fits: the one
+  whose arguments read most exactly wins. Per argument, exact is a whole number for an integer
+  parameter, a number for a floating one, an enum name, `true`/`false`, the right count of numbers for
+  a vector, an address or `null` for an object; a whole number for a floating parameter is one step
+  looser; `string`, `object` and `Parse` are the loosest. A tie answers `ambiguous call` and the tied
+  overloads, one per line. No fit: with one candidate its first problem and its signature, with
+  several every overload (at most 10, `+N more`).
+- **Named arguments.** `name=value` sets the parameter `name` (so optional ones before it can be
+  skipped), after the positional ones. A positional text that starts with a parameter name and `=`
+  is written with a leading `\` (`\count=3` is the text `count=3`).
+- **`out` and `ref`.** After the call each `out` and `ref` value prints as `  out name: value`.
+- **Awaitables and `IEnumerator`.** A returned awaitable (anything with `GetAwaiter()`: `Task`,
+  `ValueTask`, Unity's `Awaitable`, UniTask) is awaited, a returned `IEnumerator` is stepped
+  like an editor coroutine, both across editor updates, so the editor keeps running: one `MoveNext`
+  per update; a yielded `IEnumerator` runs nested; `AsyncOperation` waits for `isDone`,
+  `CustomYieldInstruction` for `keepWaiting`, `WaitForSeconds` and `WaitForSecondsRealtime` for
+  their time in real seconds (the first through its internal `m_Seconds` field: one update when the
+  field is missing); anything else waits one update. A `Task<T>` prints its result (a plain `Task`
+  none), an `IEnumerator` `finished after N steps` (N yields, nested ones counted). `--timeout`
+  (default 60 s) bounds the wait: past it the answer is `<what> still running after 60 s; it goes
+  on in the editor`. Neither can be stopped from outside.
+- **Synchronous code** runs on the main thread inside the request: the editor waits for it. A
+  method that never returns freezes the editor; ug gives up after `--timeout` plus 5 s and says
+  the method may still be running. Nothing stops it from outside: `Thread.Abort` on Unity's main
+  thread would leave the editor in an unknown state.
+- **Undo.** The call runs in one undo group named `ug run <Type.Method>`: what it records through
+  `Undo` (`Undo.RecordObject`, `Undo.AddComponent`, ...) is reverted by one `ug undo`. Changes made
+  without `Undo` calls are not recorded, Unity's rule for every editor script. Only the synchronous
+  part is in the group: what an awaited or stepped call records on later updates lands in the
+  editor's own groups as it comes (collapsing them later could swallow other commands' changes).
+  Unity names a group after its records, so once the code records, `ug undo` says the code's own
+  name (`undid spawn` for `Undo.RegisterCreatedObjectUndo(go, "spawn")`); naming the group again
+  after the call does not change that (tried). Nothing is saved; a loaded scene that was clean before the call and modified after is named on a `changed:`
+  line (`changed: Main.unity modified, not saved`; edit mode only: play-mode changes are lost on
+  stop anyway).
+- **Console.** What the call logged follows the result, at most 5 entries in order (`log:`,
+  `warning:`, `error:`, first line and own frame), then `(+N more: ug console --after <id>)`.
+- **`ug run --list [filter]`**: the static methods of the project's assemblies whose `Type.Method`
+  contains `filter` (case-insensitive; a trailing `.` means the type's own), grouped by type with
+  signatures as `ug api` prints them and defaults shown, at most 40 lines, then `(+N more: give a
+  longer filter)`; without a filter, the types that have static methods with their counts.
+  `ug run --list --menu [filter]`: menu items (`TypeCache` `[MenuItem]` methods of every loaded
+  assembly, Unity's too) as `path  Type.Method`. Offline, `ug find` finds methods in the graph.
+- A bridge older than 0.5.0: `bridge 0.4.0 is too old for ug run: run ug bridge install again`.
+
+### Answer shape (shared by `ug run` and `ug eval`)
+
+- First line `ran <what> in <ms> ms`, or `<what> threw after <ms> ms: <ExceptionType>: <message>`
+  and `  at <file:line>`, the first frame in the project's own files (`StackFrames`). A
+  `TargetInvocationException` or `AggregateException` is unwrapped to the exception inside. The
+  message is its first line, cut at 300 characters. A throw is an error answer (`{"error":...}`), so
+  `ug batch` stops at it.
+- `  result: <value>` through one formatter, `Values.Show`:
+
+  | Value | Printed |
+  |---|---|
+  | `null` | `null`; a destroyed Unity object `missing (destroyed <Type>)` |
+  | numbers | invariant; `float` 7 and `double` 15 significant digits |
+  | `bool`, enums | `true`, `false`; enum names (`A, B` for flags) |
+  | `string`, `char` | quoted, `\n` for line breaks, cut at 200 characters |
+  | vectors, quaternions, rects, colours, bounds, curves, gradients | as `ug inspect` prints them (`1, 2, 3`; euler angles; `r, g, b, a`; `Color32` as `#rrggbbaa`) |
+  | tuples, `KeyValuePair` | `(1, "a")`; `key: value` |
+  | `GameObject` | its address (`Level/Enemy#2`, `Assets/X.prefab:Child`) |
+  | component | `address:Component`, the form `ug set` takes for references |
+  | other `UnityEngine.Object` | asset path, `path:sub`, `builtin <name>` or `<name> (not saved)` |
+  | dictionaries | `Dictionary<string, int>[3] {a: 1, b: 2, c: 3}` |
+  | other collections | `List<int>[25] [1, 2, 3, ... +15 more]`, the first 10 items (an array `GameObject[3] [...]`); a collection that overrides `ToString` (a Newtonsoft `JObject`) prints that text on one line |
+  | `Type`, delegates | the type's full name; `delegate Type.Method` |
+  | `IFormattable` and `IConvertible` values (`DateTime`, `Guid`, `TimeSpan`, Newtonsoft `JValue`) | `ToString` with the invariant culture |
+  | other objects | `TypeName {field: value, prop: value}`: public instance fields and properties one level deep, at most 20; deeper values print as their type name, or their `ToString` when the type overrides it; a getter that throws prints `<threw X>` |
+
+- When anything was cut, the whole value (strings whole, collections up to 1,000 items, two levels
+  deep) goes to `Library/unitygraph/result.txt` and the result line ends `(+more:
+  Library/unitygraph/result.txt)`: running the code again would repeat its side effects, reading
+  the file does not.
+- Then the `out`, console and `changed:` lines.
+
 ## Performance targets
 
 | Operation | Target |
@@ -182,7 +323,10 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
 - **Bridge:** EditMode tests in `fixtures/BridgeHost` run in batch mode
   (`Unity -batchmode -projectPath fixtures/BridgeHost -runTests -testPlatform EditMode`): JSON
   writer, token and `Origin` checks, console ring buffer and dedup, own-frame extraction,
-  compile message conversion, `run` resolution and refusals.
+  compile message conversion, `run` resolution and refusals; for R1 argument parsing per type,
+  overload choice (count, exactness, ties), optional, named, `params`, `out`, `Task` and
+  `IEnumerator` waits, the formatter per row of its table, the exception shape, logs, `changed:`
+  and the undo group.
 - **End to end** (env-gated on `UG_UNITY`, the editor executable): start BridgeHost in batch mode
   without `-quit`, wait for `bridge.json`, then `ug status`, a clean `ug compile`, add a file
   with an error and `ug compile` again, `ug run` on a fixture method, stop the editor. Times go
@@ -195,8 +339,9 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
   `Library/unitygraph/`.
 - Ask first: installing the bridge into a project (each project); a new endpoint that changes
   the project (play mode, asset edits); any non-loopback address.
-- Never: edit `Packages/` or the user's manifest; send anything off the machine; run a method
-  from a request that names a file path or takes arguments.
+- Never: edit `Packages/` or the user's manifest; send anything off the machine; read a file a
+  request names. (Until 2026-10-10 also: run a method that takes arguments; R1 and X1 lifted
+  that at the user's request: `ug run` and `ug eval` run what the user asks, unrestricted.)
 
 ## Measured
 
@@ -244,6 +389,30 @@ E5 on purge-squad (2026-09-30), the user's open editor, Unity 6000.3.14f1, bridg
 - With the Claude app in the foreground and Unity in the background: `ug status`, fresh
   process, 138–175 ms over 7 runs; `ug compile` with no script changes 159–223 ms over 5 runs.
   The background throttle does not hold a refresh back noticeably.
+
+R1 on purge-squad (2026-10-10), the editor in batch mode with `-ugBridge`, bridge 0.5.0 copied in
+with `ug bridge install --copy`, fresh `ug.exe` process per call:
+
+| Call | Answer | Time |
+| --- | --- | --- |
+| `ug run --list` (782 types with static methods) | 42 lines, 2,056 bytes | 286 ms |
+| `ug run --list SaveMenu.` | 4 lines, 99 bytes | 246 ms |
+| `ug run --list Ads` (7 types) | 24 lines, 2,010 bytes | 250 ms |
+| `ug run --list --menu GunLab` | 3 lines, 122 bytes | 183 ms |
+| `ug run SaveMenu.CanDelete` (private static) | 50 bytes, ran in 7.9 ms | 289 ms |
+| `ug run AdsrEnvelop.Map 5 0 10 0 100`, and with `name=value` | 141 bytes, ran in 1.4–1.7 ms | 236–238 ms |
+| `ug run Ads.Raise main Bogus` (bad enum) | 184 bytes, the names and signature | 240 ms |
+| `ug run Ads.Nope` | 178 bytes, the type's static methods | 235 ms |
+
+- The first `--list` gave 3,580 types: Unity Version Control's precompiled DLLs in
+  `Library/PackageCache` counted as the project's. Registry packages' DLLs are no longer own.
+- Before R1 a method with arguments took a throwaway editor script: write it, `ug compile` (a
+  domain reload: 10.9 s on purge-squad), `ug run`, delete it, compile again: 5 calls and two
+  reloads where `ug run` takes one call and no reload.
+- The MCP calls it replaces, from the Evidence snapshot: 577 execute-code calls (444 `eval`, 129
+  `run_script`, 4 `eval_file`), code 519 bytes on average, answers 584 bytes on average (median
+  197, p90 1,049). Only 2 were a single static call that `ug run` takes as is; the rest is `ug
+  eval`'s (X1).
 
 ## Open points
 

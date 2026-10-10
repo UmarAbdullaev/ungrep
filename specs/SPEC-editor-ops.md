@@ -56,7 +56,9 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_graphics`, `manage_physics`, `manage_profiler` | `ug perf` (render, memory, profiler counters; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
 | `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |
 | `batch_execute` | `ug batch` with editor commands, one process and one connection |
-| `set_active_instance`, `execute_custom_tool` | One editor per project root; `ug run` for project editor methods |
+| `set_active_instance` | One editor per project root |
+| `execute_custom_tool` (`tool_name`, `parameters`) | `ug run <Type.Method> [args...]` (SPEC-editor-link, Running code): any static method of the project with typed arguments, overloads, defaults, `out` values, awaited `Task`/`IEnumerator`. A custom tool's `HandleCommand(JObject)` is `ug run MyTool.HandleCommand '{"count": 3}'` (`JObject.Parse`); the tool list is `ug run --list HandleCommand` |
+| execute-code calls (MCP `execute_code`, throwaway editor scripts) | `ug eval "<C#>"`, `ug eval --file x.cs` (SPEC-editor-link, Running code) |
 
 Beyond the MCP server: the code and asset graph (answers with Unity closed), the compile gate,
 guards on serialized-field renames and `.meta` safety, token stats, and no idle context cost.

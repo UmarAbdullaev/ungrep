@@ -20,9 +20,6 @@ public sealed record CompileMessage(string? Assembly, string? File, int Line, in
 /// <summary>`GET /compile` and `compile.json`: the last compile (counter 0 when none was seen).</summary>
 public sealed record CompileResult(int Compile, DateTimeOffset? Started, DateTimeOffset? Finished, IReadOnlyList<CompileMessage> Messages);
 
-/// <summary>`GET /run`.</summary>
-public sealed record RunOutcome(bool Ran, string? Result, string? Error, string? Frame, double Ms);
-
 /// <summary>One console entry; <see cref="Count"/> counts consecutive repeats.</summary>
 public sealed record ConsoleEntry(long Id, string Type, string Text, string? Frame, int Count);
 

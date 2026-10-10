@@ -27,7 +27,7 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal static class Bridge
     {
-        public const string Version = "0.4.0";
+        public const string Version = "0.5.0";
 
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";
@@ -39,7 +39,6 @@ namespace UnityGraph.Bridge
         private static CompileLog _compile;
         private static volatile string _status = "{}";
         private static string _statusInputs;
-        private static HashSet<string> _own;
 
         static Bridge()
         {
@@ -128,6 +127,7 @@ namespace UnityGraph.Bridge
         private static void Update()
         {
             RefreshStatus();
+            CodeRun.Tick();
             _server.Pump(Handle);
         }
 
@@ -189,8 +189,6 @@ namespace UnityGraph.Bridge
                     return Now(StartTests(request));
                 case "/tests/result":
                     return Now(TestResult(request));
-                case "/run":
-                    return Now(Run(request));
                 default:
                     return Routes.Handle(request, _console) ?? Now(Reply.Fail(404, "unknown request " + request.Path));
             }
@@ -254,33 +252,6 @@ namespace UnityGraph.Bridge
         {
             string answer = TestRuns == null ? null : TestRuns.Result(request.Get("id") ?? "");
             return answer == null ? Reply.Fail(404, "no test run " + request.Get("id")) : Reply.Ok(answer);
-        }
-
-        private static Reply Run(Request request)
-        {
-            MethodRunner.Outcome outcome = MethodRunner.Run(request.Get("target"), IsOwnAssembly, ProjectRoot);
-            return Reply.Ok(new Json().Object()
-                .Field("ran", outcome.Ran)
-                .Field("result", outcome.Result)
-                .Field("error", outcome.Error)
-                .Field("frame", outcome.Frame)
-                .Field("ms", Math.Round(outcome.Milliseconds, 1))
-                .EndObject().ToString());
-        }
-
-        // Script assemblies built from files under Assets/ or embedded packages.
-        private static bool IsOwnAssembly(string name)
-        {
-            if (_own == null)
-            {
-                _own = new HashSet<string>(
-                    CompilationPipeline.GetAssemblies()
-                        .Where(a => !MethodRunner.IsFramework(a.name) && a.sourceFiles.Any(f => StackFrames.IsOwn(f.Replace('\\', '/'), ProjectRoot)))
-                        .Select(a => a.name),
-                    StringComparer.Ordinal);
-            }
-
-            return _own.Contains(name);
         }
 
         private static void WriteDiscovery(string token, int port)

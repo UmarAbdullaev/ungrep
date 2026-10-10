@@ -136,7 +136,7 @@ public sealed partial class EditorEndToEndTests
         var clock = Stopwatch.StartNew();
         // The probe was written before the editor opened, so it is usually compiled already.
         Assert.Matches(@"^(compiled in \d+\.\d s|no script changes): 0 errors\n$", Ug(log, "compile"));
-        Assert.Matches(@"^ran BridgeHost\.InputProbe\.Build in \d+ ms\n  result: built\n$", Ug(log, "run", "BridgeHost.InputProbe.Build"));
+        Assert.Matches(@"^ran BridgeHost\.InputProbe\.Build\(\) in [\d.]+ ms\n  result: ""built""\n(  changed: .+\n)?$", Ug(log, "run", "BridgeHost.InputProbe.Build"));
 
         // In edit mode every action is refused, and nothing is held.
         Assert.Equal("not playing: ug play first\n", Ug(log, "press", "Space"));

@@ -52,11 +52,6 @@ internal static partial class EditorCommands
         yield return Command("compile", "Refresh, wait for the script compile, and list its errors.", [warnings, timeout], (root, result) =>
             Compile(root, result.GetValue(warnings), TimeSpan.FromSeconds(Math.Max(1, result.GetValue(timeout))), editorLog ?? EditorLog.DefaultPath()));
 
-        var target = new Argument<string>("target") { Description = "Namespace.Type.Method or Type.Method (static, no parameters), or a menu path like Tools/Build." };
-        var runTimeout = new Option<int>("--timeout") { Description = "Seconds to wait for the method. Default: 60.", DefaultValueFactory = _ => 60 };
-        yield return Command("run", "Run a static editor method or a menu item in the open editor.", [target, runTimeout], (root, result) =>
-            Run(root, result.GetValue(target)!, TimeSpan.FromSeconds(Math.Max(1, result.GetValue(runTimeout)))));
-
         var copy = new Option<bool>("--copy") { Description = "Copy the package into " + CopyFolder.Replace('\\', '/') + "/ instead of printing how to add it." };
         var bridge = new Command("bridge", "Add the editor bridge to the project, or remove it.");
         bridge.Subcommands.Add(Command("install", "Print how to add the bridge package, or copy it with --copy.", [copy], (root, result) =>
@@ -125,45 +120,6 @@ internal static partial class EditorCommands
         return (0, outcome.Problem == null
             ? CompileText.Format(outcome, warnings)
             : CompileText.Fallback(root, outcome.Problem, editorLog, warnings));
-    }
-
-    public static (int ExitCode, string Text) Run(string root, string target, TimeSpan timeout)
-    {
-        BridgeConnection connection = BridgeClient.Connect(root, ProcessCheck);
-        if (connection.Client == null)
-        {
-            return (0, "Unity not reachable (" + connection.Problem + "); ug run needs the bridge\n" + InstallHint(root));
-        }
-
-        using BridgeClient client = connection.Client;
-        RunOutcome outcome;
-        try
-        {
-            outcome = client.Run(target, timeout);
-        }
-        catch (BridgeUnavailableException e)
-        {
-            return (0, "no answer from Unity (" + e.Message + ")\n");
-        }
-
-        string ms = outcome.Ms.ToString("0", CultureInfo.InvariantCulture);
-        if (!outcome.Ran)
-        {
-            return (0, "did not run " + target + ": " + outcome.Error + "\n");
-        }
-
-        if (outcome.Error != null)
-        {
-            return (0, target + " threw after " + ms + " ms: " + outcome.Error + "\n" + (outcome.Frame == null ? "" : "  at " + outcome.Frame + "\n"));
-        }
-
-        var text = new StringBuilder("ran ").Append(target).Append(" in ").Append(ms).Append(" ms\n");
-        if (outcome.Result != null)
-        {
-            text.Append("  result: ").Append(outcome.Result.ReplaceLineEndings("\n    ")).Append('\n');
-        }
-
-        return (0, text.ToString());
     }
 
     public static (int ExitCode, string Text) Install(string root, bool copy, string? package)
@@ -240,6 +196,12 @@ internal static partial class EditorCommands
         /// <summary>A play-input request (SPEC-play-input): needs the module switch and bridge 0.4.0.</summary>
         public bool PlayInput { get; init; }
 
+        /// <summary>A request that runs code (`ug run`, `ug eval`): needs bridge 0.5.0.</summary>
+        public bool Code { get; init; }
+
+        /// <summary>Added to the message when Unity does not answer in time.</summary>
+        public string? NoAnswer { get; init; }
+
         public OpRequest(string pathAndQuery, params string?[] edits)
             : this(pathAndQuery, edits, OpTimeout, TimeSpan.FromSeconds(60))
         {
@@ -308,7 +270,7 @@ internal static partial class EditorCommands
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
 
-        if (request.PlayInput && !client.HasPlayInput)
+        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode))
         {
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
@@ -321,7 +283,7 @@ internal static partial class EditorCommands
         }
         catch (BridgeUnavailableException e)
         {
-            return Failed("no answer from Unity (" + e.Message + ")\n");
+            return Failed("no answer from Unity (" + e.Message + ")" + (request.NoAnswer == null ? "" : "; " + request.NoAnswer) + "\n");
         }
 
         if (answer.Local != null || answer.Online != null)
@@ -587,6 +549,18 @@ internal static partial class EditorCommands
         yield return Ops("select", "select", "Show, set or clear the editor's selection.", [selected, clear], r =>
             new OpRequest(Query("/select", ("object", r.GetValue(selected)), ("clear", True(r.GetValue(clear))))));
 
+        Argument<string?> runTarget = Optional("target", "Namespace.Type.Method or Type.Method: any static method of the project's code; or a menu path like Tools/Build. With --list: a filter.");
+        var runArgs = new Argument<string[]>("args")
+        {
+            Description = "Arguments in ug set's grammar: 3, 1.5, true, Hard (enum), 0,1,0 (vector), #ff8800, Player/Gun or Assets/X.mat (object), [a, b] (list), {a: 1} (struct), null; name=value names one.",
+            Arity = ArgumentArity.ZeroOrMore,
+        };
+        Option<bool> runList = Flag("--list", "List what can be run: types with static methods; a filter like Tools. or Spawn lists signatures.");
+        Option<bool> runMenu = Flag("--menu", "With --list: menu items instead of methods.");
+        var runTimeout = new Option<int>("--timeout") { Description = "Seconds to wait for a returned Task or IEnumerator. Default: 60.", DefaultValueFactory = _ => 60 };
+        yield return Ops("run", "run", "Run a static method of the project's code with arguments, or a menu item, in the open editor; prints its result, logs and what it modified.", [runTarget, runArgs, runList, runMenu, runTimeout], r =>
+            RunRequest(r.GetValue(runTarget), r.GetValue(runArgs) ?? [], r.GetValue(runList), r.GetValue(runMenu), r.GetValue(runTimeout)));
+
         foreach (Command command in InputCommands())
         {
             yield return command;
@@ -603,6 +577,32 @@ internal static partial class EditorCommands
         // The vendored folders joined with |, for requests whose target the bridge learns or checks itself.
         static string VendoredPrefixes(UnityGraphConfig config) => string.Join('|', config.Vendored.Prefixes);
         static string? Number(int? number) => number?.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>`/run`: the target and each argument as `a0`, `a1`, ...; or the list request. Waits the bridge's deadline plus 5 s.</summary>
+    public static OpRequest RunRequest(string? target, string[] args, bool list, bool menu, int timeout)
+    {
+        int seconds = Math.Max(1, timeout);
+        var parameters = new List<(string, string?)>();
+        if (list)
+        {
+            parameters.Add(("list", target ?? ""));
+            parameters.Add(("menu", menu ? "true" : null));
+        }
+        else
+        {
+            parameters.Add(("target", target ?? ""));
+            parameters.Add(("n", args.Length.ToString(CultureInfo.InvariantCulture)));
+            parameters.AddRange(args.Select((arg, i) => ("a" + i.ToString(CultureInfo.InvariantCulture), (string?)arg)));
+            parameters.Add(("timeout", seconds.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return new OpRequest(Query("/run", [.. parameters]))
+        {
+            Timeout = TimeSpan.FromSeconds(seconds + 5),
+            Code = true,
+            NoAnswer = "the code may still be running in the editor, and nothing stops it from outside",
+        };
     }
 
     // An editor-ops command: `command` is how the user types it, for the messages.

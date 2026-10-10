@@ -166,6 +166,29 @@ public sealed class EditorDocsAndBatchTests : IDisposable
     }
 
     [Fact]
+    public void A_run_step_that_throws_stops_the_batch()
+    {
+        _bridge.Publish(_root, bridge: "0.5.0");
+        Answer(path => path.StartsWith("/run", StringComparison.Ordinal)
+            ? "{\"error\":\"Game.Tools.Spawn(int count) threw after 2 ms: ArgumentException: count must be positive\\n  at Assets/Tools.cs:12\"}"
+            : "{\"lines\":[\"done\"]}");
+
+        (int exitCode, string output) = Run("batch", "object create A", "run Game.Tools.Spawn -1", "save");
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("""
+            1/3 object create A
+            done
+            2/3 run Game.Tools.Spawn -1
+            Game.Tools.Spawn(int count) threw after 2 ms: ArgumentException: count must be positive
+              at Assets/Tools.cs:12
+            stopped at step 2: 1 step not run. Earlier steps stay done; ug undo reverts them one by one.
+
+            """.ReplaceLineEndings("\n"), output);
+        Assert.Equal(["/status", "/object/create?name=A", "/run?target=Game.Tools.Spawn&n=1&a0=-1&timeout=60"], _bridge.Requests);
+    }
+
+    [Fact]
     public void A_vendored_edit_stops_the_batch_before_asking_Unity()
     {
         Answer(_ => "{\"lines\":[\"done\"]}");
@@ -203,7 +226,7 @@ public sealed class EditorDocsAndBatchTests : IDisposable
 
     [Theory]
     [InlineData("find --live --tag Player", "not an editor-ops command")]
-    [InlineData("run Tools/Build", "not an editor-ops command")]
+    [InlineData("run Tools.Spawn --timeout soon", "Cannot parse argument")]
     [InlineData("compile", "not an editor-ops command")]
     [InlineData("status", "not an editor-ops command")]
     [InlineData("batch \"tree\"", "not an editor-ops command")]

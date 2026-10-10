@@ -67,6 +67,9 @@ namespace UnityGraph.Bridge
                 { "/package/add", (r, c) => Deferred(() => PackageOps.Add(r)) },
                 { "/package/remove", (r, c) => Deferred(() => PackageOps.Remove(r)) },
 
+                // Running code (SPEC-editor-link, Running code).
+                { "/run", (r, c) => Deferred(() => MethodRunner.Run(r, c)) },
+
                 // Screenshots, API lookup and stats.
                 { "/shot", (r, c) => Checked(() => ShotOps.Shot(r)) },
                 { "/api", (r, c) => Checked(() => ApiOps.Api(r)) },

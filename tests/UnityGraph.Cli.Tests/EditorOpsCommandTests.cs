@@ -167,16 +167,17 @@ public sealed class EditorOpsCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData("File/Quit", "did not run File/Quit: refused, it would close the editor (ug does not quit Unity)\n", "refused, it would close the editor (ug does not quit Unity)")]
-    [InlineData("File/Build And Run", "did not run File/Build And Run: refused, it builds a player (ug does not build; use Unity's Build Profiles window)\n", "refused, it builds a player (ug does not build; use Unity's Build Profiles window)")]
-    public void Menu_refusals_are_printed_with_the_menu_path(string target, string expected, string reason)
+    [InlineData("File/Quit", "did not run File/Quit: refused, it would close the editor (ug does not quit Unity)")]
+    [InlineData("File/Build And Run", "did not run File/Build And Run: refused, it builds a player (ug does not build; use Unity's Build Profiles window)")]
+    public void Menu_refusals_are_printed_with_the_menu_path(string target, string refusal)
     {
         Answer(path => path.StartsWith("/run", StringComparison.Ordinal)
-            ? (200, "{\"ran\":false,\"result\":null,\"error\":\"" + reason + "\",\"frame\":null,\"ms\":0}")
+            ? (200, "{\"error\":\"" + refusal + "\"}")
             : (200, FakeBridge.Status("idle", 3)));
+        _bridge.Publish(_root, bridge: "0.5.0");
 
-        Assert.Equal(expected, Run("run", target).Output);
-        Assert.Contains("/run?target=" + Uri.EscapeDataString(target), _bridge.Requests);
+        Assert.Equal(refusal + "\n", Run("run", target).Output);
+        Assert.Contains("/run?target=" + Uri.EscapeDataString(target) + "&n=0&timeout=60", _bridge.Requests);
     }
 
     [Fact]

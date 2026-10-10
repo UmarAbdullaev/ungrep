@@ -61,7 +61,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.4.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.5.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -83,9 +83,15 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Report("compile after the fix (with domain reload)", clock.Elapsed);
         Assert.Matches(@"^compiled in \d+\.\d s: 0 errors\n$", fixedAnswer);
 
-        Assert.Matches(@"^ran BridgeHost\.FixtureMethods\.Hello in \d+ ms\n  result: hello from BridgeHost\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Hello"));
-        Assert.Contains("threw after", Ug(log, "run", "BridgeHost.FixtureMethods.Throws"), StringComparison.Ordinal);
-        Assert.StartsWith("did not run UnityEditor.EditorApplication.Exit", Ug(log, "run", "UnityEditor.EditorApplication.Exit"), StringComparison.Ordinal);
+        Assert.Matches(@"^ran BridgeHost\.FixtureMethods\.Hello\(\) in [\d.]+ ms\n  result: ""hello from BridgeHost""\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Hello"));
+        Assert.Matches(
+            @"^BridgeHost\.FixtureMethods\.Throws\(\) threw after [\d.]+ ms: InvalidOperationException: thrown on purpose\n  at Assets/Editor/FixtureMethods\.cs:\d+\n$",
+            Ug(log, "run", "BridgeHost.FixtureMethods.Throws"));
+        Assert.StartsWith(
+            "did not run UnityEditor.EditorApplication.Exit: UnityEditor.EditorApplication is Unity's, not the project's: ug eval",
+            Ug(log, "run", "UnityEditor.EditorApplication.Exit"),
+            StringComparison.Ordinal);
+        RunWithArguments(log);
 
         LoopConsole(log);
 
@@ -289,8 +295,9 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Assert.Equal("did not run File/Quit: refused, it would close the editor (ug does not quit Unity)\n", Ug(log, "run", "File/Quit"));
         Assert.Equal("did not run File/Build And Run: refused, it builds a player (ug does not build; use Unity's Build Profiles window)\n", Ug(log, "run", "File/Build And Run"));
         Assert.StartsWith("Unity 6000.3.14f1  idle", Ug(log, "status"), StringComparison.Ordinal);
-        Assert.Equal("did not run Tools/BridgeHost/Nope: no menu item Tools/BridgeHost/Nope\n", Ug(log, "run", "Tools/BridgeHost/Nope"));
-        Assert.Matches(@"^ran Tools/BridgeHost/Log Hello in \d+ ms\n$", Ug(log, "run", "Tools/BridgeHost/Log Hello"));
+        Assert.Equal("did not run Tools/BridgeHost/Nope: no menu item Tools/BridgeHost/Nope (ug run --list --menu lists them)\n", Ug(log, "run", "Tools/BridgeHost/Nope"));
+        Assert.Matches(@"^ran Tools/BridgeHost/Log Hello in [\d.]+ ms\n  log: hello from the menu( .*)?\n$", Ug(log, "run", "Tools/BridgeHost/Log Hello"));
+        Assert.Contains("Tools/BridgeHost/Log Hello  BridgeHost.FixtureMethods.LogHello", Ug(log, "run", "--list", "--menu", "BridgeHost"), StringComparison.Ordinal);
         Assert.Contains("hello from the menu", EditorLogText(log), StringComparison.Ordinal);
 
         string packageFolder = Path.Combine(_root, "LocalPackages", "com.ug.e2e");
@@ -301,7 +308,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.4.0  local", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.5.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
@@ -369,6 +376,10 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Ug(log, "undo");
         Ug(log, "undo");
         Assert.DoesNotContain("BatchOne", Ug(log, "tree"), StringComparison.Ordinal);
+        Assert.Contains(
+            "1/1 run BridgeHost.FixtureMethods.Add 1 2\nran BridgeHost.FixtureMethods.Add(int a, int b) in ",
+            Ug(log, "batch", "run BridgeHost.FixtureMethods.Add 1 2"),
+            StringComparison.Ordinal);
 
         clock.Restart();
         string play = Ug(log, "play");
@@ -479,6 +490,35 @@ public sealed partial class EditorEndToEndTests : IDisposable
         }
 
         Assert.Fail("the bridge was not idle within " + limit.TotalMinutes.ToString(CultureInfo.InvariantCulture) + " min");
+    }
+
+    // R1 (SPEC-editor-link, Running code): arguments, a default, overloads, an out value, waits, the undo group, the list.
+    private void RunWithArguments(string log)
+    {
+        var clock = Stopwatch.StartNew();
+        string spawned = Ug(log, "run", "BridgeHost.FixtureMethods.Spawn", "Crate", "1,2,3", "count=2");
+        Report("ug run with arguments", clock.Elapsed);
+        Tokens("ug run answer", spawned);
+        Assert.Matches(
+            @"^ran BridgeHost\.FixtureMethods\.Spawn\(string name, Vector3 position, int count\) in [\d.]+ ms\n"
+            + @"  result: GameObject\[2\] \[\S+, \S+\]\n  log: spawned 2 Crate  Assets/Editor/FixtureMethods\.cs:\d+\n  changed: .+ modified, not saved\n$",
+            spawned);
+        Assert.Equal("undid spawn\n", Ug(log, "undo"));
+
+        Assert.Matches(@"  result: ""int 5""\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Add", "2", "3"));
+        Assert.Matches(@"  result: ""double 2\.5""\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Add", "2", "0.5"));
+        Assert.Matches(@"  result: true\n  out half: 3\n$", Ug(log, "run", "BridgeHost.FixtureMethods.TryHalf", "6"));
+        Assert.StartsWith(
+            "did not run BridgeHost.FixtureMethods.Add: no overload takes these arguments",
+            Ug(log, "run", "BridgeHost.FixtureMethods.Add", "two", "3"),
+            StringComparison.Ordinal);
+        Assert.Matches(@"^ran BridgeHost\.FixtureMethods\.Later\(int milliseconds\) in \d+ ms\n  result: ""waited 300 ms""\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Later", "300"));
+        Assert.Matches(@"  result: finished after 3 steps\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Steps", "3"));
+        Assert.Matches(@"still running after 1 s; it goes on in the editor\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Later", "3000", "--timeout", "1"));
+
+        string listed = Ug(log, "run", "--list", "FixtureMethods.");
+        Assert.StartsWith("BridgeHost.FixtureMethods  ", listed, StringComparison.Ordinal);
+        Assert.Contains("  static GameObject[] Spawn(string name, Vector3 position, int count = 1)\n", listed, StringComparison.Ordinal);
     }
 
     // unity-loop (SPEC-unity-loop, Testing): `ug console` shows a logged fixture error.

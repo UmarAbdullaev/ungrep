@@ -14,8 +14,11 @@ namespace UnityGraph.Bridge
         // Exception traces: `at Game.Foo.Bar () [0x00001] in D:\Proj\Assets\Scripts\Foo.cs:12`.
         private static readonly Regex _frame = new Regex(@"(?:\(at | in )(?<file>.+?):(?<line>\d+)\)?\s*$", RegexOptions.Compiled);
 
-        /// <summary>`Assets/Scripts/Foo.cs:12`, or null when no frame is the project's own.</summary>
-        public static string OwnFrame(string stackTrace, string projectRoot)
+        /// <summary>
+        /// `Assets/Scripts/Foo.cs:12`, or null when no frame is the project's own. A frame in
+        /// <paramref name="snippet"/> (the file name an eval was compiled under) counts as own.
+        /// </summary>
+        public static string OwnFrame(string stackTrace, string projectRoot, string snippet = null)
         {
             if (string.IsNullOrEmpty(stackTrace))
             {
@@ -25,6 +28,11 @@ namespace UnityGraph.Bridge
             foreach (string line in stackTrace.Split('\n'))
             {
                 Match match = _frame.Match(line.TrimEnd('\r'));
+                if (match.Success && snippet != null && match.Groups["file"].Value == snippet)
+                {
+                    return snippet + ":" + match.Groups["line"].Value;
+                }
+
                 if (match.Success && Relative(match.Groups["file"].Value, projectRoot) is string file && IsOwn(file, projectRoot))
                 {
                     return file + ":" + match.Groups["line"].Value;
