@@ -92,6 +92,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
             Ug(log, "run", "UnityEditor.EditorApplication.Exit"),
             StringComparison.Ordinal);
         RunWithArguments(log);
+        EvalCommands(log);
 
         LoopConsole(log);
 
@@ -387,6 +388,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Assert.Matches(@"^playing \(entered in \d+\.\d s\)\n$", play);
         Assert.EndsWith("\nplaying\n", Ug(log, "scene"), StringComparison.Ordinal);
         Assert.Contains("Spawn", Ug(log, "find", "--live", "--component", "Turret"), StringComparison.Ordinal);
+        Assert.Matches(@"  result: true\n$", Ug(log, "eval", "Application.isPlaying && Object.FindAnyObjectByType<BridgeHost.Turret>() != null"));
         string perf = Ug(log, "perf");
         Assert.StartsWith("playing\nrender  ", perf, StringComparison.Ordinal);
         Assert.Contains(" draw calls  ", perf, StringComparison.Ordinal);
@@ -410,6 +412,8 @@ public sealed partial class EditorEndToEndTests : IDisposable
             Report("fresh-process ug tree, median of 5", Median(ug, 5, _ => ["tree"]));
             Report("fresh-process ug inspect, median of 5", Median(ug, 5, _ => ["inspect", "Level/Spawn", "--component", "Turret"]));
             Report("fresh-process ug object active (an edit), median of 5", Median(ug, 5, i => ["object", "active", "Crate", i % 2 == 0 ? "false" : "true"]));
+            Report("fresh-process ug eval (an expression), median of 5", Median(ug, 5, i => ["eval", "Selection.count + " + i.ToString(CultureInfo.InvariantCulture)]));
+            Report("fresh-process ug eval --check, median of 5", Median(ug, 5, _ => ["eval", "--check", "Selection.count"]));
         }
 
         int pid = _unity.Id;
@@ -519,6 +523,83 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "run", "--list", "FixtureMethods.");
         Assert.StartsWith("BridgeHost.FixtureMethods  ", listed, StringComparison.Ordinal);
         Assert.Contains("  static GameObject[] Spawn(string name, Vector3 position, int count = 1)\n", listed, StringComparison.Ordinal);
+    }
+
+    // X1 (SPEC-editor-link, Running code): an expression, statements with Undo then `ug undo`, a log, a compile
+    // error, an endless loop stopped by the guard, a file's entry with arguments, batch steps, memory per eval.
+    private void EvalCommands(string log)
+    {
+        var clock = Stopwatch.StartNew();
+        string version = Ug(log, "eval", "Application.unityVersion");
+        Report("ug eval (expression, the first: references listed)", clock.Elapsed);
+        Tokens("ug eval answer", version);
+        Assert.Matches(@"^ran snippet in [\d.]+ ms\n  result: ""6000\.3\.14f1""\n$", version);
+
+        clock.Restart();
+        string made = Ug(log, "eval", "var go = new GameObject(\"Evaled\"); Undo.RegisterCreatedObjectUndo(go, \"eval spawn\"); go.name");
+        Report("ug eval (statements)", clock.Elapsed);
+        Assert.Matches(@"^ran snippet in [\d.]+ ms\n  result: ""Evaled""\n  changed: .+ modified, not saved\n$", made);
+        Assert.Matches(@"  result: false\n$", Ug(log, "eval", "GameObject.Find(\"Evaled\") == null"));
+        Assert.Equal("undid eval spawn\n", Ug(log, "undo"));
+        Assert.Matches(@"  result: true\n$", Ug(log, "eval", "GameObject.Find(\"Evaled\") == null"));
+        Assert.Matches(@"^ran snippet in [\d.]+ ms\n  log: hello from eval  snippet:1\n$", Ug(log, "eval", "Debug.Log(\"hello from eval\");"));
+
+        Assert.StartsWith(
+            "did not run snippet: 1 compile error\n  snippet:1:13 CS1061 'Camera' does not contain a definition for 'fieldOfVeiw'",
+            Ug(log, "eval", "Camera.main.fieldOfVeiw"),
+            StringComparison.Ordinal);
+
+        clock.Restart();
+        string looped = Ug(log, "eval", "--timeout", "2", "long n = 0;\nwhile (true) { n++; }");
+        Report("ug eval of an endless loop, --timeout 2", clock.Elapsed);
+        Assert.Matches(@"^snippet threw after \d+ ms: TimeoutException: a loop kept the editor waiting for 2 s; ug stopped it\n  at snippet:2\n$", looped);
+        Assert.StartsWith("Unity 6000.3.14f1  idle", Ug(log, "status"), StringComparison.Ordinal);
+
+        // A file outside Assets/, so Unity does not compile it too.
+        string tools = Path.Combine(_root, "Tools");
+        Directory.CreateDirectory(tools);
+        string file = Path.Combine(tools, "Build.cs");
+        File.WriteAllText(
+            file,
+            "using UnityEngine;\n\npublic static class Build\n{\n    public static string Arena(int waves, Vector3 at, string level = \"Easy\") => level + \" \" + waves + \" at \" + at.x;\n\n"
+            + "    public static void Fail() => throw new System.InvalidOperationException(\"from the file\");\n}\n");
+        clock.Restart();
+        string arena = Ug(log, "eval", "--file", file, "--entry", "Build.Arena", "3", "1,2,3", "level=Hard");
+        Report("ug eval --file with arguments", clock.Elapsed);
+        Assert.Matches(@"^ran Build\.Arena\(int waves, Vector3 at, string level\) in [\d.]+ ms\n  result: ""Hard 3 at 1""\n$", arena);
+        Assert.Matches(
+            @"^Build\.Fail\(\) threw after [\d.]+ ms: InvalidOperationException: from the file\n  at " + System.Text.RegularExpressions.Regex.Escape(file.Replace('\\', '/')) + @":7\n$",
+            Ug(log, "eval", "--file", file, "--entry", "Build.Fail"));
+
+        string batch = Ug(log, "batch", "eval var n = 2; n * 21", "eval \"Debug.isDebugBuild || true\"");
+        Assert.StartsWith("1/2 eval var n = 2; n * 21\nran snippet in ", batch, StringComparison.Ordinal);
+        Assert.Contains("  result: 42\n2/2 eval \"Debug.isDebugBuild || true\"\nran snippet in ", batch, StringComparison.Ordinal);
+        Assert.Contains("  result: true\n", batch, StringComparison.Ordinal);
+
+        // Mono keeps each eval's assembly until the next domain reload: what 50 evals add. The editor's
+        // private bytes are read from here: Mono's Process class answers 0 for them.
+        const string Memory = "UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() / 1024 + \" \" + System.AppDomain.CurrentDomain.GetAssemblies().Length";
+        long[] before = MemoryNow(log, Memory);
+        clock.Restart();
+        for (int i = 0; i < 50; i++)
+        {
+            Ug(log, "eval", "Selection.count + " + i.ToString(CultureInfo.InvariantCulture));
+        }
+
+        Report("ug eval x50 in one process, per eval", clock.Elapsed / 50);
+        long[] after = MemoryNow(log, Memory);
+        Assert.Equal(before[2] + 51, after[2]);
+        TestContext.Current.TestOutputHelper?.WriteLine(
+            "memory per eval: " + ((after[0] - before[0]) / 51).ToString(CultureInfo.InvariantCulture) + " KB private, "
+            + ((after[1] - before[1]) / 51).ToString(CultureInfo.InvariantCulture) + " KB Mono heap");
+    }
+
+    // `<private KB> <Mono heap KB> <assemblies>`: the editor process's private bytes and an eval's two numbers.
+    private long[] MemoryNow(string log, string code)
+    {
+        string value = System.Text.RegularExpressions.Regex.Match(Ug(log, "eval", code), @"result: ""([\d ]+)""").Groups[1].Value;
+        _unity!.Refresh();
+        return [_unity.PrivateMemorySize64 / 1024, .. value.Split(' ').Select(v => long.Parse(v, CultureInfo.InvariantCulture))];
     }
 
     // unity-loop (SPEC-unity-loop, Testing): `ug console` shows a logged fixture error.

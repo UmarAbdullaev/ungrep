@@ -41,7 +41,8 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
 - **Transport.** `System.Net.HttpListener` (Mono's managed listener: no URL reservation, no
   admin) on `http://127.0.0.1:<port>/`, loopback only. The port is the one used before the last
   domain reload when it is still free, otherwise a free one the OS picks. HTTP/1.1, `GET` only
-  (other methods get `405`; Mono itself answers a bodiless `POST` with `411`), parameters in the
+  (other methods get `405`; Mono itself answers a bodiless `POST` with `411`) except `POST /eval`,
+  whose body (at most 16 MB, read on the listener thread) is the assembly to run; parameters in the
   query string, answers in JSON (written by a small writer in the package,
   not `JsonUtility`).
 - **Discovery.** `Library/unitygraph/bridge.json`, rewritten on each start and deleted on quit:
@@ -49,6 +50,12 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
   ```json
   {"bridge": "0.1.0", "port": 51234, "token": "<32 hex>", "pid": 20416, "unity": "6000.3.14f1"}
   ```
+
+  Written to `bridge.json.tmp`, then replaced in one step; ug reads it shared for delete, so a
+  read during a reload does not block the replace, and the bridge retries a blocked replace for
+  up to 1 s (another reader, a virus scanner). Found in X1's end to end runs: a read at the
+  wrong moment failed the replace and left the bridge unstarted until the next reload
+  (`unitygraph bridge did not start: Unable to remove the file to be replaced` in Editor.log).
 
 - **Access.** Every request carries `X-UG-Token: <token>`; a wrong or missing token is `401`.
   Requests with an `Origin` header (a browser) are `403`. Nothing is read from or written to
@@ -75,6 +82,8 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
 | `GET /tests?platform=EditMode&filter=<name>` | Starts a run through `TestRunnerApi`; answers a run id. |
 | `GET /tests/result?id=<id>` | `running`, or totals, duration and each failed test with message and first own frame. |
 | `GET /run?target=<Type.Method or menu path>` | Runs a static parameterless method of a project assembly (not `UnityEngine`/`UnityEditor`/`System`), or a menu item through `EditorApplication.ExecuteMenuItem` when the target contains `/`. Answers the result's `ToString()` (cut at 2 KB), or the exception type, message and first own frame, and the time taken. Bridge 0.5.0 replaces it: arguments, the editor-ops answer shape, see Running code. |
+| `GET /eval/refs` | Bridge 0.5.0: `{"refs": [paths], "defines": [...], "lang": "9.0"}`, the files `ug eval` compiles against (Running code). |
+| `POST /eval?...` | Bridge 0.5.0: loads the body's assembly and runs its entry; the editor-ops answer shape (Running code). |
 
 "Own frame": the first stack frame whose file is under `Assets/` or an embedded package.
 
@@ -250,14 +259,16 @@ Game.Tools  3 static methods
   method that never returns freezes the editor; ug gives up after `--timeout` plus 5 s and says
   the method may still be running. Nothing stops it from outside: `Thread.Abort` on Unity's main
   thread would leave the editor in an unknown state.
-- **Undo.** The call runs in one undo group named `ug run <Type.Method>`: what it records through
-  `Undo` (`Undo.RecordObject`, `Undo.AddComponent`, ...) is reverted by one `ug undo`. Changes made
+- **Undo.** The call runs in one undo group: what it records through `Undo`
+  (`Undo.RecordObject`, `Undo.AddComponent`, ...) is reverted by one `ug undo`. Changes made
   without `Undo` calls are not recorded, Unity's rule for every editor script. Only the synchronous
   part is in the group: what an awaited or stepped call records on later updates lands in the
   editor's own groups as it comes (collapsing them later could swallow other commands' changes).
-  Unity names a group after its records, so once the code records, `ug undo` says the code's own
-  name (`undid spawn` for `Undo.RegisterCreatedObjectUndo(go, "spawn")`); naming the group again
-  after the call does not change that (tried). Nothing is saved; a loaded scene that was clean before the call and modified after is named on a `changed:`
+  `ug undo` names the last record, so it says the code's own name (`undid spawn` for
+  `Undo.RegisterCreatedObjectUndo(go, "spawn")`). The group is not named (X1, found end to end):
+  `Undo.SetCurrentGroupName` adds a record even to a group that stays empty, so a call that
+  records nothing (`ug eval "Selection.count"`) put `ug eval` over the last change's name, and the
+  next `ug undo` said `undid ug eval` while it reverted that change. Nothing is saved; a loaded scene that was clean before the call and modified after is named on a `changed:`
   line (`changed: Main.unity modified, not saved`; edit mode only: play-mode changes are lost on
   stop anyway).
 - **Console.** What the call logged follows the result, at most 5 entries in order (`log:`,
@@ -269,6 +280,124 @@ Game.Tools  3 static methods
   `ug run --list --menu [filter]`: menu items (`TypeCache` `[MenuItem]` methods of every loaded
   assembly, Unity's too) as `path  Type.Method`. Offline, `ug find` finds methods in the graph.
 - A bridge older than 0.5.0: `bridge 0.4.0 is too old for ug run: run ug bridge install again`.
+
+### `ug eval "<C#>"`, `ug eval --file <x.cs>`
+
+Any C# in the open editor, edit or play mode, unrestricted (user, 2026-10-10): no API blocklist,
+no sandbox. ug compiles it with Roslyn; the bridge loads the assembly in memory and runs it.
+
+```
+$ ug eval "Selection.activeGameObject.GetComponentsInChildren<Renderer>().Length"
+ran snippet in 0.4 ms
+  result: 12
+
+$ ug eval "foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None)) { Undo.RecordObject(c, \"fov\"); c.fieldOfView = 50; }"
+ran snippet in 1.1 ms
+  changed: Main.unity modified, not saved
+
+$ ug eval "Camera.main.fieldOfVeiw"
+did not run snippet: 1 compile error
+  snippet:1:13 CS1061 'Camera' does not contain a definition for 'fieldOfVeiw' and no accessible extension method 'fieldOfVeiw' accepting a first argument of type 'Camera' could be found (are you missing a using directive or an assembly reference?)
+
+$ ug eval --file Tools/Build.cs --entry Build.Arena 3 Hard
+ran Build.Arena(int waves, Difficulty level) in 41 ms
+  result: Arena/Wave#3
+```
+
+- **Input.** The code as one argument, or `--file <path>` (`-` reads standard input, for a
+  heredoc, named `stdin`). Further arguments go to the entry method (below) in `ug run`'s
+  grammar, bound by the same code (overloads, `name=value`, `params`, `out`); statements take none.
+- **Shapes.** ug parses the text as a C# file (C# 9 top-level statements, without their rule that
+  statements come first):
+  - A bare expression (`Selection.count`): its value is the result.
+  - Statements: in order, the body of a generated static method. A `return x;` returns `x`; a
+    last expression statement (its `;` optional) whose type is not `void` and that is not an
+    assignment, `++` or `--` is the result. Without either the method is `void` and the answer
+    has no `result:` line (`Debug.Log("hi");`). A body with `await` becomes `async Task<object>`
+    (`async Task` without a value) and is awaited, one with `yield` an `IEnumerator` that is
+    stepped, both as `ug run` waits (`--timeout`, default 60 s). Local functions (`static int
+    Sq(int x) => x * x;` too) stay local functions. A directive pair (`#if UNITY_EDITOR` ...
+    `#endif`) may span statements; one that spans statements and types does not survive the
+    split. (A top-level member with an access modifier, `public static int Sq...`, goes into the
+    generated class as written, but Roslyn reads the statements after it as members: write it
+    as a local function or in a class.)
+  - Types and namespaces (classes, structs, enums, extension classes) stay top-level types,
+    usable from the statements. With no statements, the entry is `--entry Type.Method`, else the
+    one static `Run` or `Main` method of the file's types (any access, any parameters, any return
+    type). None or several: `did not run x.cs: no static Run() or Main(); give --entry
+    Type.Method` or the list found.
+- **Usings.** By default: `System`, `System.Collections`, `System.Collections.Generic`,
+  `System.Linq`, `System.Threading.Tasks`, `UnityEngine`, `UnityEditor`,
+  `UnityEngine.SceneManagement`, and the aliases `Object = UnityEngine.Object` and `Random =
+  UnityEngine.Random` (both names exist in `System` and `UnityEngine`; an alias of the same name in
+  the code replaces ours). The code's own `using`s are added.
+- **Compile.** In the ug process with Roslyn (`UnityGraph.Code`), as Unity compiles editor
+  scripts: C# 9 (Unity 2021.2 to 6000.x; 8.0 for 2020.2 to 2021.1, 7.3 before), the editor's
+  script defines (`EditorUserBuildSettings.activeScriptCompilationDefines`: `UNITY_EDITOR`, the
+  version, platform and project defines), unsafe code allowed, a debug build with a portable PDB
+  so a frame reads `snippet:3`. References: `GET /eval/refs` lists the files of the assemblies
+  loaded in the editor, one per name, plus the `Facades` folder next to the loaded `mscorlib`.
+  So a snippet binds against what runs: Mono's own `mscorlib` (`MonoBleedingEdge/lib/mono/unityjit-*`),
+  the same API as the `unity-4.8-api` reference assemblies Unity compiles scripts against, and
+  the project's assemblies as last compiled. The bridge keeps the list until the domain reloads
+  (a compile that changes scripts reloads it) and lists again when more assemblies have loaded.
+  Without that list (no bridge, or an error answer) ug takes every DLL in
+  `Library/ScriptAssemblies`, the editor's `Data/Managed` and `Data/Managed/UnityEngine`, and
+  `Data/MonoBleedingEdge/lib/mono/unityjit-*` with its `Facades`. The editor is the bridge's
+  process when `bridge.json` names a live one, else the version in
+  `ProjectSettings/ProjectVersion.txt` under Unity Hub's install folder (`secondaryInstallPath.json`
+  in Hub's settings folder, else Hub's default `.../Unity/Hub/Editor`). A ug process reads each
+  reference file once and again only after it changes (its write time), so the evals of a `ug
+  batch` after the first compile in tens of milliseconds, not 160 ms each (Measured).
+- **Compile errors** are the answer, nothing runs: `did not run snippet: N compile errors`, then at
+  most 10 as `snippet:line:col CSxxxx text` (`--file` shows its path; lines and columns are the
+  code's own, the generated wrapper never shows), each cut at 300 characters, then `(+N more:
+  Library/unitygraph/eval/errors.txt)` with all of them. Warnings are not shown. It is an error
+  answer, so `ug batch` stops.
+- **`--check`** compiles and prints `compiled: no errors (N ms)` or the errors (headed `snippet: N
+  compile errors`); nothing is sent to the editor. It works with Unity closed (the fallback
+  references).
+- **Run.** `POST /eval?source=&what=&entry=&n=&a0=...&timeout=` with the assembly and its PDB in
+  the body (`<4-byte little-endian assembly length><assembly><pdb>`, at most 16 MB; more is
+  `413`). Refused while compiling or importing (editor-ops rule 6). On the main thread the bridge
+  calls `Assembly.Load(assembly, pdb)`: nothing is written to disk, no domain reload. It finds the
+  entry (`entry` is its full metadata name, `Type+Nested.Method`), binds the arguments with
+  `ug run`'s code and runs it through the same path (`CodeRun`): the answer shape below named
+  `what` (sent for statements: `snippet`, or the file's name), else the entry's signature
+  (`Type.Method(params)`), the waits, the console lines, `changed:`. Frames in `source` (the name
+  the code was compiled under: `snippet`, the path as given, `stdin`) count as own, in its
+  exception and in what it logs (`log: hi  snippet:1`), until the next domain reload.
+- **Memory.** Mono cannot unload an assembly: each eval's stays loaded until the next domain
+  reload (a script compile or entering play mode with domain reload on): about 30 KB of private
+  memory per eval, the Mono heap flat (Measured). Types a snippet declares exist only in its assembly: a later eval does not see them,
+  and Unity has no script asset for them, so a `MonoBehaviour` or `ScriptableObject` declared in a
+  snippet cannot be saved in a scene or asset.
+- **Undo** (decided): as `ug run`, the synchronous part runs in one undo group (not named), so
+  one `ug undo` reverts what the snippet recorded through `Undo` (`Undo.RecordObject(t, "move")`
+  before a change, `Undo.RegisterCreatedObjectUndo`, `Undo.AddComponent`, `Undo.DestroyObjectImmediate`).
+  A field written without an `Undo` call is not recorded: Unity's rule for every editor script,
+  and ug cannot know which objects a snippet will touch to record them first. Nothing is saved.
+- **Endless loops** (decided): code on the main thread cannot be aborted from outside
+  (`Thread.Abort` on Unity's main thread would leave the editor in an unknown state). ug guards
+  the loops it compiles instead: each `while`, `do`, `for` and `foreach` body in the code starts
+  with a call to the bridge's `EvalGuard.Check(seconds)` (on the body's first line, so lines stay
+  the code's), which throws a `TimeoutException` once the main thread has been away from the
+  editor loop for `--timeout` seconds (measured from the last editor update; checked every 1,024
+  iterations). The answer is `snippet threw after 60012 ms: TimeoutException: a loop kept the
+  editor waiting for 60 s; ug stopped it` and `  at snippet:4`. Not guarded: loops inside methods
+  the code calls (the project's, Unity's, .NET's), a loop that catches every exception and goes
+  on, and endless recursion (a stack overflow ends the editor). For those ug gives up after
+  `--timeout` plus 5 s and says the code may still be running, as `ug run` does. A loop on another
+  thread is not guarded: the editor keeps running.
+- **In `ug batch`**: an `eval` step takes the rest of its line as the code, as written (no quoting
+  needed; one pair of `"` around all of it is dropped when no other `"` but `\"` is inside, and
+  `\"` then reads as `"`); options go before the code. `eval --file x.cs` works too.
+- A bridge older than 0.5.0: `bridge 0.4.0 is too old for ug eval: run ug bridge install again`;
+  `--check` still works. The same for a 0.5.0 bridge copied in before X1 (R1's, purge-squad's):
+  it answers `404` to `/eval/refs`.
+- A request the bridge refuses (`4xx`, as `413` over 16 MB) did not run: `did not run snippet:
+  bridge answered 413: the body is over 16 MB`. Only no answer at all says the code may still be
+  running.
 
 ### Answer shape (shared by `ug run` and `ug eval`)
 
@@ -311,6 +440,8 @@ Game.Tools  3 static methods
 | `ug compile` with no script changes | ≤ 1.5 s |
 | Client overhead on a compile (time beyond Unity's own compile and reload) | ≤ 1 s |
 | Bridge start after a domain reload | ≤ 20 ms on the main thread |
+| `ug eval` of an expression, fresh process (compile in ug + load and run in the editor) | ≤ 1.5 s |
+| `/eval` load and run of a small snippet, in the editor | ≤ 20 ms |
 
 ## Testing
 
@@ -318,6 +449,12 @@ Game.Tools  3 static methods
   on loopback replaying recorded answers): discovery (missing, stale pid, wrong token, older
   bridge), the compile flow including a refused connection during a reload and a new port after
   it, the deadline, error sorting, dedup and the 20-line cap.
+- **`ug eval`** (`tests/UnityGraph.Code.Tests`, `tests/UnityGraph.Cli.Tests`, no Unity): the three
+  shapes and their values, defines, the entry choice and its problems, errors on the code's own
+  lines and columns, frames naming the snippet, the loop guard (run in the test process with a
+  stand-in guard), `--check`; the fallback references and the editor folder; against the fake
+  bridge the request and body, the 10-error cap and errors file, refusals that send nothing, an
+  old bridge, batch `eval` steps and their quoting.
 - **Editor.log:** golden answers on logs recorded from `fixtures/BridgeHost` batch runs (2022.3
   format added when recorded), another project's log, a log with no compile.
 - **Bridge:** EditMode tests in `fixtures/BridgeHost` run in batch mode
@@ -326,10 +463,13 @@ Game.Tools  3 static methods
   compile message conversion, `run` resolution and refusals; for R1 argument parsing per type,
   overload choice (count, exactness, ties), optional, named, `params`, `out`, `Task` and
   `IEnumerator` waits, the formatter per row of its table, the exception shape, logs, `changed:`
-  and the undo group.
+  and the undo group; for X1 `/eval/refs`, loading an assembly with its PDB (frames name the
+  snippet), the entry binding, the loop guard, the body size cap.
 - **End to end** (env-gated on `UG_UNITY`, the editor executable): start BridgeHost in batch mode
   without `-quit`, wait for `bridge.json`, then `ug status`, a clean `ug compile`, add a file
-  with an error and `ug compile` again, `ug run` on a fixture method, stop the editor. Times go
+  with an error and `ug compile` again, `ug run` on a fixture method, `ug eval` (expression,
+  statements with Undo then `ug undo`, a compile error, an endless loop stopped by the guard, a
+  `--file` entry with arguments, a batch step), stop the editor. Times go
   in Measured.
 - Coverage ≥ 80% lines on EditorLink.
 
@@ -413,6 +553,58 @@ with `ug bridge install --copy`, fresh `ug.exe` process per call:
   `run_script`, 4 `eval_file`), code 519 bytes on average, answers 584 bytes on average (median
   197, p90 1,049). Only 2 were a single static call that `ug run` takes as is; the rest is `ug
   eval`'s (X1).
+
+X1 end-to-end test (2026-10-11, `UG_UNITY` set), BridgeHost in batch mode, commands in process
+unless marked fresh:
+
+| Step | Time |
+| --- | --- |
+| The first `ug eval` (references listed) | 2.9–3.3 s |
+| Statements with `Undo`, then the log case | 0.42–1.0 s |
+| An endless loop stopped by the guard, `--timeout 2` | 2.2–2.5 s |
+| `--file` with arguments | 0.21–0.46 s |
+| 50 evals in one process, per eval | 0.336 s; 0.058 s with the references kept |
+| Fresh process, an expression, median of 5 | 1.02–1.50 s |
+| Fresh process, `--check`, median of 5 | 0.77–1.21 s |
+
+An expression's answer is 46 bytes (11 tokens). Over 50 evals: 51 more assemblies, 30 KB private
+memory and 20 KB of Mono heap per eval (no collect first). The 1.5 s run had the test process
+and the editor compiling on the same machine; the target is met in the other run and on
+purge-squad.
+
+X1 on purge-squad (2026-10-11), the user's open editor (Unity 6000.3.14f1, in the background),
+bridge 0.5.0 with X1 copied in with `ug bridge install --copy` (imported through the old bridge's
+`/refresh`, no click needed), a fresh `ug.exe` process per call; tokens are bytes / 4:
+
+| Chore | Calls | Answer | Time |
+| --- | --- | --- | --- |
+| Expression: the 14 weapon-part assets by name (the first eval: references listed) | 1 | 234 bytes, 59 tokens | 1.60 s (ran in 277 ms) |
+| Statements: the clips of three FBX files | 1 | 290 bytes, 73 tokens (cut at 200 characters, `+more`) | 1.27 s |
+| Statements: a project `ScriptableObject` type (`NodeCatalog`) read | 1 | 70 bytes, 18 tokens | 1.09 s |
+| Create a GameObject with `Undo`, `ug undo`, check it is gone | 3 | 99 + 17 + 38 bytes, 39 tokens | 1.13 + 0.26 + 1.02 s |
+| `--file` of a class, `--entry` with two arguments | 1 | 127 bytes, 32 tokens | 1.35 s |
+| A compile error | 1 | 122 bytes, 31 tokens | 0.95 s |
+| `--check` | 1 | 29 bytes, 7 tokens | 0.87 s |
+| `ug run SaveMenu.CanDelete`, for comparison | 1 | 51 bytes, 13 tokens | 0.27 s |
+| An expression, 5 times | 1 each | 35 bytes, 9 tokens | 1.00–1.10 s |
+| `--check`, 3 times | 1 each | 29 bytes | 0.80–0.82 s (compile 648–661 ms) |
+
+- A fresh process pays for Roslyn starting cold: `--check` alone takes 0.8 s, 0.65 s of it the
+  compile. Sending, loading and running add about 0.2 s, most of it the editor's background
+  update rate; in one process `eval` minus `--check` is about 20 ms per call.
+- `ug batch` of 50 evals: 8.7 s (50 `--check` steps 8.0 s) while each compile read every
+  reference file again; with the references kept per process 2.7 s, 54 ms per eval (50 `--check`
+  steps 1.7 s).
+- Memory over 51 evals, a `GC.Collect` before each reading: private bytes (read outside the
+  editor; Mono answers 0 for its own process) +1.5 MB, about 31 KB per eval; the Mono heap
+  1,128,616 KB before, 1,128,600 KB after; 51 more assemblies (390 to 441). Without the collect
+  the heap read 61 MB higher: garbage not yet collected, not the evals.
+- After the create and `ug undo`, `ug scene` showed the scene unmodified. Nothing was saved.
+- Before X1 each chore took a throwaway editor script: write it, `ug compile` (a domain reload,
+  10.9 s here), `ug run`, delete it, compile again: 5 calls and two reloads where `ug eval` takes
+  one call and none. MCP's `eval` answers averaged 584 bytes (Evidence); these were 29 to 290.
+- Strings print as `Values.Quote` prints them for `ug inspect`: `\n` escaped, a `"` inside left
+  as is (`"5 parts: Core_Burst Core "Burst Core"; ..."`).
 
 ## Open points
 

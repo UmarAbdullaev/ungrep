@@ -409,6 +409,9 @@ namespace UnityGraph.Bridge.Tests
             Assert.AreEqual(
                 "ran UnityGraph.Bridge.Tests.RunTargets.Spawn(string name) in N ms\n  result: Crate\n  changed: Main.unity modified, not saved",
                 Run("RunTargets.Spawn", "Crate"));
+
+            // A call that records nothing leaves the last change's name: a named group would add a record of its own.
+            Run("RunTargets.Hello");
             Assert.AreEqual("undid spawn", Text(EditOps.UndoLast(false)));
             Assert.IsNull(GameObject.Find("Crate"));
         }

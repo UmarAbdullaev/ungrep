@@ -40,7 +40,6 @@ namespace UnityGraph.Bridge
         internal sealed class Call
         {
             public string What;
-            public string UndoName;
             public Func<object> Invoke;
             public bool HasResult;
             public Func<IEnumerable<KeyValuePair<string, object>>> Outs;
@@ -74,9 +73,15 @@ namespace UnityGraph.Bridge
                 Clock = Stopwatch.StartNew(),
             };
 
+            if (call.Snippet != null)
+            {
+                StackFrames.AddEvalSource(call.Snippet);
+            }
+
+            // One group, not named: Undo.SetCurrentGroupName adds a record even to an empty group, so a
+            // call that records nothing would put its name over the last change's in `ug undo`.
             Undo.IncrementCurrentGroup();
             int group = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName("ug " + call.UndoName);
             try
             {
                 run.Result = call.Invoke();
@@ -167,7 +172,7 @@ namespace UnityGraph.Bridge
             if (error != null)
             {
                 lines.Add(run.Call.What + " threw after " + ms + " ms: " + error.GetType().Name + ": " + Message(error));
-                string frame = StackFrames.OwnFrame(error.StackTrace, Bridge.ProjectRoot, run.Call.Snippet);
+                string frame = StackFrames.OwnFrame(error.StackTrace, Bridge.ProjectRoot);
                 if (frame != null)
                 {
                     lines.Add("  at " + frame);

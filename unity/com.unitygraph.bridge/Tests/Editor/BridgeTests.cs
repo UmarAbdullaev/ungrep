@@ -180,6 +180,36 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void Bridge_json_is_replaced_once_a_reader_lets_go()
+        {
+            string folder = Path.Combine(Bridge.ProjectRoot, "Temp", "ug-publish-test");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, "bridge.json");
+            File.WriteAllText(path, "old");
+            try
+            {
+                // Read the way ug read it until X1: shared for reading only, which blocks a replace.
+                var reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                var release = new Thread(() =>
+                {
+                    Thread.Sleep(200);
+                    reader.Dispose();
+                });
+                release.Start();
+
+                Bridge.Publish(path, "new");
+
+                release.Join();
+                Assert.AreEqual("new", File.ReadAllText(path));
+                Assert.IsFalse(File.Exists(path + ".tmp"));
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
         public void Query_parameters_are_decoded()
         {
             Request request = Request.From(new Uri("http://127.0.0.1:1/run?target=Tools%2FBuild+Lab&x"));

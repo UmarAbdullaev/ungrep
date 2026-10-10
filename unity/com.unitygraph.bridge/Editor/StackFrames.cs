@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
@@ -14,11 +15,21 @@ namespace UnityGraph.Bridge
         // Exception traces: `at Game.Foo.Bar () [0x00001] in D:\Proj\Assets\Scripts\Foo.cs:12`.
         private static readonly Regex _frame = new Regex(@"(?:\(at | in )(?<file>.+?):(?<line>\d+)\)?\s*$", RegexOptions.Compiled);
 
-        /// <summary>
-        /// `Assets/Scripts/Foo.cs:12`, or null when no frame is the project's own. A frame in
-        /// <paramref name="snippet"/> (the file name an eval was compiled under) counts as own.
-        /// </summary>
-        public static string OwnFrame(string stackTrace, string projectRoot, string snippet = null)
+        // The file names evals were compiled under (`snippet`, `Tools/Build.cs`); their frames are own.
+        // Locked: logs arrive on any thread.
+        private static readonly HashSet<string> _evalSources = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>Frames in <paramref name="source"/>, the name an eval's code was compiled under, count as own from now on.</summary>
+        public static void AddEvalSource(string source)
+        {
+            lock (_evalSources)
+            {
+                _evalSources.Add(source);
+            }
+        }
+
+        /// <summary>`Assets/Scripts/Foo.cs:12` (or `snippet:3` in an eval's code), or null when no frame is the project's own.</summary>
+        public static string OwnFrame(string stackTrace, string projectRoot)
         {
             if (string.IsNullOrEmpty(stackTrace))
             {
@@ -28,9 +39,9 @@ namespace UnityGraph.Bridge
             foreach (string line in stackTrace.Split('\n'))
             {
                 Match match = _frame.Match(line.TrimEnd('\r'));
-                if (match.Success && snippet != null && match.Groups["file"].Value == snippet)
+                if (match.Success && IsEvalSource(match.Groups["file"].Value))
                 {
-                    return snippet + ":" + match.Groups["line"].Value;
+                    return match.Groups["file"].Value + ":" + match.Groups["line"].Value;
                 }
 
                 if (match.Success && Relative(match.Groups["file"].Value, projectRoot) is string file && IsOwn(file, projectRoot))
@@ -40,6 +51,14 @@ namespace UnityGraph.Bridge
             }
 
             return null;
+        }
+
+        private static bool IsEvalSource(string file)
+        {
+            lock (_evalSources)
+            {
+                return _evalSources.Contains(file);
+            }
         }
 
         /// <summary>A project-relative path with `/`, or null when the path is outside the project.</summary>

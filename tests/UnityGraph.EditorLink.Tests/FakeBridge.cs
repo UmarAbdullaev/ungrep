@@ -33,6 +33,9 @@ internal sealed class FakeBridge : IDisposable
 
     public ConcurrentQueue<string?> Tokens { get; } = new();
 
+    /// <summary>The bodies of `POST` requests, in order.</summary>
+    public ConcurrentQueue<byte[]> Bodies { get; } = new();
+
     /// <summary>Writes `bridge.json` for this bridge into <paramref name="projectRoot"/>.</summary>
     public void Publish(string projectRoot, string bridge = "0.1.0", int pid = 4242, string token = Token)
     {
@@ -84,9 +87,20 @@ internal sealed class FakeBridge : IDisposable
                 string target = lines[0].Split(' ')[1];
                 Requests.Enqueue(target);
                 Tokens.Enqueue(lines.FirstOrDefault(l => l.StartsWith("X-UG-Token:", StringComparison.OrdinalIgnoreCase))?["X-UG-Token:".Length..].Trim());
+                if (lines.FirstOrDefault(l => l.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) is { } length)
+                {
+                    var body = new byte[int.Parse(length["Content-Length:".Length..].Trim(), CultureInfo.InvariantCulture)];
+                    for (int read = 0; read < body.Length;)
+                    {
+                        int got = stream.Read(body, read, body.Length - read);
+                        read += got > 0 ? got : throw new IOException("the body ended early");
+                    }
 
-                (int status, string body) = Handle(target);
-                byte[] bytes = Encoding.UTF8.GetBytes(body);
+                    Bodies.Enqueue(body);
+                }
+
+                (int status, string answer) = Handle(target);
+                byte[] bytes = Encoding.UTF8.GetBytes(answer);
                 string response = "HTTP/1.1 " + status.ToString(CultureInfo.InvariantCulture) + " X\r\nContent-Type: application/json\r\nContent-Length: "
                     + bytes.Length.ToString(CultureInfo.InvariantCulture) + "\r\nConnection: close\r\n\r\n";
                 stream.Write(Encoding.ASCII.GetBytes(response));

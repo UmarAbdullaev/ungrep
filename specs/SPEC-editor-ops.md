@@ -58,7 +58,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `batch_execute` | `ug batch` with editor commands, one process and one connection |
 | `set_active_instance` | One editor per project root |
 | `execute_custom_tool` (`tool_name`, `parameters`) | `ug run <Type.Method> [args...]` (SPEC-editor-link, Running code): any static method of the project with typed arguments, overloads, defaults, `out` values, awaited `Task`/`IEnumerator`. A custom tool's `HandleCommand(JObject)` is `ug run MyTool.HandleCommand '{"count": 3}'` (`JObject.Parse`); the tool list is `ug run --list HandleCommand` |
-| execute-code calls (MCP `execute_code`, throwaway editor scripts) | `ug eval "<C#>"`, `ug eval --file x.cs` (SPEC-editor-link, Running code) |
+| execute-code calls (MCP `execute_code`; unity-editor-mcp `eval` (`code`, `timeout`), `eval_file` (`file`, `timeout`), `run_script` (`file`, `entry`, `args`, `timeout_ms`, `dry_run`); throwaway editor scripts) | `ug eval "<C#>"`, `ug eval --file x.cs [--entry Type.Method] [args...]` (SPEC-editor-link, Running code): `code` is the argument, `file` is `--file` (`-` for standard input), `entry` is `--entry`, `args` are the arguments after it in `ug run`'s grammar, `timeout`/`timeout_ms` is `--timeout` in seconds, `dry_run` is `--check` (compile only, Unity may be closed). No temporary script in `Assets/`, no domain reload |
 
 Beyond the MCP server: the code and asset graph (answers with Unity closed), the compile gate,
 guards on serialized-field renames and `.meta` safety, token stats, and no idle context cost.

@@ -32,6 +32,7 @@ namespace UnityGraph.Bridge
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";
         private const string ConsoleKey = "unitygraph.bridge.console";
+        private const int DiscoveryAttempts = 40;
 
         private static readonly ConsoleBuffer _console = new ConsoleBuffer();
         private static Server _server;
@@ -53,6 +54,9 @@ namespace UnityGraph.Bridge
             }
             catch (Exception e)
             {
+                // A listener already started would hold its port with nothing to stop it before the next reload.
+                _server?.Stop();
+                _server = null;
                 UnityEngine.Debug.LogWarning("unitygraph bridge did not start: " + e.Message);
             }
         }
@@ -126,6 +130,7 @@ namespace UnityGraph.Bridge
 
         private static void Update()
         {
+            EvalGuard.Beat();
             RefreshStatus();
             CodeRun.Tick();
             _server.Pump(Handle);
@@ -264,15 +269,36 @@ namespace UnityGraph.Bridge
                 .Field("unity", Application.unityVersion)
                 .EndObject().ToString();
             Directory.CreateDirectory(Folder);
-            string temp = DiscoveryFile + ".tmp";
-            File.WriteAllText(temp, json);
-            if (File.Exists(DiscoveryFile))
+            Publish(DiscoveryFile, json);
+        }
+
+        /// <summary>Writes <paramref name="path"/> whole through a temporary file, so a reader never sees half of it.</summary>
+        internal static void Publish(string path, string text)
+        {
+            string temp = path + ".tmp";
+            File.WriteAllText(temp, text);
+
+            // A reader (an older ug, a virus scanner) can hold the file for a moment: a failed replace
+            // here left the bridge unstarted until the next reload, so try for up to a second.
+            for (int attempt = 1; ; attempt++)
             {
-                File.Replace(temp, DiscoveryFile, null);
-            }
-            else
-            {
-                File.Move(temp, DiscoveryFile);
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Replace(temp, path, null);
+                    }
+                    else
+                    {
+                        File.Move(temp, path);
+                    }
+
+                    return;
+                }
+                catch (IOException) when (attempt < DiscoveryAttempts)
+                {
+                    System.Threading.Thread.Sleep(25);
+                }
             }
         }
     }

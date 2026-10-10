@@ -561,6 +561,8 @@ internal static partial class EditorCommands
         yield return Ops("run", "run", "Run a static method of the project's code with arguments, or a menu item, in the open editor; prints its result, logs and what it modified.", [runTarget, runArgs, runList, runMenu, runTimeout], r =>
             RunRequest(r.GetValue(runTarget), r.GetValue(runArgs) ?? [], r.GetValue(runList), r.GetValue(runMenu), r.GetValue(runTimeout)));
 
+        yield return EvalCommand();
+
         foreach (Command command in InputCommands())
         {
             yield return command;

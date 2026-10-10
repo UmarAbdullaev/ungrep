@@ -52,6 +52,9 @@ public sealed record TestRunResult(string State, int Passed, int Failed, int Ski
 /// </summary>
 public sealed record OpAnswer(IReadOnlyList<string>? Lines, string? Error, string? Wait, string? Local = null, IReadOnlyList<string>? Online = null);
 
+/// <summary>`GET /eval/refs`: the files the editor's loaded assemblies came from, its script defines and C# version.</summary>
+public sealed record EvalRefs(IReadOnlyList<string> Refs, IReadOnlyList<string> Defines, string Lang);
+
 /// <summary>How a wait for an editor state ended; <see cref="Problem"/> is null when it was reached.</summary>
 public sealed record WaitOutcome(string? Problem, TimeSpan Elapsed)
 {

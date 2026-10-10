@@ -155,6 +155,21 @@ public sealed class BridgeClient : IDisposable
             : answer;
     }
 
+    /// <summary>`GET /eval/refs`: what `ug eval` compiles against in this editor.</summary>
+    public EvalRefs EvalRefs() => BridgeJson.Parse<EvalRefs>(Get("/eval/refs", RequestTimeout));
+
+    /// <summary>
+    /// `POST /eval`: runs a compiled snippet; <paramref name="body"/> is the assembly's length
+    /// (4 bytes, little-endian), the assembly and its PDB. The answer is an editor-ops answer.
+    /// </summary>
+    public OpAnswer Eval(string pathAndQuery, byte[] body, TimeSpan timeout)
+    {
+        OpAnswer answer = BridgeJson.Parse<OpAnswer>(Send(HttpMethod.Post, pathAndQuery, body, timeout));
+        return answer.Lines == null && answer.Error == null
+            ? throw new BridgeUnavailableException("the bridge answered neither lines nor an error")
+            : answer;
+    }
+
     /// <summary>
     /// Polls the status until the editor is in <paramref name="state"/> (`playing` counts `paused`
     /// too), riding out the domain reload play mode starts with, as the compile wait does.
@@ -309,7 +324,10 @@ public sealed class BridgeClient : IDisposable
         string json;
         try
         {
-            json = File.ReadAllText(path);
+            // Shared for delete too: the bridge replaces the file as it starts, and a read must not stop that.
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            json = reader.ReadToEnd();
         }
         catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
         {
@@ -383,17 +401,24 @@ public sealed class BridgeClient : IDisposable
         return true;
     }
 
-    private string Get(string pathAndQuery, TimeSpan timeout)
+    private string Get(string pathAndQuery, TimeSpan timeout) => Send(HttpMethod.Get, pathAndQuery, null, timeout);
+
+    private string Send(HttpMethod method, string pathAndQuery, byte[]? body, TimeSpan timeout)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:" + _info.Port.ToString(CultureInfo.InvariantCulture) + pathAndQuery);
+        using var request = new HttpRequestMessage(method, "http://127.0.0.1:" + _info.Port.ToString(CultureInfo.InvariantCulture) + pathAndQuery);
         request.Headers.Add("X-UG-Token", _info.Token);
+        if (body != null)
+        {
+            request.Content = new ByteArrayContent(body);
+        }
+
         using var cancel = new CancellationTokenSource(timeout);
         try
         {
             using HttpResponseMessage response = _http.Send(request, cancel.Token);
             using var reader = new StreamReader(response.Content.ReadAsStream(cancel.Token));
-            string body = reader.ReadToEnd();
-            return response.StatusCode == HttpStatusCode.OK ? body : throw new BridgeUnavailableException(Failure(response.StatusCode, body));
+            string text = reader.ReadToEnd();
+            return response.StatusCode == HttpStatusCode.OK ? text : throw new BridgeUnavailableException(Failure(response.StatusCode, text));
         }
         catch (HttpRequestException e)
         {

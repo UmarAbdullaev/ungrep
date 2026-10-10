@@ -65,7 +65,7 @@ internal static partial class EditorCommands
         var problems = new StringBuilder();
         for (int i = 0; i < lines.Count; i++)
         {
-            string[] words = [.. CommandLineParser.SplitCommandLine(lines[i])];
+            string[] words = EvalStep(lines[i]) ?? [.. CommandLineParser.SplitCommandLine(lines[i])];
             if (words.Length > 0 && words[0] == "ug")
             {
                 words = words[1..];
@@ -113,7 +113,11 @@ internal static partial class EditorCommands
                 var output = new StringWriter();
                 var error = new StringWriter();
                 _opFailed = false;
-                int exit = editorRoot.Parse([.. parsed[i], "--project", root]).Invoke(new InvocationConfiguration { Output = output, Error = error });
+                // --project goes before a `--` (an eval step's code follows one).
+                string[] step = parsed[i];
+                int end = Array.IndexOf(step, "--");
+                string[] words = end < 0 ? [.. step, "--project", root] : [.. step[..end], "--project", root, .. step[end..]];
+                int exit = editorRoot.Parse(words).Invoke(new InvocationConfiguration { Output = output, Error = error });
                 text.Append(output).Append(error);
                 if (exit != 0 || _opFailed || error.GetStringBuilder().Length > 0)
                 {

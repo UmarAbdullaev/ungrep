@@ -94,11 +94,17 @@ namespace UnityGraph.Bridge
 
             Type type = types[0];
             List<MethodInfo> candidates = Runnable(type).Where(m => m.Name == methodName).ToList();
-            if (candidates.Count == 0)
-            {
-                return NoMethod(type, methodName);
-            }
+            return candidates.Count == 0 ? NoMethod(type, methodName) : Choose(candidates, args, timeout, out call);
+        }
 
+        /// <summary>
+        /// The call the overload of <paramref name="candidates"/> (one type's methods of one name)
+        /// that fits <paramref name="args"/> best makes, or why none or several fit; `ug eval` binds
+        /// a file's entry with it too.
+        /// </summary>
+        public static string Choose(List<MethodInfo> candidates, List<string> args, double timeout, out CodeRun.Call call)
+        {
+            call = null;
             List<Binding> bindings = candidates.Select(m => Bind(m, args)).ToList();
             List<Binding> fits = bindings.Where(b => b.Problem == null).OrderBy(b => b.Rank).ThenBy(b => b.Defaults).ThenBy(b => b.Expanded).ToList();
             if (fits.Count == 0)
@@ -115,11 +121,11 @@ namespace UnityGraph.Bridge
 
             Binding chosen = fits[0];
             ParameterInfo[] parameters = chosen.Method.GetParameters();
-            string what = DisplayName(type) + "." + methodName + "(" + string.Join(", ", parameters.Select(p => (p.IsOut ? "out " : p.ParameterType.IsByRef ? "ref " : "") + ApiOps.TypeName(p.ParameterType) + " " + p.Name)) + ")";
+            string what = DisplayName(chosen.Method.DeclaringType) + "." + chosen.Method.Name
+                + "(" + string.Join(", ", parameters.Select(p => (p.IsOut ? "out " : p.ParameterType.IsByRef ? "ref " : "") + ApiOps.TypeName(p.ParameterType) + " " + p.Name)) + ")";
             call = new CodeRun.Call
             {
                 What = what,
-                UndoName = "run " + DisplayName(type) + "." + methodName,
                 Invoke = () => chosen.Method.Invoke(null, chosen.Values),
                 HasResult = chosen.Method.ReturnType != typeof(void),
                 Outs = () => parameters.Where(p => p.ParameterType.IsByRef).Select(p => new KeyValuePair<string, object>(p.Name, chosen.Values[p.Position])),
@@ -347,7 +353,6 @@ namespace UnityGraph.Bridge
             call = new CodeRun.Call
             {
                 What = path,
-                UndoName = "run " + path,
                 Invoke = () => EditorApplication.ExecuteMenuItem(path) ? null : new CodeRun.Refusal { Message = "did not run " + path + ": no menu item " + path + " (ug run --list --menu lists them)" },
                 Timeout = timeout,
             };

@@ -69,6 +69,8 @@ namespace UnityGraph.Bridge
 
                 // Running code (SPEC-editor-link, Running code).
                 { "/run", (r, c) => Deferred(() => MethodRunner.Run(r, c)) },
+                { "/eval/refs", (r, c) => Now(EvalRunner.Refs()) },
+                { "/eval", (r, c) => Deferred(() => EvalRunner.Run(r, c)) },
 
                 // Screenshots, API lookup and stats.
                 { "/shot", (r, c) => Checked(() => ShotOps.Shot(r)) },
