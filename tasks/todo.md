@@ -81,7 +81,7 @@ Details and acceptance criteria: `plan.md`.
 - [x] O9 editor-ops: screenshots, API lookup, stats, batch (147 EditMode tests, 3 skipped without a graphics device; ug shot|api|docs|perf|batch; docs fallback with trimmer and cache; e2e covers them)
 - [x] U1 editor-ops UI tools (P1 Part 1 gaps: `ug event list|add|remove` for UnityEvent calls, component addresses `Object:Component` in `ug set`, overlay canvases in `ug shot game`; 156 EditMode tests, e2e covers events; UI Toolkit is not drawn by `ug shot`, the answer says so; skill has a UI recipe)
 - [x] K1 skill diet: SKILL.md 10.7 KB (~2.7k tokens) to 2.0 KB (~510); option lists left to `ug <cmd> --help`, UI recipe moved to skills/unity/ui.md (read on demand); SPEC budget now 600
-- [ ] O10 editor-ops: purge-squad measurement (edits there allowed by the user 2026-09-30)
+- [ ] O10 editor-ops: purge-squad measurement (edits there allowed by the user 2026-09-30); runs after R1-O13 (user, 2026-10-10), three-way: `ug` vs Unity CLI (`com.unity.pipeline`) vs MCP for Unity on the same chores; ask before installing either in purge-squad
 
 ## Not built yet (planned 2026-10-01; spec first for each, then tests, then a purge-squad measurement)
 
@@ -100,7 +100,18 @@ its skill line (one line in SKILL.md, detail in `--help`; keep the body under 60
 - [x] I4 after each action a one-line digest (new console errors, objects changed, scene change) and optional `--shot`; batchable through `ug batch`
 - [x] Q2 query: `ug outline <file>` (members with lines, no bodies) and `ug impact <symbol>` (what breaks if it changes: refs grouped by kind, serialized-data counts)
 - [ ] G1 guards spec, then hooks: serialized field renamed or removed (assets holding data), `[SerializeReference]` type moves, `.meta`-safe `mv`/`cp`/`rm`, vendored-folder edits; each hook silent unless it fires
+
+Unity MCP gaps (added 2026-10-10 by the user, in this order after G1; O10 runs after them). Full
+capability, not cut down to save tokens (user, 2026-10-10): answers stay compact with `more`, but
+nothing MCP for Unity can do is left out for cost reasons.
+
+- [ ] R1 `ug run Type.Method [args...]`: static methods with parameters (numbers, bool, string, enum, vectors, colours, object addresses, asset paths; parsed with `ug set`'s value parser), return value printed; closes MCP `execute_custom_tool`
+- [ ] X1 `ug eval "<C#>"` / `ug eval --file <x.cs>`: any C# in the open editor (edit or play mode), return value printed, compile errors with lines, `using`s for UnityEngine/UnityEditor by default; snippet compiled by `ug` with Roslyn against the project's and Unity's assemblies, loaded by the bridge in memory (no domain reload); unrestricted (user, 2026-10-10)
+- [ ] O11 `ug shot` viewpoints: `--from x,y,z --look <object|x,y,z>` (temporary camera, nothing saved), `ug shot scene --frame <object>`, `ug shot <object> --angles` (front/back/left/right/top/three-quarter in one PNG contact sheet), `--orbit` angle and elevation grid; closes MCP `manage_scene screenshot` modes and `manage_camera screenshot_multiview`
+- [ ] U2 UI Toolkit (spike first: runtime panel listing, event sending, offscreen drawing): `ug ui` lists UI Toolkit elements (name, classes, text, screen rect) with `doc/Name` addresses, `ug click` on them, `ug tree --ui <UIDocument>` visual tree, `ug shot` draws UI Toolkit, UIDocument and PanelSettings setup through `ug component add`/`ug asset create` (checked, or new commands where missing); asset-index edges for UXML templates and USS style sheets; closes MCP `manage_ui`
+- [ ] O12 profiler: `ug perf --record <s>` (top markers by self ms, GC alloc, frame spikes), `ug perf profiler start|stop|status` with `.raw` files and areas, `ug perf memory` (top objects by size, `--object <x>`), snapshots take/list/compare (ask before adding `com.unity.memoryprofiler` to a project), Frame Debugger enable/events/disable; all lists capped with `more`; closes MCP `manage_profiler`
+- [ ] O13 camera and Cinemachine: `ug camera list|create|priority|aim|body|noise|blend|force|release|brain` over Cinemachine 3 components (plain Camera when Cinemachine is absent), live camera in the answer; tests on a fixture with and without the package; closes MCP `manage_camera`
 - [ ] W1 worker-agent: Unity worker subagent, delegation rules (only chores of 3+ steps), verdict at most 800 tokens
 - [ ] V1 viewer: `ug view` self-contained HTML graph for people, 0 tokens to Claude
 - [ ] B1 bench: question suites (grep baseline, codegraph, Graphify, unitygraph) scored on calls, tokens, correctness
-- [ ] D1 decide the open editor-ops points: `o:` keys through `GlobalObjectId`; UI Toolkit in `ug shot` (offscreen panel spike)
+- [ ] D1 decide the open editor-ops points: `o:` keys through `GlobalObjectId` (UI Toolkit in `ug shot` moved to U2)
