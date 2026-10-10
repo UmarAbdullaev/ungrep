@@ -51,6 +51,16 @@ public sealed class UnityGraphConfigTests
     [InlineData("""{ "docs": false }""", "docs must be an object")]
     [InlineData("""{ "docs": { "offline": true } }""", "unknown setting 'docs.offline' (known: online)")]
     [InlineData("""{ "docs": { "online": "no" } }""", "docs.online must be true or false")]
+    [InlineData("""{ "guards": "deny" }""", "guards must be an object")]
+    [InlineData("""{ "guards": { "meta": "maybe" } }""", "guards.meta must be \"warn\", \"deny\" or \"off\"")]
+    [InlineData("""{ "guards": { "rename": "warn" } }""", "unknown setting 'guards.rename' (known: field-removed, serialize-reference, meta, vendored, lint)")]
+    [InlineData("""{ "guards": { "lint": "warn" } }""", "guards.lint must be an object")]
+    [InlineData("""{ "guards": { "lint": { "mode": "loud" } } }""", "guards.lint.mode must be")]
+    [InlineData("""{ "guards": { "lint": { "level": "warn" } } }""", "unknown setting 'guards.lint.level' (known: mode, patterns)")]
+    [InlineData("""{ "guards": { "lint": { "patterns": {} } } }""", "guards.lint.patterns must be an array")]
+    [InlineData("""{ "guards": { "lint": { "patterns": [ "Find" ] } } }""", "guards.lint.patterns[0] must be an object with a \"pattern\" string")]
+    [InlineData("""{ "guards": { "lint": { "patterns": [ { "pattern": "(" } ] } } }""", "guards.lint.patterns[0].pattern is not a valid regex")]
+    [InlineData("""{ "guards": { "lint": { "patterns": [ { "pattern": "x", "why": "y" } ] } } }""", "guards.lint.patterns[0]: only \"pattern\" and a string \"message\" are known")]
     public void Rejects_bad_files_naming_the_setting(string json, string message)
     {
         var e = Assert.Throws<FormatException>(() => UnityGraphConfig.Parse(json));
@@ -93,6 +103,37 @@ public sealed class UnityGraphConfigTests
         {
             Assert.Throws<ArgumentException>(() => new VendoredFolders([prefix]));
         }
+    }
+
+    [Fact]
+    public void Guards_warn_by_default_and_read_modes_and_lint_patterns()
+    {
+        Assert.All(GuardSettings.Cases.Append("lint"), c => Assert.Equal(GuardMode.Warn, UnityGraphConfig.Default.Guards.ModeOf(c)));
+        Assert.Empty(UnityGraphConfig.Default.Guards.LintPatterns);
+
+        GuardSettings guards = UnityGraphConfig.Parse("""
+            {
+              "guards": {
+                "meta": "deny",
+                "vendored": "off",
+                "lint": {
+                  "mode": "deny",
+                  "patterns": [
+                    { "pattern": "GameObject\\.Find\\(", "message": "cache it" },
+                    { "pattern": "SendMessage\\(" },
+                  ],
+                },
+              },
+            }
+            """).Guards;
+
+        Assert.Equal(GuardMode.Deny, guards.ModeOf("meta"));
+        Assert.Equal(GuardMode.Off, guards.ModeOf("vendored"));
+        Assert.Equal(GuardMode.Warn, guards.ModeOf("field-removed"));
+        Assert.Equal(GuardMode.Deny, guards.ModeOf("lint"));
+        Assert.Equal(["cache it", ""], guards.LintPatterns.Select(p => p.Message));
+        Assert.Matches(guards.LintPatterns[0].Pattern, """var t = GameObject.Find("Turntable");""");
+        Assert.Throws<ArgumentException>(() => guards.ModeOf("rename"));
     }
 
     [Fact]

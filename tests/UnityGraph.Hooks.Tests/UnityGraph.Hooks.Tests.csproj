@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\src\UnityGraph.Hooks\UnityGraph.Hooks.csproj" />
+    <ProjectReference Include="..\..\src\UnityGraph.Code\UnityGraph.Code.csproj" />
+    <ProjectReference Include="..\..\src\UnityGraph.Assets\UnityGraph.Assets.csproj" />
   </ItemGroup>
 
   <ItemGroup>

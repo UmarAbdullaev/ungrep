@@ -29,7 +29,7 @@ public sealed class CompileGateHandler : IHookHandler
 
     public string? Handle(HookInput input, UnityProject project, CancellationToken cancel)
     {
-        string marker = MarkerPath(project.Root, input.SessionId);
+        string marker = SessionMarker.PathOf(project.Root, "gate", input.SessionId);
         if (input.EventName == "PostToolUse")
         {
             Track(input, project.Root, marker);
@@ -49,12 +49,6 @@ public sealed class CompileGateHandler : IHookHandler
 
         File.Delete(marker);
         return answer.Result == GateResult.Errors ? JsonSerializer.Serialize(new { decision = "block", reason = answer.Text }) : null;
-    }
-
-    private static string MarkerPath(string projectRoot, string? sessionId)
-    {
-        string id = new((sessionId ?? "none").Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray());
-        return Path.Combine(projectRoot, "Library", "unitygraph", "gate-" + (id.Length == 0 ? "none" : id));
     }
 
     // A script under Assets/ or Packages/ of the project: remember the edit, say nothing.

@@ -462,6 +462,33 @@ public sealed class GraphStore : IDisposable
         return ReadStrings(command);
     }
 
+    /// <summary>The record of an indexed file, or null when the graph does not hold it.</summary>
+    public FileRecord? GetFile(string path)
+    {
+        using SqliteCommand command = ReadCommand("SELECT size, mtime_ns, hash, indexer, status FROM files WHERE path = $path");
+        command.Parameters.AddWithValue("$path", path);
+        using SqliteDataReader reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        string indexer = reader.GetValue(3).ToString()!;
+        string status = reader.GetValue(4).ToString()!;
+        return new FileRecord(
+            path, reader.GetInt64(0), reader.GetInt64(1), Convert.ToHexString((byte[])reader.GetValue(2)).ToLowerInvariant(),
+            indexer == "code" ? Indexer.Code : Indexer.Asset,
+            status == "binary" ? FileStatus.Binary : status == "error" ? FileStatus.Error : FileStatus.Ok);
+    }
+
+    /// <summary>Indexed files whose path starts with <paramref name="prefix"/> (a folder path ending in `/`), ordered.</summary>
+    public IReadOnlyList<string> FilesUnder(string prefix)
+    {
+        using SqliteCommand command = ReadCommand("SELECT path FROM files WHERE substr(path, 1, length($prefix)) = $prefix ORDER BY path");
+        command.Parameters.AddWithValue("$prefix", prefix);
+        return ReadStrings(command);
+    }
+
     /// <summary>Files owning an edge of one of <paramref name="kinds"/> into any of <paramref name="keys"/>, ordered.</summary>
     public IReadOnlyList<string> FilesWithEdgesTo(IEnumerable<string> keys, EdgeKindSet kinds)
     {

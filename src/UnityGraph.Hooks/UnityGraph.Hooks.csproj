@@ -2,5 +2,10 @@
   <ItemGroup>
     <ProjectReference Include="..\UnityGraph.Core\UnityGraph.Core.csproj" />
     <ProjectReference Include="..\UnityGraph.EditorLink\UnityGraph.EditorLink.csproj" />
+    <ProjectReference Include="..\UnityGraph.Query\UnityGraph.Query.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UnityGraph.Hooks.Tests" />
   </ItemGroup>
 </Project>

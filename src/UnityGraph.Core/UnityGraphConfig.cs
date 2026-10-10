@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace UnityGraph.Core;
 
@@ -35,9 +36,10 @@ public sealed class UnityGraphConfig
 
     private readonly IReadOnlyDictionary<string, bool> _modules;
 
-    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget, VendoredFolders? vendored, bool docsOnline = true)
+    private UnityGraphConfig(IReadOnlyDictionary<string, bool> modules, int answerBudget, VendoredFolders? vendored, bool docsOnline = true, GuardSettings? guards = null)
     {
         _modules = modules;
+        Guards = guards ?? GuardSettings.Default;
         AnswerBudget = answerBudget;
         DocsOnline = docsOnline;
         Vendored = vendored ?? VendoredFolders.Default;
@@ -45,6 +47,9 @@ public sealed class UnityGraphConfig
     }
 
     public static UnityGraphConfig Default { get; } = new(ModuleDefaults, DefaultAnswerBudget, null);
+
+    /// <summary>The `guards` section: a mode per case and the lint patterns.</summary>
+    public GuardSettings Guards { get; }
 
     /// <summary>Third-party folders: the `vendored` setting, or <see cref="VendoredFolders.Default"/>.</summary>
     public VendoredFolders Vendored { get; }
@@ -96,6 +101,7 @@ public sealed class UnityGraphConfig
             int budget = DefaultAnswerBudget;
             VendoredFolders? vendored = null;
             bool docsOnline = true;
+            GuardSettings? guards = null;
             foreach (JsonProperty setting in doc.RootElement.EnumerateObject())
             {
                 switch (setting.Name)
@@ -118,12 +124,112 @@ public sealed class UnityGraphConfig
                     case "docs":
                         docsOnline = ReadDocs(setting.Value);
                         break;
+                    case "guards":
+                        guards = ReadGuards(setting.Value);
+                        break;
                     default:
-                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget, vendored, docs)");
+                        throw new FormatException($"unknown setting '{setting.Name}' (known: modules, answerBudget, vendored, docs, guards)");
                 }
             }
 
-            return new UnityGraphConfig(modules, budget, vendored, docsOnline);
+            return new UnityGraphConfig(modules, budget, vendored, docsOnline, guards);
+        }
+    }
+
+    private static GuardSettings ReadGuards(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new FormatException("guards must be an object like { \"meta\": \"deny\" }");
+        }
+
+        Dictionary<string, GuardMode> modes = GuardSettings.Default.ModesCopy();
+        GuardMode lintMode = GuardMode.Warn;
+        var patterns = new List<LintPattern>();
+        foreach (JsonProperty setting in value.EnumerateObject())
+        {
+            if (setting.Name == "lint")
+            {
+                (lintMode, patterns) = ReadLint(setting.Value);
+            }
+            else if (modes.ContainsKey(setting.Name))
+            {
+                string? text = setting.Value.ValueKind == JsonValueKind.String ? setting.Value.GetString() : null;
+                modes[setting.Name] = GuardSettings.ParseMode("guards." + setting.Name, text);
+            }
+            else
+            {
+                throw new FormatException($"unknown setting 'guards.{setting.Name}' (known: {string.Join(", ", GuardSettings.Cases)}, lint)");
+            }
+        }
+
+        return new GuardSettings(modes, lintMode, patterns);
+    }
+
+    private static (GuardMode Mode, List<LintPattern> Patterns) ReadLint(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new FormatException("guards.lint must be an object like { \"patterns\": [ ... ] }");
+        }
+
+        GuardMode mode = GuardMode.Warn;
+        var patterns = new List<LintPattern>();
+        foreach (JsonProperty setting in value.EnumerateObject())
+        {
+            switch (setting.Name)
+            {
+                case "mode":
+                    string? text = setting.Value.ValueKind == JsonValueKind.String ? setting.Value.GetString() : null;
+                    mode = GuardSettings.ParseMode("guards.lint.mode", text);
+                    break;
+                case "patterns":
+                    if (setting.Value.ValueKind != JsonValueKind.Array)
+                    {
+                        throw new FormatException("guards.lint.patterns must be an array of { \"pattern\", \"message\" }");
+                    }
+
+                    int index = 0;
+                    foreach (JsonElement item in setting.Value.EnumerateArray())
+                    {
+                        patterns.Add(ReadPattern(item, index++));
+                    }
+
+                    break;
+                default:
+                    throw new FormatException($"unknown setting 'guards.lint.{setting.Name}' (known: mode, patterns)");
+            }
+        }
+
+        return (mode, patterns);
+    }
+
+    private static LintPattern ReadPattern(JsonElement item, int index)
+    {
+        string name = $"guards.lint.patterns[{index}]";
+        if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("pattern", out JsonElement pattern) || pattern.ValueKind != JsonValueKind.String)
+        {
+            throw new FormatException($"{name} must be an object with a \"pattern\" string");
+        }
+
+        string message = "";
+        foreach (JsonProperty setting in item.EnumerateObject().Where(s => s.Name != "pattern"))
+        {
+            if (setting.Name != "message" || setting.Value.ValueKind != JsonValueKind.String)
+            {
+                throw new FormatException($"{name}: only \"pattern\" and a string \"message\" are known");
+            }
+
+            message = setting.Value.GetString()!;
+        }
+
+        try
+        {
+            return new LintPattern(new Regex(pattern.GetString()!, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(50)), message);
+        }
+        catch (ArgumentException e)
+        {
+            throw new FormatException($"{name}.pattern is not a valid regex: {e.Message}", e);
         }
     }
 
