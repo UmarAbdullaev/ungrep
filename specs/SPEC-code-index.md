@@ -155,7 +155,7 @@ serialization table test (SPEC Testing strategy).
 | `inherits` | type → base class (not `object`); interface → interface it extends | file of that base list | base list |
 | `implements` | type → each interface in its own base list | file of that base list | base list |
 | `overrides` | method/property/event → overridden member, and explicit or implicit interface implementations of it | member's file | member's first line |
-| `calls` | enclosing member → invoked method, constructor, property accessor (as the property), event add/remove (as the event) | call site's file | call site |
+| `calls` | enclosing member → invoked method, constructor, property accessor (as the property), event add/remove (as the event), field read or written (as the field), method named without a call (a method group); how, in `use` (Uses, below) | call site's file | call site |
 | `uses_type` | enclosing member → type in `typeof`, `GetComponent<T>`-style type arguments, `new T()`, casts, `is`/`as`, declarations of locals, parameters and fields; `[RequireComponent(typeof(T))]` from the type | usage's file | usage |
 | `dispatches` | enclosing member → method named by a string | call site's file | call site |
 | `script_defines` | `a:<guid>` of `<file>.cs.meta` → the file's top-level type named like the file | the `.cs` file | type's first line |
@@ -168,8 +168,28 @@ serialization table test (SPEC Testing strategy).
   still gives `uses_type T`.
 - Generic targets point at the original definition (`List<int>.Add` → `List`1.Add`), so edges
   land on nodes.
-- One edge per (src, kind, dst) per file, at the first line it occurs: the graph answers "who
-  calls X", not "how often".
+- One edge per (src, kind, dst, props) per file, at the first line it occurs: the graph answers
+  "who calls X", not "how often". A member that reads and writes a field has two edges; one that
+  reads it in three places has one.
+- **Uses (B1g, 2026-10-11).** A `calls` edge that is not a plain call says how, in props.
+  `use`:
+  - `read` / `write`: a field or property read, or written: `=`, a compound assignment, `++` and
+    `--` (each a write), an `out` or `ref` argument, an object initializer, a deconstruction.
+  - `subscribe` / `unsubscribe` / `raise`: an event, a field or property of a delegate type, or
+    one of a type derived from `UnityEngine.Events.UnityEventBase`: `+=` / `-=`;
+    `AddListener` / `RemoveListener`, and `RemoveAllListeners` (no handler); invoking it
+    (`E(x)`, `E.Invoke(x)`, `E?.Invoke(x)`) raises. `=` on a delegate is a `write`.
+  - `delegate`: a method named without being called (`list.Sort(Compare)`, `Action a = Stop`).
+  - none: a call.
+
+  A subscription names its handler: `handler` is the handler method's key for a method group of
+  an indexed method, `lambda` for a lambda or anonymous method. The method group gets its own
+  edge, from the same member, with the same `use` and `event`: the event's key, or `Type.member`
+  when the event is not indexed (`Button.onClick`). So `_health.Died += OnDied` in `Awake` gives
+  `Awake → Health.Died {use: subscribe, handler: OnDied}` and `Awake → OnDied {use: subscribe,
+  event: Health.Died}`. Before B1g the handler's edge was a plain call, fields had no `calls`
+  edges, and `ug refs` on an event listed `+=`, `-=` and the raise alike as `called from`
+  (N3's agent run grepped `Died [+-]=` for the handlers).
 - A member's own type (return type, field type) is a `uses_type` from the member.
 - **Dispatch (heuristic unless noted):** a string literal or `const` string argument to
   `SendMessage`, `SendMessageUpwards`, `BroadcastMessage`, `Invoke`, `InvokeRepeating`,

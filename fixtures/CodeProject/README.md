@@ -16,4 +16,6 @@ instances, overrides and UnityEvent calls, a material, ScriptableObjects and an 
 group. GUIDs are readable patterns (`b1000…01`). `Data/Baked.asset` is binary on purpose,
 `Scenes/New.unity` has no `.meta` on purpose, and `Textures/Grid.png` is a text placeholder.
 `ILockable` extends `IOpenable` and `Door` implements it, so `IOpenable` has an implementer
-through an extending interface (B1c).
+through an extending interface (B1c). `Spectator` (in `Turntable.cs`) subscribes to and
+unsubscribes from `Turntable.Rotated` with a method and a lambda, uses a UnityEvent and a
+delegate field, so each `use` of a `calls` edge has a line (B1g).

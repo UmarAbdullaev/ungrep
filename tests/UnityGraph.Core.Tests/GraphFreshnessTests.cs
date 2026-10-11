@@ -153,7 +153,8 @@ public sealed class GraphFreshnessTests : IDisposable
     [Theory]
     [InlineData(null)] // before whole values (C1)
     [InlineData("whole")] // before declaration lines (B1e)
-    public void A_graph_from_older_rules_has_every_file_indexed_again_once(string? rules)
+    [InlineData("whole, declaration lines")] // before uses (B1g)
+    public void A_graph_from_older_rules_is_rebuilt_on_the_first_write_open(string? rules)
     {
         WriteFile("Assets/a.cs", "class A {}");
         WriteFile("Assets/b.cs", "class B {}");
@@ -175,12 +176,13 @@ public sealed class GraphFreshnessTests : IDisposable
 
         using (GraphStore store = GraphStore.Open(_root, StoreMode.ReadWrite))
         {
-            Assert.False(store.Created);
-            Assert.Equal(["Assets/a.cs", "Assets/b.cs"], store.CheckFreshness(Stats("Assets/a.cs", "Assets/b.cs")).Changed.Order(StringComparer.Ordinal));
+            Assert.True(store.Created);
+            Assert.Equal(["Assets/a.cs", "Assets/b.cs"], store.CheckFreshness(Stats("Assets/a.cs", "Assets/b.cs")).Added.Order(StringComparer.Ordinal));
         }
 
         Indexed("Assets/a.cs", "Assets/b.cs").Dispose();
         using GraphStore again = GraphStore.Open(_root, StoreMode.ReadWrite);
+        Assert.False(again.Created);
         Assert.True(again.CheckFreshness(Stats("Assets/a.cs", "Assets/b.cs")).IsFresh);
     }
 }

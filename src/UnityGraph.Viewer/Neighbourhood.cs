@@ -91,6 +91,10 @@ public static class Neighbourhood
         _ => "assembly",
     };
 
+    // A `calls` edge that reads or writes a field or property is a reference (B1g).
+    internal static string Family(Edge edge) =>
+        edge.Kind == EdgeKind.Calls && Names.Prop(edge, "use") is "read" or "write" ? "references" : Family(edge.Kind);
+
     // What a `+N more` node calls its group: `+18 more callers`.
     private static string Noun(string family, bool incoming) => (family, incoming) switch
     {
@@ -227,7 +231,7 @@ public static class Neighbourhood
                 bool up = e.Kind == EdgeKind.ChildOf;
                 if (!up)
                 {
-                    steps.Add(new Step(e, Incoming: false, e.Dst, hit.Resolved, Family(e.Kind), Down: e.Kind is EdgeKind.Contains or EdgeKind.Places));
+                    steps.Add(new Step(e, Incoming: false, e.Dst, hit.Resolved, Family(e), Down: e.Kind is EdgeKind.Contains or EdgeKind.Places));
                 }
             }
 
@@ -244,7 +248,7 @@ public static class Neighbourhood
                 Edge e = hit.Edge;
                 if (e.Kind is not (EdgeKind.Contains or EdgeKind.Places))
                 {
-                    steps.Add(new Step(e, Incoming: true, e.Src, hit.Resolved, Family(e.Kind), Down: e.Kind == EdgeKind.ChildOf));
+                    steps.Add(new Step(e, Incoming: true, e.Src, hit.Resolved, Family(e), Down: e.Kind == EdgeKind.ChildOf));
                 }
             }
 
@@ -405,9 +409,16 @@ public static class Neighbourhood
             return group;
         }
 
+        // `subscribe, handler Game.Hud.OnDied`: how a `calls` edge uses its target (B1g).
+        private static string? Use(Edge edge) =>
+            Names.Prop(edge, "use") is not { } use ? null
+            : Names.Prop(edge, "handler") is { } handler ? $"{use}, handler {Names.Qualified(handler)}"
+            : Names.Prop(edge, "event") is { } listened ? $"{use}, {Names.Qualified(listened)}"
+            : use;
+
         private void AddEdge(Edge edge, int src, int dst)
         {
-            if (Family(edge.Kind) == "structure" || !_edgeSeen.Add(edge))
+            if (Family(edge) == "structure" || !_edgeSeen.Add(edge))
             {
                 return;
             }
@@ -418,9 +429,10 @@ public static class Neighbourhood
                 EdgeKind.EventCalls => Names.Prop(edge, "event"),
                 EdgeKind.OverridesValue => Names.Prop(edge, "path"),
                 EdgeKind.Addressable => Names.Prop(edge, "address"),
+                EdgeKind.Calls => Use(edge),
                 _ => null,
             };
-            Edges.Add(new ViewEdge(src, dst, edge.Kind, Family(edge.Kind), edge.Confidence != Confidence.Exact, note, Names.Location(edge)));
+            Edges.Add(new ViewEdge(src, dst, edge.Kind, Family(edge), edge.Confidence != Confidence.Exact, note, Names.Location(edge)));
         }
 
         private int Add(Node node, int depth, bool root, bool container)

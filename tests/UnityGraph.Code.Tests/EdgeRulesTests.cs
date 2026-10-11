@@ -50,6 +50,82 @@ public sealed class EdgeRulesTests : IDisposable
     }
 
     [Fact]
+    public void Uses_say_read_write_subscribe_unsubscribe_raise_and_delegate_with_the_handler()
+    {
+        IReadOnlyList<string> edges = Uses("""
+            using System;
+            using UnityEngine.Events;
+            namespace Game.Lab
+            {
+                public class Bell
+                {
+                    public event Action<int> Rang;
+                    public Action Done;
+                    public UnityEvent Clicked = new UnityEvent();
+                    public int Count;
+                    public int Size { get; set; }
+                    public void Ring() { Rang?.Invoke(Count); Done(); Clicked.Invoke(); }
+                }
+                public class Listener
+                {
+                    private Bell _bell;
+                    private int _last;
+                    public void Hook()
+                    {
+                        _bell.Rang += OnRang;
+                        _bell.Rang -= this.OnRang;
+                        _bell.Rang += n => _last = n;
+                        _bell.Done = Stop;
+                        _bell.Clicked.AddListener(Stop);
+                        _bell.Clicked?.RemoveListener(Stop);
+                        _bell.Clicked.RemoveAllListeners();
+                        _bell.Count++;
+                        _bell.Size += 2;
+                        int s = _bell.Size;
+                        Read(out _bell.Count);
+                        (_last, s) = (1, 2);
+                        Func<int> f = Get;
+                    }
+                    private void OnRang(int n) { }
+                    private void Stop() { }
+                    private int Get() => 0;
+                    private static void Read(out int x) { x = 0; }
+                }
+            }
+            """);
+
+        const string Hook = "cs:M:Game.Lab.Listener.Hook calls ";
+        const string Ring = "cs:M:Game.Lab.Bell.Ring calls ";
+        Assert.Contains(Ring + "cs:E:Game.Lab.Bell.Rang @12 {\"use\":\"raise\"}", edges);
+        Assert.Contains(Ring + "cs:F:Game.Lab.Bell.Count @12 {\"use\":\"read\"}", edges);
+        Assert.Contains(Ring + "cs:F:Game.Lab.Bell.Done @12 {\"use\":\"raise\"}", edges);
+        Assert.Contains(Ring + "cs:F:Game.Lab.Bell.Clicked @12 {\"use\":\"raise\"}", edges);
+        Assert.Contains(Hook + "cs:E:Game.Lab.Bell.Rang @20 {\"use\":\"subscribe\",\"handler\":\"cs:M:Game.Lab.Listener.OnRang(System.Int32)\"}", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.OnRang(System.Int32) @20 {\"use\":\"subscribe\",\"event\":\"cs:E:Game.Lab.Bell.Rang\"}", edges);
+        Assert.Contains(Hook + "cs:E:Game.Lab.Bell.Rang @21 {\"use\":\"unsubscribe\",\"handler\":\"cs:M:Game.Lab.Listener.OnRang(System.Int32)\"}", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.OnRang(System.Int32) @21 {\"use\":\"unsubscribe\",\"event\":\"cs:E:Game.Lab.Bell.Rang\"}", edges);
+        Assert.Contains(Hook + "cs:E:Game.Lab.Bell.Rang @22 {\"use\":\"subscribe\",\"handler\":\"lambda\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Listener._last @22 {\"use\":\"write\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Bell.Done @23 {\"use\":\"write\"}", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.Stop @23 {\"use\":\"delegate\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Bell.Clicked @24 {\"use\":\"subscribe\",\"handler\":\"cs:M:Game.Lab.Listener.Stop\"}", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.Stop @24 {\"use\":\"subscribe\",\"event\":\"cs:F:Game.Lab.Bell.Clicked\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Bell.Clicked @25 {\"use\":\"unsubscribe\",\"handler\":\"cs:M:Game.Lab.Listener.Stop\"}", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.Stop @25 {\"use\":\"unsubscribe\",\"event\":\"cs:F:Game.Lab.Bell.Clicked\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Bell.Clicked @26 {\"use\":\"unsubscribe\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Listener._bell @20 {\"use\":\"read\"}", edges);
+        Assert.Contains(Hook + "cs:F:Game.Lab.Bell.Count @27 {\"use\":\"write\"}", edges);
+        Assert.Contains(Hook + "cs:P:Game.Lab.Bell.Size @28 {\"use\":\"write\"}", edges);
+        Assert.Contains(Hook + "cs:P:Game.Lab.Bell.Size @29 {\"use\":\"read\"}", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.Read(System.Int32@) @30", edges);
+        Assert.Contains(Hook + "cs:M:Game.Lab.Listener.Get @32 {\"use\":\"delegate\"}", edges);
+
+        // One edge per (src, kind, dst, props): `Count` written three ways is one write.
+        Assert.Single(edges, e => e.StartsWith(Hook + "cs:F:Game.Lab.Bell.Count ", StringComparison.Ordinal));
+        Assert.Single(edges, e => e.StartsWith(Hook + "cs:F:Game.Lab.Listener._last ", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Interface_extending_interface_is_inherits()
     {
         IReadOnlyList<string> edges = Edges("""
@@ -192,5 +268,12 @@ public sealed class EdgeRulesTests : IDisposable
     private IReadOnlyList<string> Edges(string source) =>
         Index(source).Edges
             .Select(e => $"{e.Src} {KindNames.Of(e.Kind)} {e.Dst}{(e.Kind == EdgeKind.Dispatches ? " " + e.Confidence.ToString().ToLowerInvariant() : "")} @{e.Line}")
+            .ToList();
+
+    // `calls` edges with their props.
+    private IReadOnlyList<string> Uses(string source) =>
+        Index(source).Edges
+            .Where(e => e.Kind == EdgeKind.Calls)
+            .Select(e => $"{e.Src} calls {e.Dst} @{e.Line}{(e.Props is null ? "" : " " + e.Props)}")
             .ToList();
 }

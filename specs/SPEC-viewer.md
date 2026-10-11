@@ -89,8 +89,8 @@ ug view <symbol|asset> [--depth N] [--kind <k>[,<k>]] [--all] [--open] [--out <f
 
   | Family | Edge kinds | Colour |
   | --- | --- | --- |
-  | calls | `calls`, `dispatches`, `event_calls`, `anim_event_calls` | blue |
-  | references | `references`, `overrides_value`, `uses_type` | orange |
+  | calls | `calls` (but reads and writes), `dispatches`, `event_calls`, `anim_event_calls` | blue |
+  | references | `references`, `overrides_value`, `uses_type`, `calls` that read or write (B1g) | orange |
   | hierarchy | `inherits`, `implements`, `overrides` | reddish purple |
   | instances | `instance_of`, `script_defines`, `variant_of` | vermillion |
   | assembly | `in_assembly`, `assembly_refs`, `addressable` | bluish green |

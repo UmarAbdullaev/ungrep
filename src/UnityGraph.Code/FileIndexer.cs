@@ -47,7 +47,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
     private readonly string? _scriptGuid;
     private readonly List<Node> _nodes = [];
     private readonly List<Edge> _edges = [];
-    private readonly HashSet<(string, EdgeKind, string)> _seen = [];
+    private readonly HashSet<(string, EdgeKind, string, string?)> _seen = [];
     private readonly HashSet<string> _keys = new(StringComparer.Ordinal);
     private readonly Dictionary<INamedTypeSymbol, Dictionary<ISymbol, List<ISymbol>>> _interfaceMaps = new(SymbolEqualityComparer.Default);
 
@@ -459,7 +459,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
             // A default constructor has no node; `new T()` still gives `uses_type T`.
             case IMethodSymbol { IsImplicitlyDeclared: true }:
                 return;
-            case IMethodSymbol or IPropertySymbol or IEventSymbol:
+            case IMethodSymbol or IPropertySymbol or IEventSymbol or IFieldSymbol:
                 kind = EdgeKind.Calls;
                 break;
             case INamedTypeSymbol type:
@@ -478,8 +478,170 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
         ISymbol definition = target is IMethodSymbol { ReducedFrom: { } reduced } ? reduced : target.OriginalDefinition;
         if (_workspace.IsIndexedSource(definition) && KeyOf(definition) is { } key)
         {
-            AddEdge(_sourceKey, kind, key, Confidence.Exact, at);
+            AddEdge(_sourceKey, kind, key, Confidence.Exact, at, kind == EdgeKind.Calls ? UseOf(at, target) : null);
         }
+    }
+
+    // ---- uses (SPEC-code-index, Uses) ------------------------------------------------------------
+
+    // How the member named at <paramref name="at"/> is used, as edge props; null for a call.
+    private string? UseOf(SyntaxNode at, ISymbol target)
+    {
+        if (at is not ExpressionSyntax named)
+        {
+            return null;
+        }
+
+        ExpressionSyntax whole = Whole(named);
+        var props = new Props();
+        if (target is IMethodSymbol)
+        {
+            // Named without a call: a method group, a handler when it is subscribed.
+            if (named is not SimpleNameSyntax || whole.Parent is InvocationExpressionSyntax call && call.Expression == whole)
+            {
+                return null;
+            }
+
+            (string groupUse, ISymbol? listened) = HandlerOf(whole);
+            props.Text("use", groupUse);
+            props.Text("event", listened is null ? null : ListenedName(listened));
+            return props.ToJson();
+        }
+
+        bool listenable = IsListenable(target);
+        (string use, ExpressionSyntax? handler) = whole.Parent switch
+        {
+            AssignmentExpressionSyntax assign when assign.Left == whole =>
+                listenable && assign.IsKind(SyntaxKind.AddAssignmentExpression) ? ("subscribe", assign.Right)
+                : listenable && assign.IsKind(SyntaxKind.SubtractAssignmentExpression) ? ("unsubscribe", assign.Right)
+                : ("write", null),
+            PrefixUnaryExpressionSyntax or PostfixUnaryExpressionSyntax when IsIncrement(whole.Parent) => ("write", null),
+            ArgumentSyntax argument when argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword) || argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword)
+                || argument.Parent is TupleExpressionSyntax { Parent: AssignmentExpressionSyntax deconstruct } tuple && deconstruct.Left == tuple => ("write", null),
+            InvocationExpressionSyntax invoke when listenable && invoke.Expression == whole => ("raise", null),
+            MemberAccessExpressionSyntax access when listenable && access.Expression == whole
+                && access.Parent is InvocationExpressionSyntax invoke && invoke.Expression == access
+                && ListenerCall(access.Name.Identifier.ValueText) is { } call => (call, FirstArgument(invoke)),
+            ConditionalAccessExpressionSyntax conditional when listenable && conditional.Expression == whole
+                && conditional.WhenNotNull is InvocationExpressionSyntax { Expression: MemberBindingExpressionSyntax binding } invoke
+                && ListenerCall(binding.Name.Identifier.ValueText) is { } call => (call, FirstArgument(invoke)),
+            _ => ("read", null),
+        };
+
+        props.Text("use", use);
+        props.Text("handler", use is "subscribe" or "unsubscribe" ? HandlerKey(handler) : null);
+        return props.ToJson();
+    }
+
+    private static bool IsIncrement(SyntaxNode? node) =>
+        node is not null && (node.IsKind(SyntaxKind.PreIncrementExpression) || node.IsKind(SyntaxKind.PreDecrementExpression)
+            || node.IsKind(SyntaxKind.PostIncrementExpression) || node.IsKind(SyntaxKind.PostDecrementExpression));
+
+    private static ExpressionSyntax? FirstArgument(InvocationExpressionSyntax invoke) => invoke.ArgumentList.Arguments.FirstOrDefault()?.Expression;
+
+    // The expression a name stands for: `x.Name`, `x?.Name` and `x?.y.Name` for the name in them.
+    private static ExpressionSyntax Whole(ExpressionSyntax name)
+    {
+        ExpressionSyntax e = name;
+        while (true)
+        {
+            switch (e.Parent)
+            {
+                case MemberAccessExpressionSyntax access when access.Name == e:
+                case MemberBindingExpressionSyntax binding when binding.Name == e:
+                case ConditionalAccessExpressionSyntax conditional when conditional.WhenNotNull == e:
+                    e = (ExpressionSyntax)e.Parent;
+                    continue;
+                default:
+                    return e;
+            }
+        }
+    }
+
+    // What a method on an event, delegate or UnityEvent does: `Invoke` raises, `AddListener` subscribes.
+    private static string? ListenerCall(string method) => method switch
+    {
+        "Invoke" or "DynamicInvoke" or "BeginInvoke" => "raise",
+        "AddListener" => "subscribe",
+        "RemoveListener" or "RemoveAllListeners" => "unsubscribe",
+        _ => null,
+    };
+
+    // A method group's use: the handler a `+=`, `-=`, `AddListener` or `RemoveListener` names,
+    // with the event, field or property it is subscribed to; else a delegate.
+    private (string Use, ISymbol? Listened) HandlerOf(ExpressionSyntax group)
+    {
+        if (group.Parent is AssignmentExpressionSyntax assign && assign.Right == group
+            && (assign.IsKind(SyntaxKind.AddAssignmentExpression) || assign.IsKind(SyntaxKind.SubtractAssignmentExpression))
+            && _model.GetSymbolInfo(assign.Left).Symbol is { } left && IsListenable(left))
+        {
+            return (assign.IsKind(SyntaxKind.AddAssignmentExpression) ? "subscribe" : "unsubscribe", left);
+        }
+
+        if (group.Parent is ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invoke } }
+            && invoke.Expression switch
+            {
+                MemberAccessExpressionSyntax access => (access.Name, (ExpressionSyntax?)access.Expression),
+                MemberBindingExpressionSyntax binding => (binding.Name, (invoke.Parent as ConditionalAccessExpressionSyntax)?.Expression),
+                _ => default,
+            } is ({ } method, { } receiver)
+            && ListenerCall(method.Identifier.ValueText) is "subscribe" or "unsubscribe"
+            && _model.GetSymbolInfo(receiver).Symbol is { } listened && IsListenable(listened))
+        {
+            return (ListenerCall(method.Identifier.ValueText)!, listened);
+        }
+
+        return ("delegate", null);
+    }
+
+    // The handler a subscription names: the key of an indexed method's group, `lambda`, or null.
+    private string? HandlerKey(ExpressionSyntax? handler)
+    {
+        switch (handler)
+        {
+            case null:
+                return null;
+            case AnonymousFunctionExpressionSyntax:
+                return "lambda";
+        }
+
+        SymbolInfo info = _model.GetSymbolInfo(handler);
+        return (info.Symbol ?? info.CandidateSymbols.FirstOrDefault()) is IMethodSymbol method
+            && _workspace.IsIndexedSource(method.OriginalDefinition) && KeyOf(method) is { } key
+            ? key
+            : null;
+    }
+
+    // An event's key, or `Type.member` when it is not indexed (`Button.onClick`).
+    private string ListenedName(ISymbol listened) =>
+        _workspace.IsIndexedSource(listened.OriginalDefinition) && KeyOf(listened) is { } key
+            ? key
+            : (listened.ContainingType is { } type ? type.Name + "." : "") + listened.Name;
+
+    // An event, or a field or property of a delegate type or a UnityEvent type: something listened to.
+    private static bool IsListenable(ISymbol symbol)
+    {
+        ITypeSymbol? type = symbol switch
+        {
+            IEventSymbol => null,
+            IFieldSymbol field => field.Type,
+            IPropertySymbol property => property.Type,
+            _ => null,
+        };
+        if (symbol is IEventSymbol || type is { TypeKind: TypeKind.Delegate })
+        {
+            return true;
+        }
+
+        for (INamedTypeSymbol? t = type as INamedTypeSymbol; t is not null; t = t.BaseType)
+        {
+            if (UnityRules.FullName(t) == "UnityEngine.Events.UnityEventBase")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool IsNameof(InvocationExpressionSyntax node) =>
@@ -561,10 +723,10 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
     private void AddEdge(string src, EdgeKind kind, string dst, Confidence confidence, SyntaxNode at, string? props = null) =>
         AddEdge(src, kind, dst, confidence, Lines(at).Start, props);
 
-    // One edge per (src, kind, dst) per file: the walk runs in source order, so the first is the first line.
+    // One edge per (src, kind, dst, props) per file: the walk runs in source order, so the first is the first line.
     private void AddEdge(string src, EdgeKind kind, string dst, Confidence confidence, int line, string? props = null)
     {
-        if (_seen.Add((src, kind, dst)))
+        if (_seen.Add((src, kind, dst, props)))
         {
             _edges.Add(new Edge(src, kind, dst, confidence, _path, line, props));
         }
