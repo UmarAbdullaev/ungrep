@@ -31,7 +31,6 @@ public sealed class UnityGraphConfig
         ["query"] = true,
         ["unity-loop"] = true,
         ["viewer"] = true,
-        ["worker-agent"] = true,
     };
 
     private readonly IReadOnlyDictionary<string, bool> _modules;

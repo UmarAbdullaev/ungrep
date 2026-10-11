@@ -36,12 +36,14 @@ public sealed record SessionStats(
 
 /// <summary>
 /// Totals over a project's sessions. Sessions with no model turn inside the window are left out.
+/// Subagents are counted apart: their turns run in their own context, not the main thread's.
 /// </summary>
 public sealed class UsageStats
 {
-    public UsageStats(IReadOnlyList<SessionStats> sessions)
+    public UsageStats(IReadOnlyList<SessionStats> sessions, IReadOnlyList<SubagentRow>? subagents = null)
     {
         Sessions = sessions;
+        Subagents = SubagentRow.Merge(subagents ?? []);
         Turns = sessions.Sum(s => s.TurnContext.Count);
         ContextTokens = sessions.Sum(s => s.ContextTokens);
         Compactions = sessions.Sum(s => s.CompactionTurns.Count);
@@ -75,6 +77,9 @@ public sealed class UsageStats
     public long FirstTurnMedian { get; }
 
     public IReadOnlyDictionary<string, CategoryTotals> Categories { get; }
+
+    /// <summary>Subagent runs and the context they read, one row per agent type.</summary>
+    public IReadOnlyList<SubagentRow> Subagents { get; }
 }
 
 /// <summary>
@@ -87,6 +92,9 @@ public static class TranscriptAnalyzer
     /// <summary>A drop of more than 40% between consecutive turns is taken as a compaction.</summary>
     public const double CompactionRatio = 0.6;
 
+    /// <summary>The type of a subagent whose `.meta.json` is missing or names none.</summary>
+    public const string UnknownAgentType = "unknown";
+
     public static UsageStats AnalyzeDirectory(string transcriptDirectory, TimeWindow window)
     {
         var sessions = new List<SessionStats>();
@@ -95,21 +103,54 @@ public static class TranscriptAnalyzer
             return new UsageStats(sessions);
         }
 
+        var subagents = new List<SubagentRow>();
         var files = Directory.GetFiles(transcriptDirectory, "*.jsonl").Order(StringComparer.Ordinal);
         foreach (string file in files)
         {
-            SessionStats? session = AnalyzeSession(Path.GetFileNameWithoutExtension(file), ReadLines(file), window);
+            string id = Path.GetFileNameWithoutExtension(file);
+            SessionStats? session = AnalyzeSession(id, ReadLines(file), window);
             if (session is not null)
             {
                 sessions.Add(session);
             }
+
+            // A background subagent can run on inside the window after its session's last turn.
+            subagents.AddRange(AnalyzeSubagents(Path.Combine(transcriptDirectory, id, "subagents"), window));
         }
 
-        return new UsageStats(sessions);
+        return new UsageStats(sessions, subagents);
     }
 
     /// <summary>Returns null when no model turn falls inside the window.</summary>
-    public static SessionStats? AnalyzeSession(string id, IEnumerable<string> lines, TimeWindow window)
+    public static SessionStats? AnalyzeSession(string id, IEnumerable<string> lines, TimeWindow window) =>
+        Analyze(id, lines, window, subagent: false);
+
+    /// <summary>
+    /// A session's subagents, one row per agent type: every `agent-&lt;id&gt;.jsonl` in its
+    /// `subagents` folder, its turns summed like the main thread's. The type is `agentType` in the
+    /// `.meta.json` beside the transcript. A subagent with no turn inside the window is left out.
+    /// Claude Code's recorded `totalTokens` is only a subagent's last context, not what it read.
+    /// </summary>
+    public static IReadOnlyList<SubagentRow> AnalyzeSubagents(string subagentDirectory, TimeWindow window)
+    {
+        var rows = new List<SubagentRow>();
+        if (!Directory.Exists(subagentDirectory))
+        {
+            return rows;
+        }
+
+        foreach (string file in Directory.GetFiles(subagentDirectory, "agent-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            if (Analyze(Path.GetFileNameWithoutExtension(file), ReadLines(file), window, subagent: true) is { } run)
+            {
+                rows.Add(new SubagentRow(AgentType(Path.ChangeExtension(file, ".meta.json")), 1, run.ContextTokens));
+            }
+        }
+
+        return SubagentRow.Merge(rows);
+    }
+
+    private static SessionStats? Analyze(string id, IEnumerable<string> lines, TimeWindow window, bool subagent)
     {
         var turns = new List<long>();
         var seenMessages = new HashSet<string>(StringComparer.Ordinal);
@@ -131,7 +172,7 @@ public static class TranscriptAnalyzer
             }
 
             JsonElement entry = doc.RootElement;
-            if (!IsAssistantTurn(entry, window, out JsonElement message, out JsonElement content))
+            if (!IsAssistantTurn(entry, window, subagent, out JsonElement message, out JsonElement content))
             {
                 continue;
             }
@@ -205,13 +246,13 @@ public static class TranscriptAnalyzer
         return new SessionStats(id, turns, compactions, categories);
     }
 
-    private static bool IsAssistantTurn(JsonElement entry, TimeWindow window, out JsonElement message, out JsonElement content)
+    private static bool IsAssistantTurn(JsonElement entry, TimeWindow window, bool subagent, out JsonElement message, out JsonElement content)
     {
         message = default;
         content = default;
 
         // Subagent turns run in their own context; they are not the main thread's cost.
-        if (entry.TryGetProperty("isSidechain", out JsonElement sidechain) && sidechain.ValueKind == JsonValueKind.True)
+        if (!subagent && entry.TryGetProperty("isSidechain", out JsonElement sidechain) && sidechain.ValueKind == JsonValueKind.True)
         {
             return false;
         }
@@ -243,6 +284,24 @@ public static class TranscriptAnalyzer
         && value.TryGetInt64(out long tokens)
             ? tokens
             : 0;
+
+    private static string AgentType(string metaPath)
+    {
+        try
+        {
+            using JsonDocument meta = JsonDocument.Parse(File.ReadAllText(metaPath));
+            return meta.RootElement.ValueKind == JsonValueKind.Object
+                && meta.RootElement.TryGetProperty("agentType", out JsonElement type)
+                && type.ValueKind == JsonValueKind.String
+                && type.GetString() is { Length: > 0 } name
+                    ? name
+                    : UnknownAgentType;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return UnknownAgentType;
+        }
+    }
 
     private static JsonDocument? TryParse(string line)
     {

@@ -4,9 +4,9 @@ using System.Text;
 namespace UnityGraph.Stats;
 
 /// <summary>
-/// Plain-text `ug stats` report, written for Claude and people alike: a summary line, then where
-/// the context went by category, with deltas when a baseline report is given. Stays under 30
-/// lines whatever the transcripts hold.
+/// Plain-text `ug stats` report, written for Claude and people alike: a summary line, subagents
+/// when there were any, then where the context went by category, with deltas when a baseline
+/// report is given. Stays under 30 lines whatever the transcripts hold.
 /// </summary>
 public static class StatsText
 {
@@ -42,10 +42,38 @@ public static class StatsText
             .Append(Invariant($" | tool calls {report.ToolCalls:N0}{PercentDelta(report.ToolCalls, baseline?.ToolCalls)}"))
             .Append('\n');
         text.Append(Invariant($"context charged to tool calls {Tokens(report.ChargedContextTokens)} ({Share(report.ChargedContextTokens, report.ContextTokens)})"))
-            .Append("\n\n");
+            .Append('\n');
+        AppendSubagents(text, report, baseline);
+        text.Append('\n');
 
         AppendCategories(text, report, baseline);
         return text.ToString();
+    }
+
+    /// <summary>
+    /// One line, only when this report or its baseline ran subagents: what they read in their own
+    /// context, which the main thread's figures above leave out, and the two summed.
+    /// </summary>
+    private static void AppendSubagents(StringBuilder text, StatsReport report, StatsReport? baseline)
+    {
+        IReadOnlyList<SubagentRow> now = report.Subagents ?? [];
+        IReadOnlyList<SubagentRow>? before = baseline?.Subagents;
+        if (now.Count == 0 && (before?.Count ?? 0) == 0)
+        {
+            return;
+        }
+
+        int runs = now.Sum(r => r.Runs);
+        long context = now.Sum(r => r.ContextTokens);
+        text.Append(Invariant($"subagents {runs} runs{CountDelta(runs, before?.Sum(r => r.Runs))}"))
+            .Append(Invariant($" | context {Tokens(context)}{PercentDelta(context, before?.Sum(r => r.ContextTokens))}"))
+            .Append(Invariant($" | main + subagents {Tokens(report.ContextTokens + context)}"));
+        if (now.Count > 0)
+        {
+            text.Append(" | ").AppendJoin(", ", now.Select(r => Invariant($"{r.Type} {r.Runs} run{(r.Runs == 1 ? "" : "s")} {Tokens(r.ContextTokens)}")));
+        }
+
+        text.Append('\n');
     }
 
     private static void AppendCategories(StringBuilder text, StatsReport report, StatsReport? baseline)

@@ -123,7 +123,11 @@ internal static class QueryCommands
         return command;
     }
 
-    public static int Run(string start, int? budget, string? graphDirectory, Func<QueryEngine, int, string> ask, out string text, bool all = false, int from = 0)
+    public static int Run(string start, int? budget, string? graphDirectory, Func<QueryEngine, int, string> ask, out string text, bool all = false, int from = 0) =>
+        Run(start, budget, graphDirectory, (_, engine, tokens) => ask(engine, tokens), out text, all, from);
+
+    // The same, for a caller that reads the store too (`ug view`); `module` is its own switch.
+    public static int Run(string start, int? budget, string? graphDirectory, Func<GraphStore, QueryEngine, int, string> ask, out string text, bool all = false, int from = 0, string? module = null)
     {
         UnityProject? unity = UnityProject.Find(start);
         if (unity is null)
@@ -156,6 +160,12 @@ internal static class QueryCommands
             return 0;
         }
 
+        if (module is not null && !config.IsEnabled(module))
+        {
+            text = module + " is off in " + UnityGraphConfig.RelativePath + "\n";
+            return 0;
+        }
+
         GraphUpdate update = GraphUpdate.Load(unity.Root, config);
         if (update.Code is null)
         {
@@ -171,7 +181,7 @@ internal static class QueryCommands
             string indexed = created
                 ? string.Create(CultureInfo.InvariantCulture, $"indexed {summary.Files:N0} files in {summary.Elapsed.TotalSeconds:0.0} s\n")
                 : "";
-            text = indexed + ask(new QueryEngine(store, unity.Root) { All = all, From = from }, tokens);
+            text = indexed + ask(store, new QueryEngine(store, unity.Root) { All = all, From = from }, tokens);
             return 0;
         }
         catch (GraphLockedException)
@@ -179,7 +189,7 @@ internal static class QueryCommands
             try
             {
                 using GraphStore store = GraphStore.Open(unity.Root, StoreMode.ReadOnly, graphDirectory: graphDirectory);
-                text = ask(new QueryEngine(store, unity.Root) { All = all, From = from }, tokens);
+                text = ask(store, new QueryEngine(store, unity.Root) { All = all, From = from }, tokens);
                 if (!text.StartsWith('{'))
                 {
                     text += "note: graph busy, edits from the last seconds may be missing\n";

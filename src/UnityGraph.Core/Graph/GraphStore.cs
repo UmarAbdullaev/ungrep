@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.Sqlite;
 
@@ -485,6 +486,25 @@ public sealed class GraphStore : IDisposable
             path, reader.GetInt64(0), reader.GetInt64(1), Convert.ToHexString((byte[])reader.GetValue(2)).ToLowerInvariant(),
             indexer == "code" ? Indexer.Code : Indexer.Asset,
             status == "binary" ? FileStatus.Binary : status == "error" ? FileStatus.Error : FileStatus.Ok);
+    }
+
+    /// <summary>
+    /// The graph's revision (SPEC-viewer): the first 12 hex characters of a SHA-256 over every
+    /// indexed file's path and content hash, in path order. Only a reindex that changed, added or
+    /// removed a file changes it.
+    /// </summary>
+    public string Revision()
+    {
+        using SqliteCommand command = ReadCommand("SELECT path, hash FROM files ORDER BY path");
+        using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            sha.AppendData(Encoding.UTF8.GetBytes(reader.GetString(0) + "\n"));
+            sha.AppendData((byte[])reader.GetValue(1));
+        }
+
+        return Convert.ToHexString(sha.GetHashAndReset())[..12].ToLowerInvariant();
     }
 
     /// <summary>Indexed files whose path starts with <paramref name="prefix"/> (a folder path ending in `/`), ordered.</summary>
