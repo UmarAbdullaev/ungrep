@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -49,6 +50,7 @@ public sealed class SnippetCompilerTests
         """;
 
     private static readonly Lazy<(string Path, Assembly Assembly)> _stubs = new(BuildStubs);
+    private static readonly ConditionalWeakTable<SnippetBuild, MethodInfo> _entries = new();
 
     private static SnippetSettings Settings(params string[] defines) =>
         new([.. Runtime(), _stubs.Value.Path], defines, "9.0") { GuardSeconds = 5 };
@@ -108,6 +110,28 @@ public sealed class SnippetCompilerTests
         }
 
         Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task A_local_functions_yield_await_and_return_are_its_own()
+    {
+        SnippetBuild sequence = Build("IEnumerable<int> Gen() { yield return 1; yield return 2; }\nreturn Gen();");
+        Assert.Equal(typeof(object), Entry(sequence).ReturnType);
+        Assert.Equal([1, 2], Assert.IsAssignableFrom<IEnumerable<int>>(Run(sequence)));
+
+        SnippetBuild steps = Build("IEnumerator Wait() { yield return null; }\nreturn Wait();");
+        Assert.Equal(typeof(object), Entry(steps).ReturnType);
+        Assert.IsAssignableFrom<IEnumerator>(Run(steps));
+
+        SnippetBuild later = Build("async Task<int> Four() { await Task.Delay(1); return 4; }\nreturn Four();");
+        Assert.Equal(typeof(object), Entry(later).ReturnType);
+        Assert.Equal(4, await Assert.IsAssignableFrom<Task<int>>(Run(later)));
+
+        SnippetBuild quiet = Build("async Task<int> Twice(int x) { await Task.Delay(1); return x * 2; }\nDebug.Log(Twice(2).Result);");
+        Assert.Equal(typeof(void), Entry(quiet).ReturnType);
+        Assert.False(quiet.HasResult);
+        Assert.Null(Run(quiet));
+        Assert.Contains("4", StubLogs());
     }
 
     [Fact]
@@ -280,10 +304,7 @@ public sealed class SnippetCompilerTests
 
     private static object? Run(SnippetBuild build)
     {
-        _ = _stubs.Value;
-        Assembly assembly = AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(build.Assembly!), new MemoryStream(build.Pdb!));
-        MethodInfo method = assembly.GetType(build.EntryType!, throwOnError: true)!
-            .GetMethod(build.EntryMethod!, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!;
+        MethodInfo method = Entry(build);
 
         // The bridge prints a result when the entry returns one, so statements without a value must be void.
         if (build.Statements && (method.ReturnType == typeof(object) || method.ReturnType == typeof(void)))
@@ -301,6 +322,15 @@ public sealed class SnippetCompilerTests
             throw;
         }
     }
+
+    // The build's entry method, its assembly loaded once.
+    private static MethodInfo Entry(SnippetBuild build) => _entries.GetValue(build, b =>
+    {
+        _ = _stubs.Value;
+        Assembly assembly = AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(b.Assembly!), new MemoryStream(b.Pdb!));
+        return assembly.GetType(b.EntryType!, throwOnError: true)!
+            .GetMethod(b.EntryMethod!, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!;
+    });
 
     private static List<string> StubLogs() =>
         (List<string>)_stubs.Value.Assembly.GetType("UnityEngine.Debug")!.GetField("Logs")!.GetValue(null)!;

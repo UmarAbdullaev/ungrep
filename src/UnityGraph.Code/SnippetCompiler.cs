@@ -334,10 +334,10 @@ public static class SnippetCompiler
         && local.Declaration.Variables.Count == 1 && local.Declaration.Variables[0] is { Identifier.IsMissing: true, Initializer: null }
         && local.SemicolonToken.IsMissing;
 
-    // The statements' own nodes: not inside a lambda, an anonymous method or a local function, whose
-    // awaits, yields and returns are their own.
+    // The statements' own nodes: not inside a lambda, an anonymous method or a local function (a
+    // statement that is one too), whose awaits, yields and returns are their own.
     private static IEnumerable<SyntaxNode> Scan(SyntaxNode node) =>
-        node.DescendantNodesAndSelf(n => n == node || n is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax));
+        node.DescendantNodesAndSelf(n => n is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax));
 
     private static bool IsValue(ExpressionSyntax expression) =>
         expression is not (AssignmentExpressionSyntax

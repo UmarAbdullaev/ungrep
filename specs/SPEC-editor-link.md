@@ -316,7 +316,10 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
     has no `result:` line (`Debug.Log("hi");`). A body with `await` becomes `async Task<object>`
     (`async Task` without a value) and is awaited, one with `yield` an `IEnumerator` that is
     stepped, both as `ug run` waits (`--timeout`, default 60 s). Local functions (`static int
-    Sq(int x) => x * x;` too) stay local functions. A directive pair (`#if UNITY_EDITOR` ...
+    Sq(int x) => x * x;` too) stay local functions, and their `await`, `yield` and `return x`,
+    like a lambda's, are their own: they do not make the body async, an iterator or one with a
+    value (`IEnumerator Wait() { yield return null; } return Wait();` returns the enumerator,
+    stepped as above). A directive pair (`#if UNITY_EDITOR` ...
     `#endif`) may span statements; one that spans statements and types does not survive the
     split. (A top-level member with an access modifier, `public static int Sq...`, goes into the
     generated class as written, but Roslyn reads the statements after it as members: write it
