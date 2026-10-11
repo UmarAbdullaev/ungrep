@@ -1,6 +1,6 @@
 # Spec: cameras and Cinemachine (`ug camera`)
 
-Part of unitygraph's `editor-ops` module (see `../SPEC.md`, module table; `SPEC-editor-ops.md` for
+Part of ungrep's `editor-ops` module (see `../SPEC.md`, module table; `SPEC-editor-ops.md` for
 addresses, Undo and the bridge). Status: **built** (O13, 2026-10-11). Closes the Unity MCP server's
 `manage_camera` (its `screenshot` and `screenshot_multiview` actions are `ug shot`, O11).
 
@@ -17,7 +17,7 @@ camera and any blend in progress, as the brain sees it after the change.
 
 In: `ug camera [list]`, `ug camera create|priority|body|aim|noise|blend|force|release|brain`;
 Cinemachine 3 (`com.unity.cinemachine` 3.x, namespace `Unity.Cinemachine`) in the bridge
-sub-assembly `UnityGraph.Bridge.Editor.Cinemachine`; plain Unity cameras without it.
+sub-assembly `Ungrep.Bridge.Editor.Cinemachine`; plain Unity cameras without it.
 
 Out:
 

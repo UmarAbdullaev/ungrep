@@ -6,7 +6,7 @@ setlocal
 set "root=%~dp0.."
 set "dll=%root%\dist\ug\ug.dll"
 if not exist "%dll%" (
-    echo unitygraph: ug is not built; run: dotnet publish "%root%\src\UnityGraph.Cli" -c Release -o "%root%\dist\ug" 1>&2
+    echo ungrep: ug is not built; run: dotnet publish "%root%\src\Ungrep.Cli" -c Release -o "%root%\dist\ug" 1>&2
     exit /b 0
 )
 
@@ -17,7 +17,7 @@ if not defined found for /f "delims=" %%P in ('where dotnet 2^>nul') do if not d
 if not defined found call :check "%ProgramFiles%\dotnet"
 if not defined found call :check "%LOCALAPPDATA%\Microsoft\dotnet"
 if not defined found (
-    echo unitygraph: needs the .NET 8 runtime or newer: https://dotnet.microsoft.com/download/dotnet/8.0 1>&2
+    echo ungrep: needs the .NET 8 runtime or newer: https://dotnet.microsoft.com/download/dotnet/8.0 1>&2
     exit /b 0
 )
 

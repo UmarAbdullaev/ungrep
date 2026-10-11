@@ -1,9 +1,9 @@
 {
   "dependencies": {
     "com.unity.test-framework": "1.6.0",
-    "com.unitygraph.bridge": "file:../../../unity/com.unitygraph.bridge"
+    "com.ungrep.bridge": "file:../../../unity/com.ungrep.bridge"
   },
   "testables": [
-    "com.unitygraph.bridge"
+    "com.ungrep.bridge"
   ]
 }

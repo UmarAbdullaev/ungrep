@@ -1,6 +1,6 @@
 # Spec: worker-agent
 
-Part of unitygraph (see `../SPEC.md`, module table). Status: **removed 2026-10-11** (user), after
+Part of ungrep (see `../SPEC.md`, module table). Status: **removed 2026-10-11** (user), after
 it was built the same day (W1). Kept as the record of the dry run; nothing below ships.
 
 ## Removed
@@ -60,7 +60,7 @@ any new hook event; Bash command allowlists (a plugin cannot ship them, see Limi
 
 `agents/unity-worker.md`, found by convention (every Markdown file under a plugin's `agents/`
 defines one agent; `plugin.json` needs no `agents` key). Claude Code calls it by its scoped name
-`unitygraph:unity-worker`.
+`ungrep:unity-worker`.
 
 ```yaml
 ---
@@ -70,7 +70,7 @@ tools: Bash, Read, Grep
 model: sonnet
 maxTurns: 60
 skills:
-  - unitygraph:unity
+  - ungrep:unity
 ---
 ```
 
@@ -90,7 +90,7 @@ skills:
   ends the run with partial output.
 - **skills**: the `unity` skill's body is put into the worker's context at start (its command list,
   addresses and rules: ~600 tokens there, none in the main thread). The docs do not say whether a
-  plugin agent names a plugin skill as `unitygraph:unity` or `unity`; the prompt therefore says to
+  plugin agent names a plugin skill as `ungrep:unity` or `unity`; the prompt therefore says to
   read `${CLAUDE_PLUGIN_ROOT}/skills/unity/SKILL.md` when the skill is not in its context. The
   dry run checks which happened.
 - `${CLAUDE_PLUGIN_ROOT}` is replaced in agent and skill bodies; it is not set in the Bash
@@ -104,7 +104,7 @@ Format checked against Claude Code's docs on 2026-10-11 (plugins/components "age
 "frontmatter fields in plugin agents", sub-agents "supported frontmatter fields", "choose a
 model", "preload skills", plugins manifest reference "where each variable resolves" and
 "executables"), and with Claude Code 2.1.295: `claude plugin validate` passes and `claude plugin
-details unitygraph@unitygraph-dev` lists `Agents (1) unity-worker`, always-on ~93 tokens
+details ungrep@ungrep-dev` lists `Agents (1) unity-worker`, always-on ~93 tokens
 (unity ~30, unity-worker ~70).
 
 ## Delegation rule
@@ -187,10 +187,10 @@ has anything to do there.
 
 ## Switch
 
-`modules.worker-agent` in `.claude/unitygraph.json` (default on). Claude Code lists every agent
+`modules.worker-agent` in `.claude/ungrep.json` (default on). Claude Code lists every agent
 under a plugin's `agents/`, and no plugin setting hides one, so the switch works through the
 worker's first call: with the module off, `ug status` ends with `worker-agent is off in
-.claude/unitygraph.json: chores run inline, not in unity-worker`, and the worker answers `verdict:
+.claude/ungrep.json: chores run inline, not in unity-worker`, and the worker answers `verdict:
 not run: worker-agent is off` with no other call. `worker.md` tells the main thread to do chores
 inline after that answer. With the module on, `ug status` prints nothing more (0 tokens).
 
@@ -205,7 +205,7 @@ inline after that answer. With the module on, `ug status` prints nothing more (0
 | Verdict, in the main thread | ≤ 800 tokens | 738 and 486 in the dry run, plus ~180 of Claude Code's hand-back frame |
 
 `AgentBudgetTests` checks the listing budget the way `SkillBudgetTests` checks the body: the two
-lines Claude Code lists (`- unitygraph:unity: <description>` and `- unitygraph:unity-worker:
+lines Claude Code lists (`- ungrep:unity: <description>` and `- ungrep:unity-worker:
 <description> (Tools: Bash, Read, Grep)`), bytes / 4, at most 300. It also checks the front matter
 against the fields a plugin agent supports, `model: sonnet`, the tool list, the preloaded skill,
 and that the prompt keeps every verdict line.
@@ -256,14 +256,14 @@ Sonnet and with Haiku (Decisions #6).
 
 ## Testing
 
-- `tests/UnityGraph.Stats.Tests/WorkerDelegationsTests` on a transcript in the recorded shapes
+- `tests/Ungrep.Stats.Tests/WorkerDelegationsTests` on a transcript in the recorded shapes
   (`Fixtures/worker/delegations.jsonl`): a foreground result, a short one, a background run
   notified twice, a hand-back, another agent type, a subagent's own Agent call, a background shell
   notification, a run with no result; the workers' own transcripts beside it
   (`Fixtures/worker/delegations/subagents/`: a turn written on two lines, a resumed run, a running
   one, a missing one, another agent type's); the time window; directory totals; the text line
   (golden), an old baseline without `worker`, a baseline-only line, the JSON round trip.
-- `tests/UnityGraph.Cli.Tests/AgentBudgetTests`: listing budget, front matter, verdict contract,
+- `tests/Ungrep.Cli.Tests/AgentBudgetTests`: listing budget, front matter, verdict contract,
   the skill's pointers.
 - `EditorCommandTests`: `ug status` with the switch off (editor reachable and not), and silent
   with it on.
@@ -354,14 +354,14 @@ beside the main thread's so a project can see which way it goes.
    to keep it): Sonnet costs less per token for chores that are mostly play, set and read back. The
    call's `model` parameter picks another model for one chore. `inherit` would follow the main
    thread and run every chore at its rates. No per-project setting exists: a plugin cannot fill its
-   agent's front matter from `.claude/unitygraph.json`.
+   agent's front matter from `.claude/ungrep.json`.
 8. `ug stats` reports worker context (the user's choice, 2026-10-11), summed from the workers' own
    transcripts, since the counts Claude Code records in the main transcript are a last context, not
    a cost.
 
 ## Open points
 
-1. Settled by the dry run: `skills: [unitygraph:unity]` preloads the skill (its text is in both
+1. Settled by the dry run: `skills: [ungrep:unity]` preloads the skill (its text is in both
    workers' first message; neither read `SKILL.md`).
 2. Whether the plugin's hooks fire on the worker's tool calls (not documented; nothing depends on
    it today).

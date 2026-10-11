@@ -1,0 +1,27 @@
+{
+    "name": "Ungrep.Bridge.Editor.InputSystem",
+    "rootNamespace": "Ungrep.Bridge",
+    "references": [
+        "Ungrep.Bridge.Editor",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UG_INPUT_SYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.3.0",
+            "define": "UG_INPUT_SYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

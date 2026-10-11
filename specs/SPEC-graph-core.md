@@ -1,6 +1,6 @@
 # Spec: graph-core
 
-Part of unitygraph (see `../SPEC.md`). Status: **draft** (2026-09-29).
+Part of ungrep (see `../SPEC.md`). Status: **draft** (2026-09-29).
 
 ## Objective
 
@@ -30,7 +30,7 @@ Out: parsing (indexers), answer formatting and budgets (`query`), anything that 
 
 ## Location and lifetime
 
-- Database: `<UnityProject>/Library/unitygraph/graph.db`. `Library/` is ignored by every Unity
+- Database: `<UnityProject>/Library/ungrep/graph.db`. `Library/` is ignored by every Unity
   `.gitignore` and is safe to delete; deleting it only costs a cold index.
 - The database is a cache. Nothing in it is user data. Any doubt (version mismatch, corruption,
   failed migration) is resolved by deleting it and rebuilding.
@@ -172,12 +172,12 @@ Notes:
 - `schema_version` mismatch → the store deletes the database and reports `rebuild required`;
   there are no migrations before v1.
 
-## Public surface (`UnityGraph.Core`)
+## Public surface (`Ungrep.Core`)
 
 ```csharp
 public sealed class GraphStore : IDisposable
 {
-    // graphDirectory: default <root>/Library/unitygraph; elsewhere only to measure a project read-only.
+    // graphDirectory: default <root>/Library/ungrep; elsewhere only to measure a project read-only.
     public static GraphStore Open(string projectRoot, StoreMode mode, TimeSpan? lockTimeout = null, string? graphDirectory = null);
     public static GraphStore OpenStaging(string projectRoot, TimeSpan? lockTimeout = null, string? graphDirectory = null); // full index
     public void Publish();                                                // staged graph becomes the graph
@@ -232,11 +232,11 @@ public static class FileHash { public static string Of(string fullPath); }  // S
 ## Concurrency
 
 - Readers never block: WAL lets `ug` queries read while a hook writes.
-- One writer at a time: a read-write store holds `Library/unitygraph/write.lock` (a share-none
+- One writer at a time: a read-write store holds `Library/ungrep/write.lock` (a share-none
   handle on Windows, flock on macOS/Linux, so it goes with the process) from open to dispose,
   and each write is one SQLite transaction. `Open` waits up to `lockTimeout` (1 s) and then
   throws `GraphLockedException`; a hook catches it and calls `DirtyFiles.Mark`, which appends
-  to `Library/unitygraph/dirty.txt`; the next writer calls `TakeDirty` and reindexes them
+  to `Library/ungrep/dirty.txt`; the next writer calls `TakeDirty` and reindexes them
   (design rule 5).
 - A full index writes into `graph.db.new` (`OpenStaging`, holding the write lock throughout),
   so queries keep working on the old graph while a cold index runs. `Publish` copies it into
@@ -263,7 +263,7 @@ On a purge-squad-sized graph (estimate: ~40k nodes, ~200k edges):
 | Database size | ≤ 50 MB | 49.3 MB |
 
 Measured 2026-09-29 on the dev machine (Windows 11, Release, median of 21 runs) with the
-generated graph in `tests/UnityGraph.Core.Tests/SyntheticGraph.cs`: 3,000 files, 39,800 nodes,
+generated graph in `tests/Ungrep.Core.Tests/SyntheticGraph.cs`: 3,000 files, 39,800 nodes,
 203,400 edges, with hub types and methods. Also checked, not a target: a 4-letter prefix that
 matches 15,600 nodes takes ~9 ms (bound 25 ms). Size is the tightest: the bulk writer drops
 the secondary indexes and builds them at commit (packed pages, 52.0 → 49.3 MB, and bulk
@@ -288,9 +288,9 @@ revisit first (keys are stored as text in `edges` and in both edge indexes).
 ## Boundaries
 
 - Always: one transaction per file; deterministic output; everything under
-  `Library/unitygraph/`.
+  `Library/ungrep/`.
 - Ask first: new node or edge kinds; any column change after v1; a second database file.
-- Never: write outside `Library/unitygraph/`; store file contents beyond `props`; network.
+- Never: write outside `Library/ungrep/`; store file contents beyond `props`; network.
 
 ## Open points
 

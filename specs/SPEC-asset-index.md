@@ -1,6 +1,6 @@
 # Spec: asset-index
 
-Part of unitygraph (see `../SPEC.md`). Status: **draft** (2026-09-29). Writes into the store
+Part of ungrep (see `../SPEC.md`). Status: **draft** (2026-09-29). Writes into the store
 described in `SPEC-graph-core.md`, next to `SPEC-code-index.md`.
 
 ## Objective
@@ -246,7 +246,7 @@ module switched off is skipped. `ug index` prints the combined summary on the ex
 with its existing message as a warning, assets are indexed. Queries keep their current
 behaviour without `.csproj` files.
 
-## Public surface (`UnityGraph.Assets`)
+## Public surface (`Ungrep.Assets`)
 
 ```csharp
 public static class UnityYaml { public static IReadOnlyList<YamlDocument> Read(TextReader text, List<string> problems); }
@@ -272,7 +272,7 @@ public static class AssetIndex
 }
 ```
 
-`FileContribution` and `IndexSummary` move from `UnityGraph.Code` to `UnityGraph.Core.Graph`
+`FileContribution` and `IndexSummary` move from `Ungrep.Code` to `Ungrep.Core.Graph`
 so both indexers share them.
 
 ## Failure handling

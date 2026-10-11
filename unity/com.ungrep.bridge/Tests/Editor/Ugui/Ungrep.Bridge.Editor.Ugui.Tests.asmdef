@@ -1,0 +1,33 @@
+{
+    "name": "Ungrep.Bridge.Editor.Ugui.Tests",
+    "rootNamespace": "Ungrep.Bridge.Tests",
+    "references": [
+        "Ungrep.Bridge.Editor",
+        "Ungrep.Bridge.Editor.Ugui",
+        "UnityEngine.UI",
+        "UnityEditor.TestRunner",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "UG_UGUI"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.ugui",
+            "expression": "1.0.0",
+            "define": "UG_UGUI"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -7,5 +7,5 @@
 *.bat text eol=crlf
 
 # Vendored scripts stay byte for byte as published (SPEC-viewer, Boundaries).
-src/UnityGraph.Viewer/vendor/*.js -text
-src/UnityGraph.Viewer/vendor/*.LICENSE -text
+src/Ungrep.Viewer/vendor/*.js -text
+src/Ungrep.Viewer/vendor/*.LICENSE -text

@@ -1,6 +1,6 @@
 # Spec: unity-loop
 
-Part of unitygraph (see `../SPEC.md`, module table). Status: **built** (2026-10-01). Builds on
+Part of ungrep (see `../SPEC.md`, module table). Status: **built** (2026-10-01). Builds on
 `editor-link` (`SPEC-editor-link.md`: bridge, `BridgeClient`, `ug compile`) and closes what the
 Unity MCP server's `read_console`, `run_tests` and `get_test_job` do, in answers sized for Claude.
 
@@ -26,7 +26,7 @@ a player build; editing anything from a hook (hooks never touch scenes, prefabs 
 All take `--project <dir>`; plain text; exit 0 for any answer, 1 only for no Unity project or an
 invalid config. They need the bridge: `Unity not reachable (<reason>); ug <cmd> needs the bridge`
 plus the install hint `ug status` gives. The config switches `editor-link` and `unity-loop` turn
-them off (`unity-loop is off in .claude/unitygraph.json`).
+them off (`unity-loop is off in .claude/ungrep.json`).
 
 ### `ug console [--level error|warning|log] [--count N] [--after ID] [--budget T]`
 
@@ -233,7 +233,7 @@ unless it fires (design rules 3 and 9).
 
 - **Edit tracking (PostToolUse on Edit, MultiEdit, Write, NotebookEdit).** A file with the extension `.cs`,
   `.asmdef` or `.asmref` under `Assets/` or `Packages/` of the Unity project marks the session
-  dirty: it creates `Library/unitygraph/gate-<session_id>` (our own folder, where `bridge.json`
+  dirty: it creates `Library/ungrep/gate-<session_id>` (our own folder, where `bridge.json`
   and `hook-errors.log` live). Nothing else is written, nothing is printed.
 - **Stop.** No marker for the session: exit at once, no output, no Unity call (0 tokens, about 100 ms).
   With a marker: connect to the bridge; if the editor is playing or paused the check is skipped and
@@ -250,14 +250,14 @@ unless it fires (design rules 3 and 9).
 
 ## Testing
 
-- **Client and formatting** (`tests/UnityGraph.EditorLink.Tests`, `UnityGraph.Cli.Tests`, fake
+- **Client and formatting** (`tests/Ungrep.EditorLink.Tests`, `Ungrep.Cli.Tests`, fake
   bridge): console folding, ordering, level filter, `--after`, budget cut and `more`, empty
   answers; test run green, red with 20-line cap, no tests, compile errors first, a refused
   connection mid-run with a new port, timeout, 501 and 409; log with and without a session, old
   bridge; `play --for`; unreachable answers for each command; the gate's check (clean, errors,
   playing, unreachable, timeout) against the fake bridge; the modified-scene refusal and a stopped
   run for `ug test` and `ug test --failures`.
-- **Hooks** (`tests/UnityGraph.Hooks.Tests`): the recorded PostToolUse and Stop payloads: a `.cs`
+- **Hooks** (`tests/Ungrep.Hooks.Tests`): the recorded PostToolUse and Stop payloads: a `.cs`
   edit marks, a `.txt` or outside-project edit does not, Stop with no marker is silent and calls
   nothing, errors give the block JSON, a clean check and an unreachable bridge are silent, the
   marker is deleted, a second Stop is silent, module off is silent.
@@ -273,7 +273,7 @@ unless it fires (design rules 3 and 9).
 ## Boundaries
 
 - Always: the gate stays silent when clean and when Unity is out of reach; answers within budget;
-  a hook never edits project files (only its marker in `Library/unitygraph/`).
+  a hook never edits project files (only its marker in `Library/ungrep/`).
 - Ask first: any further bridge request that changes the project; a new hook event; a network call
   (none here).
 - Never: block a Stop for anything but compile errors; loop a Stop; wait for Unity past the deadline.

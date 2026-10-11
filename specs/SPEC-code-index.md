@@ -1,6 +1,6 @@
 # Spec: code-index
 
-Part of unitygraph (see `../SPEC.md`). Status: **draft** (2026-09-29). Writes into the store
+Part of ungrep (see `../SPEC.md`). Status: **draft** (2026-09-29). Writes into the store
 described in `SPEC-graph-core.md`.
 
 ## Objective
@@ -54,7 +54,7 @@ answers (`query`); source generators and analyzers (not run); a project without 
   `Assets/ThirdParty/`, `Assets/Vendor/`, `Assets/AssetStore/`, `Packages/`.
   The same list is what `guards` protects (SPEC Boundaries: never edit vendored folders).
 
-Config addition (`.claude/unitygraph.json`, read by `UnityGraphConfig`):
+Config addition (`.claude/ungrep.json`, read by `UngrepConfig`):
 
 ```jsonc
 {
@@ -224,7 +224,7 @@ every refresh, and each `Update` re-reads them anyway (loading is cheap next to 
 - Reindex builds the compilation of the file's project and its references from the files on
   disk; only the reindexed files are walked for edges.
 
-## Public surface (`UnityGraph.Code`)
+## Public surface (`Ungrep.Code`)
 
 ```csharp
 public sealed class CodeWorkspace                                   // the loaded projects
@@ -240,7 +240,7 @@ public sealed class CodeWorkspace                                   // the loade
 
 public sealed record FileContribution(FileRecord File, IReadOnlyList<Node> Nodes, IReadOnlyList<Edge> Edges);
 
-// In UnityGraph.Core, shared with guards and config.
+// In Ungrep.Core, shared with guards and config.
 public sealed class VendoredFolders { public IReadOnlyList<string> Prefixes { get; } public bool Contains(string path); public static VendoredFolders Default { get; } }
 
 public static class CodeIndex
@@ -269,10 +269,10 @@ indexed 1,160 files (412 own, 748 vendored): 14,203 nodes, 61,877 edges in 11.4 
 
 One line on success; problems follow as `  warning: ...` lines, at most 10 and a count. Past 10
 the count line names the file that holds every warning: `  ... and 32 more warnings:
-Library/unitygraph/index-warnings.txt` (the graph directory, one warning per line; rewritten by
+Library/ungrep/index-warnings.txt` (the graph directory, one warning per line; rewritten by
 each `ug index`, so it is empty after an index without warnings and nothing is deleted, C1). Exit 0
 unless the graph can't be written. `--graph-dir <dir>` (hidden) puts the graph and its lock
-somewhere other than `Library/unitygraph/`, so purge-squad can be measured without writing into
+somewhere other than `Library/ungrep/`, so purge-squad can be measured without writing into
 it; `GraphStore.Open`/`OpenStaging` gain an optional `graphDirectory` for it.
 
 ## Failure handling
@@ -315,7 +315,7 @@ it; `GraphStore.Open`/`OpenStaging` gain an optional `graphDirectory` for it.
 ## Boundaries
 
 - Always: read-only on the Unity project (the only write is the graph under
-  `Library/unitygraph/`); deterministic rows; exact unless marked heuristic.
+  `Library/ungrep/`); deterministic rows; exact unless marked heuristic.
 - Ask first: new node or edge kinds; indexing `Library/PackageCache`; running analyzers or
   source generators; a new package besides `Microsoft.CodeAnalysis.CSharp` (approved
   2026-09-29).
@@ -325,7 +325,7 @@ it; `GraphStore.Open`/`OpenStaging` gain an optional `graphDirectory` for it.
 
 purge-squad, 2026-09-29, dev machine (Windows 11, Release build, `ug index --graph-dir` into a
 temp folder; update times on a copy of its index inputs, fresh process each run, median of 11).
-Acceptance test: `UG_PURGE_SQUAD=<project> dotnet test tests/UnityGraph.Code.Tests`.
+Acceptance test: `UG_PURGE_SQUAD=<project> dotnet test tests/Ungrep.Code.Tests`.
 
 | What | Measured |
 | --- | --- |

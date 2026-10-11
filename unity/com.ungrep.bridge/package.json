@@ -1,0 +1,9 @@
+{
+  "name": "com.ungrep.bridge",
+  "version": "0.15.0",
+  "displayName": "ungrep bridge",
+  "description": "Editor-only bridge that lets the ungrep CLI (ug) read the editor's state, compile, console and test results, run static editor methods, and open, inspect and edit scenes (through Undo, saved only when asked). Listens on 127.0.0.1 only.",
+  "unity": "2022.3",
+  "license": "MIT",
+  "author": { "name": "ungrep" }
+}

@@ -1,6 +1,6 @@
 # Spec: editor-link
 
-Part of unitygraph (see `../SPEC.md`, Decisions #3). Status: **draft** (2026-09-29). Used by
+Part of ungrep (see `../SPEC.md`, Decisions #3). Status: **draft** (2026-09-29). Used by
 `unity-loop` (compile gate, `ug console`, `ug test`, `ug log`).
 
 ## Objective
@@ -11,7 +11,7 @@ editor method, so the compile loop (5.3% of purge-squad's context, about 4 calls
 becomes one call that waits for Unity itself. When Unity is not reachable, `Editor.log` answers
 what it can.
 
-Live access goes through our own small editor-only package (`com.unitygraph.bridge`), not a
+Live access goes through our own small editor-only package (`com.ungrep.bridge`), not a
 Unity MCP server: no MCP tools in the context (idle cost), no dependency on which MCP server the
 user runs, and the answers are shaped for `ug`'s line format.
 
@@ -19,10 +19,10 @@ user runs, and the answers are shaped for `ug`'s line format.
 
 In:
 
-- `unity/com.unitygraph.bridge`: the editor package (Unity 2022.3 LTS or newer). It listens on
-  loopback, publishes how to reach it in `Library/unitygraph/bridge.json`, and serves status,
+- `unity/com.ungrep.bridge`: the editor package (Unity 2022.3 LTS or newer). It listens on
+  loopback, publishes how to reach it in `Library/ungrep/bridge.json`, and serves status,
   refresh-and-compile, compile messages, console entries, test runs and static-method runs.
-- `src/UnityGraph.EditorLink`: the client (`BridgeClient`) and the `Editor.log` reader.
+- `src/Ungrep.EditorLink`: the client (`BridgeClient`) and the `Editor.log` reader.
 - CLI: `ug status`, `ug compile`, `ug run`, `ug bridge install|remove`.
 - `fixtures/BridgeHost`: a small Unity 6 project that loads the package from this repo, with
   EditMode tests run in batch mode.
@@ -45,7 +45,7 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
   whose body (at most 16 MB, read on the listener thread) is the assembly to run; parameters in the
   query string, answers in JSON (written by a small writer in the package,
   not `JsonUtility`).
-- **Discovery.** `Library/unitygraph/bridge.json`, rewritten on each start and deleted on quit:
+- **Discovery.** `Library/ungrep/bridge.json`, rewritten on each start and deleted on quit:
 
   ```json
   {"bridge": "0.1.0", "port": 51234, "token": "<32 hex>", "pid": 20416, "unity": "6000.3.14f1"}
@@ -55,18 +55,18 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
   read during a reload does not block the replace, and the bridge retries a blocked replace for
   up to 1 s (another reader, a virus scanner). Found in X1's end to end runs: a read at the
   wrong moment failed the replace and left the bridge unstarted until the next reload
-  (`unitygraph bridge did not start: Unable to remove the file to be replaced` in Editor.log).
+  (`ungrep bridge did not start: Unable to remove the file to be replaced` in Editor.log).
 
 - **Access.** Every request carries `X-UG-Token: <token>`; a wrong or missing token is `401`.
   Requests with an `Origin` header (a browser) are `403`. Nothing is read from or written to
   paths a request names. The only files the bridge writes are `bridge.json`, `compile.json` and
-  `result.txt` (a cut `ug run`/`ug eval` result) in `Library/unitygraph/`.
+  `result.txt` (a cut `ug run`/`ug eval` result) in `Library/ungrep/`.
 - **Threading.** The listener thread answers `/status` from a snapshot the main thread refreshes
   every editor update, so status works while the editor is busy importing. Every other request
   is queued to the main thread (`EditorApplication.update`) and answered from there.
 - **State across reloads.** The console buffer, the compile counter and the port go into
   `SessionState` before a reload and come back after it. The last compile's messages are also
-  written to `Library/unitygraph/compile.json`, so they survive a reload and a crash, and the
+  written to `Library/ungrep/compile.json`, so they survive a reload and a crash, and the
   client can read them without the bridge.
 - **Idle cost.** A blocked listener thread and one log callback appending to a ring buffer; no
   polling, no timers.
@@ -149,7 +149,7 @@ The fallback cannot trigger a compile; `compile.json` is preferred over the log 
 ## Commands
 
 All take `--project <dir>`; plain text; exit 0 for any answer, 1 only for no Unity project or an
-invalid config. `editor-link` off in config: `editor-link is off in .claude/unitygraph.json`.
+invalid config. `editor-link` off in config: `editor-link is off in .claude/ungrep.json`.
 
 ```
 $ ug status
@@ -174,9 +174,9 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
   fallback takes `--all` the same way. The compile gate's reason keeps the 20-line cap and its
   last line names `ug compile --all`.
 - `ug bridge install` prints the two ways to add the package: `ug bridge install --copy`
-  (recommended), which copies the package into `Assets/Plugins/UnityGraphBridge/` (a vendored
+  (recommended), which copies the package into `Assets/Plugins/UngrepBridge/` (a vendored
   folder, so the graph ignores it), or Unity's Package Manager "Add package from disk" on
-  `unity/com.unitygraph.bridge/package.json` in the plugin folder (Unity edits its own manifest;
+  `unity/com.ungrep.bridge/package.json` in the plugin folder (Unity edits its own manifest;
   we never touch `Packages/`). The copy comes first since 0.9.0: an installed plugin lives in a
   versioned cache folder that an update deletes, so a `file:` link into it breaks
   (`specs/SPEC-release.md`). When the manifest already has the package, `--copy` copies nothing,
@@ -359,7 +359,7 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
   `UnityEngine.SceneManagement`, and the aliases `Object = UnityEngine.Object` and `Random =
   UnityEngine.Random` (both names exist in `System` and `UnityEngine`; an alias of the same name in
   the code replaces ours). The code's own `using`s are added.
-- **Compile.** In the ug process with Roslyn (`UnityGraph.Code`), as Unity compiles editor
+- **Compile.** In the ug process with Roslyn (`Ungrep.Code`), as Unity compiles editor
   scripts: C# 9 (Unity 2021.2 to 6000.x; 8.0 for 2020.2 to 2021.1, 7.3 before), the editor's
   script defines (`EditorUserBuildSettings.activeScriptCompilationDefines`: `UNITY_EDITOR`, the
   version, platform and project defines), unsafe code allowed, a debug build with a portable PDB
@@ -377,7 +377,7 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
   in Hub's settings folder, else Hub's default `.../Unity/Hub/Editor`). A ug process reads each
   reference file once and again only after it changes (its write time), so the evals of a `ug
   batch` after the first compile in tens of milliseconds, not 160 ms each (Measured).
-- **Kept builds.** A build that runs is kept in `Library/unitygraph/eval/cache/`, keyed by a
+- **Kept builds.** A build that runs is kept in `Library/ungrep/eval/cache/`, keyed by a
   SHA-256 of the code, its name (`snippet`, the `--file` path), `--entry`, `--timeout`, the C#
   version, the defines, ug's own build and every reference file's path, size and write time; so a
   script compile, a new ug or a changed timeout compiles again. The same code again (a poll of the
@@ -391,7 +391,7 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
 - **Compile errors** are the answer, nothing runs: `did not run snippet: N compile errors`, then at
   most 10 as `snippet:line:col CSxxxx text` (`--file` shows its path; lines and columns are the
   code's own, the generated wrapper never shows), each cut at 300 characters, then `(+N more:
-  Library/unitygraph/eval/errors.txt)` with all of them. Warnings are not shown. It is an error
+  Library/ungrep/eval/errors.txt)` with all of them. Warnings are not shown. It is an error
   answer, so `ug batch` stops.
 - **`--check`** compiles and prints `compiled: no errors (N ms)` or the errors (headed `snippet: N
   compile errors`); nothing is sent to the editor. It works with Unity closed (the fallback
@@ -465,15 +465,15 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
   | other objects | `TypeName {field: value, prop: value}`: public instance fields and properties one level deep, at most 20; deeper values print as their type name, or their `ToString` when the type overrides it; a getter that throws prints `<threw X>` |
 
 - When anything was cut, the whole value (strings whole, collections up to 1,000 items, two levels
-  deep) goes to `Library/unitygraph/result.txt` and the result line ends `(+more:
-  Library/unitygraph/result.txt)`: running the code again would repeat its side effects, reading
+  deep) goes to `Library/ungrep/result.txt` and the result line ends `(+more:
+  Library/ungrep/result.txt)`: running the code again would repeat its side effects, reading
   the file does not. The file's own bounds (1,000 items, two levels, 200 members) bound the walk
   of an object graph that may be cyclic or huge; they stay (C1), and the file says where it cut
   (`... +N more`, `{...}`): `ug eval` returning the inner value reads further.
-- A throw (C1): the whole exception goes to `Library/unitygraph/exception.txt`, `ToString()` of the
+- A throw (C1): the whole exception goes to `Library/ungrep/exception.txt`, `ToString()` of the
   unwrapped exception, so every inner exception with its message and stack trace (an
   `AggregateException` with several inner exceptions lists each). The answer gains one line after
-  the frame: `  whole exception: Library/unitygraph/exception.txt`. A file that cannot be written
+  the frame: `  whole exception: Library/ungrep/exception.txt`. A file that cannot be written
   says so instead (`  (exception file not written: <reason>)`). Each throw overwrites the file.
 - Then the `out`, console and `changed:` lines. The console lines' text is cut at 160 characters
   and at most 5 are shown, the rest named by `ug console --after <id>`; `ug console --whole` shows
@@ -549,11 +549,11 @@ coroutine (X1 and R1, Calling code).
 
 ## Testing
 
-- **Client** (`tests/UnityGraph.EditorLink.Tests`): a fake bridge (an in-test `HttpListener`
+- **Client** (`tests/Ungrep.EditorLink.Tests`): a fake bridge (an in-test `HttpListener`
   on loopback replaying recorded answers): discovery (missing, stale pid, wrong token, older
   bridge), the compile flow including a refused connection during a reload and a new port after
   it, the deadline, error sorting, dedup and the 20-line cap.
-- **`ug eval`** (`tests/UnityGraph.Code.Tests`, `tests/UnityGraph.Cli.Tests`, no Unity): the three
+- **`ug eval`** (`tests/Ungrep.Code.Tests`, `tests/Ungrep.Cli.Tests`, no Unity): the three
   shapes and their values, defines, the entry choice and its problems, errors on the code's own
   lines and columns, frames naming the snippet, the loop guard (run in the test process with a
   stand-in guard), `--check`; the fallback references and the editor folder; against the fake
@@ -580,7 +580,7 @@ coroutine (X1 and R1, Calling code).
 ## Boundaries
 
 - Always: loopback only with a token; fail open with a reason; the bridge writes only in
-  `Library/unitygraph/`.
+  `Library/ungrep/`.
 - Ask first: installing the bridge into a project (each project); a new endpoint that changes
   the project (play mode, asset edits); any non-loopback address.
 - Never: edit `Packages/` or the user's manifest; send anything off the machine; read a file a

@@ -16,8 +16,8 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       }
     },
-    "com.unitygraph.bridge": {
-      "version": "file:../../../unity/com.unitygraph.bridge",
+    "com.ungrep.bridge": {
+      "version": "file:../../../unity/com.ungrep.bridge",
       "depth": 0,
       "source": "local",
       "dependencies": {}

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ungrep.Viewer\Ungrep.Viewer.csproj" />
+    <ProjectReference Include="..\..\src\Ungrep.Code\Ungrep.Code.csproj" />
+    <ProjectReference Include="..\..\src\Ungrep.Assets\Ungrep.Assets.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Ungrep.Query.Tests\QueryFixture.cs" Link="QueryFixture.cs" />
+  </ItemGroup>
+</Project>

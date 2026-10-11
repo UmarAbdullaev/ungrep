@@ -12,7 +12,7 @@ esac
 dll="$root/dist/ug/ug.dll"
 
 if [ ! -f "$dll" ]; then
-    echo "unitygraph: ug is not built; run: dotnet publish \"$root/src/UnityGraph.Cli\" -c Release -o \"$root/dist/ug\"" >&2
+    echo "ungrep: ug is not built; run: dotnet publish \"$root/src/Ungrep.Cli\" -c Release -o \"$root/dist/ug\"" >&2
     exit 0
 fi
 
@@ -58,7 +58,7 @@ if [ -z "$dotnet_root" ] && has_runtime "$(path_root)"; then
 fi
 
 if [ -z "$dotnet_root" ]; then
-    echo "unitygraph: needs the .NET 8 runtime or newer: https://dotnet.microsoft.com/download/dotnet/8.0" >&2
+    echo "ungrep: needs the .NET 8 runtime or newer: https://dotnet.microsoft.com/download/dotnet/8.0" >&2
     exit 0
 fi
 

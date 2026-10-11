@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\UnityGraph.Bench\UnityGraph.Bench.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ungrep.Hooks\Ungrep.Hooks.csproj" />
+    <ProjectReference Include="..\..\src\Ungrep.Code\Ungrep.Code.csproj" />
+    <ProjectReference Include="..\..\src\Ungrep.Assets\Ungrep.Assets.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Payloads\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

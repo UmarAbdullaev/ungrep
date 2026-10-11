@@ -1,8 +1,8 @@
 # Spec: editor-ops
 
-Part of unitygraph (see `../SPEC.md`). Status: **draft** (2026-09-30). Builds on `editor-link`
+Part of ungrep (see `../SPEC.md`). Status: **draft** (2026-09-30). Builds on `editor-link`
 (bridge, client, discovery). Requested by the user on 2026-09-30 so that `ug` covers what people
-reach for a Unity MCP server to do, and unitygraph can be the one plugin a Unity developer needs.
+reach for a Unity MCP server to do, and ungrep can be the one plugin a Unity developer needs.
 
 ## Objective
 
@@ -40,7 +40,7 @@ or vendored folders; Unity's own CLI adapter.
 
 Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") offers, and more.
 
-| MCP tool | In unitygraph |
+| MCP tool | In ungrep |
 | --- | --- |
 | `refresh_unity`, `validate_script` | `ug compile` (editor-link) |
 | `read_console`, `run_tests`, `get_test_job` | `ug console`, `ug test` (unity-loop) |
@@ -170,9 +170,9 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/asset/folder`, `/asset/create?path=&type=`, `/asset/move?from=&to=`, `/asset/rename?path=&name=`, `/asset/duplicate?path=&to=`, `/asset/delete?path=`, `/asset/reimport?path=` | Through `AssetDatabase`, so `.meta` files and GUIDs stay right. `create` makes folders, materials (`type=Material&shader=`) and ScriptableObjects, and from bridge 0.7.0 `.uxml`, `.uss` and `.tss` files with Unity's starting content (SPEC-play-input, UI Toolkit, Setup; a PanelSettings may make Unity write its default theme, which the answer names). `delete` moves to the OS trash (`MoveAssetToTrash`). |
 | `/set?object=Assets/X.png&importer=true&...` | Importer settings (texture, model, audio) through the importer's `SerializedObject`, then reimport. Material properties by name (`_BaseColor`, `_MainTex`). |
 | `/project` | Unity version and render pipeline, tags, layers (Unity's physics layers, as `index name`), sorting layers, build scenes (enabled ones with their build index). Read-only. |
-| `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`. The answer waits for the request across editor updates (the route returns a poll that gives null until the request has finished; the connection stays open) and gives the resolved `name  version  source` (`local`, `git`, `registry`; the location for local and git). `list` reads the local cache (offline) and shows the manifest's direct dependencies, counting `com.unity.modules.*` in one line. `id` is a name, `name@version`, a git URL or `file:` path. Refused while compiling or importing and in play mode (a package change reloads scripts); `remove` refuses `com.unitygraph.bridge` (removing it would end the connection). Failures answer `could not add <id>: <Unity's message>`. |
+| `/package/list`, `/package/add?id=`, `/package/remove?name=` | `UnityEditor.PackageManager.Client`. The answer waits for the request across editor updates (the route returns a poll that gives null until the request has finished; the connection stays open) and gives the resolved `name  version  source` (`local`, `git`, `registry`; the location for local and git). `list` reads the local cache (offline) and shows the manifest's direct dependencies, counting `com.unity.modules.*` in one line. `id` is a name, `name@version`, a git URL or `file:` path. Refused while compiling or importing and in play mode (a package change reloads scripts); `remove` refuses `com.ungrep.bridge` (removing it would end the connection). Failures answer `could not add <id>: <Unity's message>`. |
 | `/run?target=<menu path>` | Menu items through editor-link's `/run`, which already calls `EditorApplication.ExecuteMenuItem`; now refused for File/Quit, File/Exit, `File/Build...` and `Build/...` menu items (matched case-insensitively, spaces around `/` ignored): `did not run File/Quit: refused, it would close the editor (ug does not quit Unity)`. The refusal is in the bridge's runner, so nothing is executed. |
-| `/shot?view=game\|scene\|<camera address>&width=&height=` (bridge 0.6.0 adds `from`, `look`, `rotation`, `fov`, `frame`, `keep`, `angles`, `orbit`, `elevations`, `distance`, `camera`: Viewpoints) | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back; root Screen Space - Overlay canvases are pointed at the last camera for the render, since no camera draws them, and put back after, without an Undo entry or a dirty flag; UI Toolkit screen panels are drawn over the cameras from bridge 0.7.0 by pointing their PanelSettings at the shot's texture for the render, and the answer counts them, `(Game view, 1 camera, 2 UI Toolkit documents)`; before 0.7.0 the answer ended `, N UI Toolkit documents not drawn`; an object with a UIDocument and a `.uxml` path with `panel=` draw UI Toolkit alone: SPEC-play-input, UI Toolkit); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
+| `/shot?view=game\|scene\|<camera address>&width=&height=` (bridge 0.6.0 adds `from`, `look`, `rotation`, `fov`, `frame`, `keep`, `angles`, `orbit`, `elevations`, `distance`, `camera`: Viewpoints) | Renders to `Library/ungrep/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back; root Screen Space - Overlay canvases are pointed at the last camera for the render, since no camera draws them, and put back after, without an Undo entry or a dirty flag; UI Toolkit screen panels are drawn over the cameras from bridge 0.7.0 by pointing their PanelSettings at the shot's texture for the render, and the answer counts them, `(Game view, 1 camera, 2 UI Toolkit documents)`; before 0.7.0 the answer ended `, N UI Toolkit documents not drawn`; an object with a UIDocument and a `.uxml` path with `panel=` draw UI Toolkit alone: SPEC-play-input, UI Toolkit); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
 | `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies: `Transform`, `UnityEngine.Transform`, `Physics.Raycast` (split at the last dot when no type has that name); short names match case-sensitively first, Unity's namespaces win over System's, an ambiguous name lists its candidates. The type view is under 300 tokens for the common types (kind, base, assembly, constructors, then property, method, static and event names, longest lists cut with `+N more`); `member` lists overloads with parameter names, `out`/`ref`/`params` and default values. Members inherited from a base say `(from Object)`; obsolete ones are left out. When reflection finds nothing the answer is `{"error":..., "online":[page addresses]}`, or `{"local":"<file>"}` when the Hub's Documentation module has the page. |
 | `/api?page=Manual/<page>\|ScriptReference/<page>\|<package>[@version]/<path>` | Names a documentation page (same answer shape: `local` file, else `error` and `online`); `ug docs` uses it. Bare `<page>` means `Manual/<page>`. The package version is the installed one's major.minor. The bridge never opens a connection: fetching, trimming and caching are the client's (rule 11). |
 | `/stats` (`ug perf`) | Lines: play state; `render` (draw calls, batches, triangles, set-pass calls, render ms from `UnityStats`, which only counts in play mode, else `only counted in play mode (ug play, then ug perf)`); memory (allocated, reserved, scripts heap, graphics driver, MB); objects (game objects, active, components in the loaded scenes); assets (files under `Assets/` with the main kinds counted). Read-only. Bridge 0.8.0 adds the `/perf/...` requests: Profiler. |
@@ -221,7 +221,7 @@ All take `--width`/`--height`. Request: `/shot?view=&from=&look=&rotation=&fov=&
   Camera but every layer (its culling mask is Nothing)`; the source keeps its mask (O10 fix, bridge
   0.10.0). Under URP the source's `UniversalAdditionalCameraData` is copied too
   (`EditorUtility.CopySerialized`: renderer, post-processing, anti-aliasing, volume layers) by the
-  sub-assembly `UnityGraph.Bridge.Editor.Urp` (`versionDefines` on `com.unity.render-pipelines.universal`),
+  sub-assembly `Ungrep.Bridge.Editor.Urp` (`versionDefines` on `com.unity.render-pipelines.universal`),
   with the camera stack emptied and the render type set to Base: a viewpoint shows the world from that
   point, so URP overlay cameras (a weapon model, a UI camera) and overlay canvases are left out. HDRP's and
   Post Processing v2's camera components are not copied (not tested; the plain copy still renders). Nothing
@@ -259,13 +259,13 @@ All take `--width`/`--height`. Request: `/shot?view=&from=&look=&rotation=&fov=&
 
   ```
   $ ug shot Player --angles
-  Library/unitygraph/shots/angles-Player.png  964x482  180.2 KB  (Player, 6 views of 320x240, distance 4.2, settings of Main Camera)
+  Library/ungrep/shots/angles-Player.png  964x482  180.2 KB  (Player, 6 views of 320x240, distance 4.2, settings of Main Camera)
     rows: front, back, left | right, top, three-quarter
   $ ug shot Player --orbit 4 --elevations 0,45
-  Library/unitygraph/shots/orbit-Player.png  966x362  120.5 KB  (Player, 4 azimuths x 2 elevations of 240x180, distance 4.2, settings of Main Camera)
+  Library/ungrep/shots/orbit-Player.png  966x362  120.5 KB  (Player, 4 azimuths x 2 elevations of 240x180, distance 4.2, settings of Main Camera)
     columns: azimuth 0, 90, 180, 270 (0 = front, 90 = right); rows: elevation 0, 45
   $ ug shot --from 0,10,-10 --look Enemy
-  Library/unitygraph/shots/view.png  960x540  95.1 KB  (from 0, 10, -10 looking at Enemy, settings of Main Camera)
+  Library/ungrep/shots/view.png  960x540  95.1 KB  (from 0, 10, -10 looking at Enemy, settings of Main Camera)
   ```
 - **Refusals** (checked before the graphics-device check, so they answer under `-nographics` too): `scene`
   with `--from`, `--look`, `--rotation`, `--angles` or `--orbit` (the Scene view moves only with
@@ -371,7 +371,7 @@ command that shows the rest.
 
   ```
   profiler  recording play mode frames since frame 1200 (holds 1200-3199)
-  file  Library/unitygraph/profiler/20261011-101500.raw  26.9 MB
+  file  Library/ungrep/profiler/20261011-101500.raw  26.9 MB
   allocation callstacks  off
   areas on  CPU, Rendering, Memory, Audio, Video, Physics, Physics2D, NetworkMessages, NetworkOperations, UI, UIDetails, GlobalIllumination, VirtualTexturing
   areas off  GPU
@@ -381,7 +381,7 @@ command that shows the rest.
   the editor in play mode too, the window's Edit Mode target). `--file` writes Unity's binary log
   (`Profiler.logFile`, `enableBinaryLog`), which the Profiler window loads: a path relative to the
   project or absolute, `.raw` added when there is no extension; without a path
-  `Library/unitygraph/profiler/<yyyyMMdd-HHmmss>.raw`. `--callstacks` sets
+  `Library/ungrep/profiler/<yyyyMMdd-HHmmss>.raw`. `--callstacks` sets
   `Profiler.enableAllocationCallstacks` (GC.Alloc samples carry call stacks; slower). Already
   recording: `start --file` adds the file, a plain `start` is refused. `stop` ends the log, turns
   callstacks and recording off, puts `profileEditor` back, and answers the time, the frame range
@@ -416,12 +416,12 @@ command that shows the rest.
 - **`snapshot take`**: `Unity.Profiling.Memory.MemoryProfiler.TakeSnapshot(path, callback,
   ManagedObjects | NativeObjects | NativeAllocations)` (the Memory Profiler package's default
   capture, without the package), waiting for the callback (at most 60 s). Default
-  `Library/unitygraph/snapshots/<yyyyMMdd-HHmmss>.snap`; `.snap` added when there is no extension.
+  `Library/ungrep/snapshots/<yyyyMMdd-HHmmss>.snap`; `.snap` added when there is no extension.
   Answers path, size and time. Unity can call back before the file is flushed, so the answer also
   waits for the file's end signature (`0xABCDCDAE`, below; at most 20 s past the callback, else
   refused with the size so far). Snapshots are big: 183 MB in 0.6 s for BridgeHost in batch mode,
   1.81 GB in 10–17.5 s for purge-squad with its window open.
-- **`snapshot list`** (client): `Library/unitygraph/snapshots/` and `MemoryCaptures/` (the package's
+- **`snapshot list`** (client): `Library/ungrep/snapshots/` and `MemoryCaptures/` (the package's
   folder), or `--folder` (MCP's default, `Application.temporaryCachePath/MemoryCaptures`, is reached
   this way), newest first, at most 20 (`--all`): path, size, capture time, product, Unity version,
   platform, total used memory and native object count, read from the file. A file ug cannot read
@@ -456,7 +456,7 @@ command that shows the rest.
   (not twice when Unity's name carries it: `TempBuffer 14 613x428`), format and count, compute
   shader and kernel, and the batch break cause. `disable` ends it; play mode stays paused. `events`
   and `disable` are refused while it is off.
-- **Files.** ug creates `Library/unitygraph/profiler/` and `Library/unitygraph/snapshots/` (Library
+- **Files.** ug creates `Library/ungrep/profiler/` and `Library/ungrep/snapshots/` (Library
   is never in version control) and never deletes what it writes there; answers give sizes. A path
   given is refused under the project's `Assets/` or `Packages/` (Unity would import a growing file),
   when the file exists, and when its folder does not.
@@ -465,7 +465,7 @@ command that shows the rest.
 - **Older bridge.** Before 0.8.0 the `/perf/...` requests are unknown: `bridge 0.7.0 is too old for
   ug perf --record: run ug bridge install again`. Plain `ug perf` works with any.
 
-**The `.snap` format** (read by `UnityGraph.EditorLink`, written by Unity 2022.2 to 6000.3; checked
+**The `.snap` format** (read by `Ungrep.EditorLink`, written by Unity 2022.2 to 6000.3; checked
 against the Memory Profiler package 1.1.12 sources): a file starts with `0xAEABCDCD` and ends with
 `0xABCDCDAE` after a `long` directory offset. The directory (`0xCDCDAEAB`, version `0x20170724`, the
 block section offset) lists one offset per entry type; the block section (`0x20170724`, block count,
@@ -728,8 +728,8 @@ AudioSource` missed Boot's AudioSource and `ug scene` listed only GalaxyMap. The
     Scripting Reference when the Hub's Documentation module is installed, then docs.unity3d.com
     (Scripting Reference, Manual, package docs) when neither answers. The request carries only
     the type, member or page name, never code or project data; pages are trimmed to signature,
-    summary, parameters and one example and cached under `%LOCALAPPDATA%/unitygraph/docs`
-    (`~/Library/Caches/unitygraph/docs` on macOS); config `docs.online: false` turns the network
+    summary, parameters and one example and cached under `%LOCALAPPDATA%/ungrep/docs`
+    (`~/Library/Caches/ungrep/docs` on macOS); config `docs.online: false` turns the network
     step off, and a failed fetch says so and fails open. Approved by the user 2026-09-30.
 
 ## Commands
@@ -787,11 +787,11 @@ stopped after 12.4 s: 0 errors, 2 warnings (ug console)
   cut to the answer budget with a line naming the page) in the order rule 11 gives: local file,
   the client's cache, then one fetch. The fetch is https to `docs.unity3d.com` only (redirects
   stay on that host), 15 s timeout, 2 MB cap, no cookies or project data in the request. The
-  cache is one trimmed text file per page address under `%LOCALAPPDATA%/unitygraph/docs`
-  (`~/Library/Caches/unitygraph/docs` on macOS, `$XDG_CACHE_HOME` or `~/.cache` on Linux).
+  cache is one trimmed text file per page address under `%LOCALAPPDATA%/ungrep/docs`
+  (`~/Library/Caches/ungrep/docs` on macOS, `$XDG_CACHE_HOME` or `~/.cache` on Linux).
   A page that cannot be fetched (`docs.online: false`, no network, HTTP error) prints the
   bridge's error and the page address to read: `not fetched, read it at: <url> (<reason>)`.
-  `.claude/unitygraph.json`: `{ "docs": { "online": false } }`. An older 0.2.0 bridge without
+  `.claude/ungrep.json`: `{ "docs": { "online": false } }`. An older 0.2.0 bridge without
   these endpoints answers `unknown request`.
 - `ug batch "step" "step" ... [--file <path>|-]` runs editor-ops commands in one process over one
   bridge connection (one `/status`, then one request per step). A step is a command as typed
@@ -1146,7 +1146,7 @@ With idle cost, file form:
 
 - Writes scene and asset files only on `ug save`, for prefab-content edits (rule 3), and for
   explicit `ug prefab`, `ug asset` and `ug package` commands. Profiler logs and memory snapshots go
-  to `Library/unitygraph/` or a path the user gives outside `Assets/` and `Packages/` (O12).
+  to `Library/ungrep/` or a path the user gives outside `Assets/` and `Packages/` (O12).
 - Never from a hook; never edits package contents or vendored folders; never discards unsaved
   work.
 - The only network access is rule 11's docs fallback, to docs.unity3d.com only, and the

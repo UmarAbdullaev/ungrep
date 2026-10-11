@@ -39,8 +39,8 @@
         "disallowedTools": ["Bash(ug:*)", "Bash(codegraph:*)"]
       }
     },
-    "unitygraph": {
-      "own": "(^|[\\s;&|(])ug\\s|Skill\\(unitygraph",
+    "ungrep": {
+      "own": "(^|[\\s;&|(])ug\\s|Skill\\(ungrep",
       "skills": ["${plugin}/skills/unity/SKILL.md"],
       "agent": {
         "pluginDir": true,
@@ -49,7 +49,7 @@
     }
   },
   "agentPrompt": "Answer in at most 12 lines; give file:line for each place you name. Do not save scenes or assets.",
-  "gate": "Assets/UnityGraphBenchProbe.cs",
+  "gate": "Assets/UngrepBenchProbe.cs",
   "questions": [
     {
       "id": "N1",
@@ -71,7 +71,7 @@
           { "run": "grep -rn \"class RunDirector\" Assets --include=*.cs" },
           { "run": "grep -nE \"void (Awake|Start|OnEnable|OnDisable|Update|FixedUpdate|LateUpdate|OnDestroy|OnValidate|Reset|OnApplication\\w+|OnTrigger\\w+|OnCollision\\w+)\\s*\\(\" Assets/Scripts/Run/RunDirector.cs" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug explain RunDirector" }
         ]
       }
@@ -102,7 +102,7 @@
           { "run": "grep -rn \"TrySpend(\" Assets --include=*.cs" },
           { "run": "grep -nE \"^\\s*(public|private|internal|protected)?\\s*(static\\s+)?\\w+\\s+\\w+\\s*\\(\" Assets/Scripts/Economy/Fabrication.cs Assets/Tests/EditMode/WalletTests.cs" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug refs Wallet.TrySpend" }
         ]
       }
@@ -133,7 +133,7 @@
           { "run": "grep -rnw \"Died\" Assets --include=*.cs" },
           { "run": "grep -nE \"void \\w+\\s*\\(\" Assets/Scripts/Combat/Enemy.cs Assets/Scripts/Combat/PlayerCharacter.cs Assets/Scripts/Run/RunDirector.cs" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug refs Health.Died" }
         ]
       }
@@ -163,7 +163,7 @@
           { "run": "grep -rnw \"IPartRule\" Assets --include=*.cs" },
           { "run": "grep -rnE \"(class|struct)\\s+\\w+[^{]*:[^{]*\\b(IPartRule|IPayload|IEmitter|ITrigger)\\b\" Assets --include=*.cs" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug refs IPartRule" }
         ]
       }
@@ -197,7 +197,7 @@
           { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset" },
           { "run": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug impact ProgressBar._value" }
         ]
       }
@@ -216,7 +216,7 @@
           { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
           { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug impact ProgressBar" }
         ]
       }
@@ -235,7 +235,7 @@
           { "run": "grep guid Assets/Prefabs/UI/ButtonPrimary.prefab.meta" },
           { "run": "grep -rl c4bb93726453a2e45977d1d160cb09f2 Assets --include=*.prefab --include=*.unity" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug refs Assets/Prefabs/UI/ButtonPrimary.prefab" }
         ]
       }
@@ -259,7 +259,7 @@
           { "run": "grep -rn -B20 39f287a42b19a594a91e2edd041ed306 Assets/Prefabs --include=*.prefab | grep m_GameObject" },
           { "run": "awk '/&(113781415653558998|2810758817136334446|5491663651673104656|6780681183313136275|2296644112916184566|4513111936334990472|5415552943172750737|4724468569595232565)$/ { f = FILENAME } f && /m_Name:/ { print f \": \" $0; f = \"\" }' Assets/Prefabs/Weapons/Parts/*.prefab" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug refs Assets/Materials/Gun_Metal.mat" }
         ]
       }
@@ -281,7 +281,7 @@
           { "run": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta" },
           { "run": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug explain RunDirector" },
           { "run": "ug explain 'Arena_Greybox.unity > Run > RunDirector'" }
         ]
@@ -305,7 +305,7 @@
           { "run": "grep guid Assets/Prefabs/Enemies/Enemy_Shooter.prefab.meta" },
           { "run": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity" }
         ],
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug refs Assets/Prefabs/Enemies/Enemy_Shooter.prefab" }
         ]
       }
@@ -320,7 +320,7 @@
         "checked": "2026-10-11, O10 chore 1: Boot has Boot/AdOverlay/Bar with ProgressBar _value 0 (ug inspect), and Boot/LoadingWindow/ProgressBar"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug find --live Bar" },
           { "run": "ug inspect Boot/AdOverlay/Bar --component ProgressBar" }
         ],
@@ -344,7 +344,7 @@
         "checked": "2026-10-11, O10 chore 2: checked by ug inspect after the set; the after step reverts the leg's undo groups"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug set Boot/AdOverlay/Bar _value 0.5 --component ProgressBar" }
         ],
         "unity-editor-mcp": [
@@ -369,7 +369,7 @@
         "checked": "2026-10-11, O10 chore 3: checked by ug inspect and the transform read after the leg"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug batch \"object create Probe --parent Boot --primitive Cube\" \"set Boot/Probe m_LocalPosition 1,2,3\" \"component add Boot/Probe Rigidbody\"" }
         ],
         "unity-editor-mcp": [
@@ -398,7 +398,7 @@
         "checked": "2026-10-11, O10 chore 4: the override is listed before the revert, and none is left after it"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug batch \"object create Btn --parent Boot/AdOverlay --prefab Assets/Prefabs/UI/ButtonPrimary.prefab\" \"set Boot/AdOverlay/Btn m_Interactable false --component Button\" \"prefab overrides Boot/AdOverlay/Btn\" \"prefab revert Boot/AdOverlay/Btn\"" }
         ],
         "unity-editor-mcp": [
@@ -422,7 +422,7 @@
         "checked": "2026-10-11, O10 chore 5: the leg read the console since entering play (none are new in this project: ug says nothing logged, Pipeline answers entries []) and the editor is back in edit mode"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug play --for 3", "timeout": 180 }
         ],
         "unity-editor-mcp": [
@@ -451,7 +451,7 @@
         "checked": "2026-10-11, O10 chore 6: the error read names the missing name (CS0103), the file is restored byte for byte and ug compile is clean after"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "printf '\\nclass BenchBroken { int X() { return benchMissing; } }\\n' >> Assets/Scripts/UI/ProgressBar.cs", "count": false },
           { "run": "ug compile", "timeout": 180 },
           { "run": "cp Temp/bench-ProgressBar.cs Assets/Scripts/UI/ProgressBar.cs", "count": false },
@@ -484,7 +484,7 @@
         "checked": "2026-10-11, O10 chore 7: two picture paths answered; each picture looked at by hand (Measured)"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug shot game" },
           { "run": "ug shot --from 4,4,-4 --look Boot/Probe" }
         ],
@@ -507,7 +507,7 @@
         "checked": "2026-10-11, O10 chore 9: a frame count and named markers answered; the editor is back in edit mode"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug play", "timeout": 180 },
           { "run": "ug perf --record 1", "timeout": 180 },
           { "run": "ug stop" }
@@ -536,7 +536,7 @@
         "checked": "2026-10-11, O10 chore 10: after the click the loading window opens on the way to Arena_Greybox; the editor is back in edit mode"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug play", "timeout": 180 },
           { "run": "ug wait 4" },
           { "run": "ug ui" },
@@ -568,7 +568,7 @@
         "checked": "2026-10-11, O10 chore 8: ug test ran the 167 EditMode tests green; Pipeline's run_tests ran none in this -automated editor (last in the suite: it can wedge Pipeline's queue)"
       },
       "steps": {
-        "unitygraph": [
+        "ungrep": [
           { "run": "ug test", "timeout": 600 }
         ],
         "unity-editor-mcp": [

@@ -1,7 +1,7 @@
 # Spec: bench
 
 `ug bench`: question suites per Unity project, run on four arms (a grep baseline, codegraph,
-Graphify, unitygraph), scored on calls, tokens, wall time, correctness against a checked answer
+Graphify, ungrep), scored on calls, tokens, wall time, correctness against a checked answer
 key and redo rate; and the overhead-budget checks that fail a release. SPEC.md's goal (−30%
 main-thread context, −15% turns, equal or better correctness) is "measured by `stats` and a
 benchmark": this is the benchmark. Depends on `stats` and every feature module. Written 2026-10-11
@@ -56,7 +56,7 @@ ug bench budgets [--project <dir>] [--gate]
 | `grep` | shell `grep`/`find`, Read | nothing | `unity-editor-mcp` |
 | `codegraph` | codegraph 1.6 `codegraph_explore` (MCP), its CLI | `.codegraph/` in the project | `unity-editor-mcp` |
 | `graphify` | `graphify query/explain/affected/path` over `graphify-out/graph.json` | the graph, built with `graphify update` (AST only, no LLM) | `unity-editor-mcp` |
-| `unitygraph` | `ug` and the `unity` skill | `ug index` done | `ug` |
+| `ungrep` | `ug` and the `unity` skill | `ug index` done | `ug` |
 
 - Graphify's full pipeline adds an LLM pass over docs and comments. It costs money per build and
   is not repeatable, so the arm uses the AST graph, the part Graphify builds for free. Its graph
@@ -95,7 +95,7 @@ Commands first named (now corrected there): System.Text.Json is already in, and 
   "arms": {
     "grep": {},
     "codegraph": { "needs": ["codegraph-index"], "own": "codegraph|mcp__codegraph__" },
-    "unitygraph": { "own": "\\bug\\b", "agent": { "pluginDir": true } }
+    "ungrep": { "own": "\\bug\\b", "agent": { "pluginDir": true } }
   },
   "agentPrompt": "Answer in at most 12 lines and give file:line for each place you name.",
   "questions": [
@@ -114,7 +114,7 @@ Commands first named (now corrected there): System.Text.Json is already in, and 
           { "read": "Assets/Scripts/Run/RunDirector.cs", "offset": 88, "limit": 40 }
         ],
         "codegraph": [ { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "RunDirector" } } ],
-        "unitygraph": [ { "run": "ug explain RunDirector" } ]
+        "ungrep": [ { "run": "ug explain RunDirector" } ]
       }
     },
     {
@@ -124,7 +124,7 @@ Commands first named (now corrected there): System.Text.Json is already in, and 
       "prompt": "Set Boot/AdOverlay/Bar's ProgressBar._value to 0.5 and read it back.",
       "before": [ { "run": "ug eval 'return UnityEditor.Undo.GetCurrentGroup();'", "capture": { "group": "result: (\\d+)" } } ],
       "steps": {
-        "unitygraph": [ { "run": "ug set Boot/AdOverlay/Bar _value 0.5 --component ProgressBar" } ],
+        "ungrep": [ { "run": "ug set Boot/AdOverlay/Bar _value 0.5 --component ProgressBar" } ],
         "unity-editor-mcp": [ { "mcp": "unity-editor-mcp", "tool": "set_serialized_field", "args": { } } ],
         "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
       },
@@ -211,7 +211,7 @@ project folder, then the run's transcript is read from Claude Code's project fol
 
 - Isolation: `--setting-sources project,local` (the user's own plugins and hooks stay out: the
   caveman hook alone changes answer length), `--strict-mcp-config` with only the arm's MCP
-  servers, `--plugin-dir <repo>` on the unitygraph arm only, a skill an arm lists outside that
+  servers, `--plugin-dir <repo>` on the ungrep arm only, a skill an arm lists outside that
   plugin (Graphify's, a personal skill in `~/.claude/skills`, which the `user` source would load)
   copied with its folder into a temp plugin named after the arm and passed with a second
   `--plugin-dir` (written for the run, removed after; `--dry-run` writes nothing), so the
@@ -239,19 +239,19 @@ Checked on every `run` and by `ug bench budgets`; a broken one exits 1.
 
 | Check | Budget | How |
 |---|---|---|
-| skill description | ≤ 300 tokens | the line Claude Code lists every session, `- unitygraph:unity: <description>`, bytes / 4 |
+| skill description | ≤ 300 tokens | the line Claude Code lists every session, `- ungrep:unity: <description>`, bytes / 4 |
 | skill body | ≤ 600 tokens | `skills/unity/SKILL.md` after the front matter, bytes / 4 |
 | compile gate | 0 bytes when clean; ≤ 20 error lines | live, `--gate` or a suite `gate`: PostToolUse marks an untouched script edited, Stop must print nothing; then a probe script with 30 errors is written, PostToolUse and Stop must block with at most 20 error lines (the head and the `+N more` line are not errors); the probe and its `.meta` are deleted and the check must be clean again, retried every 5 s for a minute while the editor reloads |
 
 - The gate check writes into the project (SPEC.md Boundaries: ask first), so it runs only with
-  `--gate` or a suite that names a probe path (`"gate": "Assets/UnityGraphBenchProbe.cs"`), and
+  `--gate` or a suite that names a probe path (`"gate": "Assets/UngrepBenchProbe.cs"`), and
   only when the editor answers. Otherwise it is "not checked", which does not fail the run; a
   release run must show all three checked.
 - Index builds cost 0 tokens by construction (no LLM); nothing to check.
 
 ## Baseline
 
-`--baseline <results.json>` compares per question and arm. Fails (exit 1), unitygraph arm only:
+`--baseline <results.json>` compares per question and arm. Fails (exit 1), ungrep arm only:
 
 - a question correct in the baseline and not now;
 - more calls than the baseline;
@@ -265,21 +265,21 @@ it is replaced only with a commit that says why.
 
 ```
 bench purge-squad  script  commit 9ce9995 (HEAD 9ce9995)
-question       grep                  codegraph  graphify  unitygraph
+question       grep                  codegraph  graphify  ungrep
 N1 navigation  2 / 110 / 0.5 ok      -          -         1 / 178 / 0.5 ok
 ...
 A5 asset       2 / 140 / 1.3 ok      -          -         3 / 8,139 / 1.2 ok redo 2
 C1 chore       2 / 411 / 1.5 ok *    -          -         2 / 79 / 0.4 ok
 ...
 - codegraph N1,N2,N3,N4,N5,A1,A2,A3,A4,A5: no steps
-- unitygraph C8: needs scenes-saved
+- ungrep C8: needs scenes-saved
 * shared steps, run once: unity-editor-mcp
 totals over 19 questions every arm ran (codegraph, graphify ran none)
             calls  tokens  seconds  correct  redo
 grep           71   7,393    111.0    19/19     0
-unitygraph     39  12,847     65.3    19/19     2
-unitygraph vs grep: calls -45%, tokens +74%
-idle tokens (always + on use)  grep 1,510 + 2,698  codegraph 0 + 0  graphify 92 + 10,831  unitygraph 27 + 599
+ungrep     39  12,847     65.3    19/19     2
+ungrep vs grep: calls -45%, tokens +74%
+idle tokens (always + on use)  grep 1,510 + 2,698  codegraph 0 + 0  graphify 92 + 10,831  ungrep 27 + 599
 budgets  skill description 27/300 ok  skill body 599/600 ok  compile gate 0 bytes clean, 20/20 error lines ok
 baseline  bench/baselines/bench-purge-squad-script.json: no regression
 results  bench/results/purge-squad-script-2026-10-11.json
@@ -321,19 +321,19 @@ runner's save prompt, so C8 is "not run" until the user saves or undoes.
 
 ## Code
 
-- `src/UnityGraph.Bench`: `Suite` (model, loader, validation), `StepExecutor` (run, read, mcp;
+- `src/Ungrep.Bench`: `Suite` (model, loader, validation), `StepExecutor` (run, read, mcp;
   polls, captures; servers fresh per leg), `BenchHost` (shell, files, processes, MCP servers), `McpClient` (stdio
   JSON-RPC: initialize, tools/list, tools/call), `ScriptRunner`, `AgentRunner`, `Scoring` (key
   items, redo, leaks), `BenchResults` (JSON), `Baseline`, `BenchText`, `Budgets`, `SkillFile`.
-- `src/UnityGraph.Cli/BenchCommand.cs`: arguments, paths, dry runs, exit codes.
+- `src/Ungrep.Cli/BenchCommand.cs`: arguments, paths, dry runs, exit codes.
 - Shell, files, processes and MCP servers behind `IBenchHost`, so the runner is tested without
   shells, editors or `claude`.
 
 ## Testing
 
-- `tests/UnityGraph.Bench.Tests`, on a fake `IBenchHost`:
+- `tests/Ungrep.Bench.Tests`, on a fake `IBenchHost`:
   - Suite loading: aliases, unknown arms and step kinds, bad regexes, missing `checked`; the
-    committed purge-squad suite loads with a unitygraph leg on every question.
+    committed purge-squad suite loads with a ungrep leg on every question.
   - Scoring: items found, `not` items, tool uses, redo, leaks, text searches.
   - Script runner: before, leg, check, after in order; a shared leg once; `needs` unmet; polls
     stop at `max`; a server that does not start, and is not tried again; servers fresh per leg;
@@ -346,7 +346,7 @@ runner's save prompt, so C8 is "not run" until the user saves or undoes.
   - Baseline compare and its report (golden).
   - Budgets: skill files over and under; the gate through the dispatcher with a fake check, the
     after-check retried while the editor reloads.
-- `tests/UnityGraph.Cli.Tests/BenchCommandTests`: dry runs in both modes run nothing, a run writes
+- `tests/Ungrep.Cli.Tests/BenchCommandTests`: dry runs in both modes run nothing, a run writes
   results and a baseline regression exits 1, usage errors exit 2.
 - End to end on purge-squad is the suite itself (Measured).
 
@@ -369,9 +369,9 @@ purge-squad 9ce9995, Unity 6000.3.14f1, bridge 0.15.0, `ug` at this commit, code
 mcp`) for the other arms' chores. Both indexes built on the user's yes and kept out of
 purge-squad's git (`.git/info/exclude`). `Boot` open, left as found. C8 not run
 (`scenes-saved`). `bench/baselines/bench-purge-squad-script.json` is this run (it replaced the
-grep-and-unitygraph run of the same day: four arms, servers fresh per leg).
+grep-and-ungrep run of the same day: four arms, servers fresh per leg).
 
-| Question | grep | codegraph | Graphify | unitygraph | Note |
+| Question | grep | codegraph | Graphify | ungrep | Note |
 |---|---|---|---|---|---|
 | N1 | 2 / 110 | 1 / 6,266 | 1 / 1,665 | 1 / 178 | |
 | N2 | 2 / 721 | 2 / 11,783, redo 1 | 3 / 1,204, redo 2 | 1 / 367 | Graphify has no member-call edges across files: grep fallback |
@@ -393,20 +393,20 @@ questions are grep's steps and their chores Pipeline's (Arms).
 | grep | 71 | 7,394 | 134.1 | 19/19 | 0 | 1,510 + 2,698 (Pipeline's 151 tool names; schemas of the 16 used) |
 | codegraph | 69 | 46,537 | 134.5 | 19/19 | 2 | 1,518 + 3,133 (Pipeline's, plus `codegraph_explore`: 8 + 435) |
 | Graphify | 73 | 16,472 | 141.9 | 19/19 | 6 | 1,602 + 13,528 (Pipeline's, plus the skill: 92 + 10,830) |
-| unitygraph | 39 | 12,846 | 72.9 | 19/19 | 2 | 27 + 599 (skill line, skill body) |
+| ungrep | 39 | 12,846 | 72.9 | 19/19 | 2 | 27 + 599 (skill line, skill body) |
 
-- Against grep: codegraph calls −3%, tokens +529%; Graphify calls +3%, tokens +123%; unitygraph
-  calls −45%, tokens +74%. Without A5, unitygraph 36 calls, 4,707 tokens against grep's 69 and
+- Against grep: codegraph calls −3%, tokens +529%; Graphify calls +3%, tokens +123%; ungrep
+  calls −45%, tokens +74%. Without A5, ungrep 36 calls, 4,707 tokens against grep's 69 and
   7,254 (−48% calls, −35% tokens).
 - Tokens here are what the calls answered. In a session each call also re-reads the context
   (the agent pilot: about 52k a turn before any answer), so a call saved is worth far more than
   its answer's bytes; the calls column is the closer measure of cost.
 - Navigation (N1-N5), where all four use their own tool: grep 12 / 2,293; codegraph 10 / 41,434;
-  Graphify 14 / 11,371; unitygraph 9 / 1,568. codegraph's explore answers with the verbatim source
+  Graphify 14 / 11,371; ungrep 9 / 1,568. codegraph's explore answers with the verbatim source
   of every related symbol and the call paths, about 6,300 tokens a call however small the
   question; Graphify's `query` is capped at 2,000 tokens of NODE and EDGE lines and falls back to
   grep on N2, N3 and N5.
-- Asset: unitygraph 11 / 10,093 (1,954 without A5) against grep's 15 / 1,346. Chores: unitygraph
+- Asset: ungrep 11 / 10,093 (1,954 without A5) against grep's 15 / 1,346. Chores: ungrep
   19 / 1,188 against Pipeline's 44 / 3,757 (O10's chore result held).
 - Budgets: skill description 27/300, body 599/600, compile gate 0 bytes clean and 20/20 error
   lines on the 30-error probe: all held, the gate checked live.
@@ -429,11 +429,11 @@ questions are grep's steps and their chores Pipeline's (Arms).
   asset; scene and prefab field values offline; implementers through derived interfaces in one
   call; `ug find <guid>` (found nothing); `ug explain`'s line at the attribute, not the class.
 
-### Script mode after the B1 fixes, unitygraph, 2026-10-11
+### Script mode after the B1 fixes, ungrep, 2026-10-11
 
 purge-squad 9ce9995, `ug` with B1a-B1e, navigation and asset questions only (the chores need the
 editor and the fixes touch none of them: their 19 / 1,188 stands). `--baseline` the four-arm run
-above: no regression. The baseline file is kept: it is the four-arm record, and its unitygraph
+above: no regression. The baseline file is kept: it is the four-arm record, and its ungrep
 numbers are the floor these beat.
 
 | Question | Before | After | Change |
@@ -443,7 +443,7 @@ numbers are the floor these beat.
 | A5 | 3 / 8,139, redo 2 | 1 / 249 | 139 field rows folded into 11 lines, one per node asset (B1a) |
 | N1-N3, N5, A1-A3 | 8 / 2,210 | 8 / 2,206 | N2 four tokens shorter: line numbers moved (B1e) |
 
-- unitygraph navigation 6 / 1,077 against grep's 12 / 2,293; asset 6 / 1,931 against grep's
+- ungrep navigation 6 / 1,077 against grep's 12 / 2,293; asset 6 / 1,931 against grep's
   15 / 1,346. With the chores, 31 calls / 4,195 tokens against grep's 71 / 7,394: calls −56%,
   tokens −43% (before: −45%, +74%).
 - `ug explain RunDirector` gives 24, the class line; the key took 23 or 24 and still does.
@@ -463,16 +463,16 @@ build's `claude` 2.1.295. 4 runs, $0.68 in all, no subagents.
 | grep | 2 | 180,117 | 0.34 (the first run: 36k of cache written) | (Grep is its tool) |
 | codegraph | 2 | 182,304 | 0.12 | no: two Grep calls |
 | Graphify | 2 | 180,305 | 0.12 | no: two Grep calls |
-| unitygraph | 3 | 171,090 | 0.10 | no: three Grep calls |
+| ungrep | 3 | 171,090 | 0.10 | no: three Grep calls |
 
 - Every arm was offered its tool (`codegraph_explore` deferred, `graphify:graphify` and
-  `unitygraph:unity` listed) and every run answered with the built-in Grep. On this question the
+  `ungrep:unity` listed) and every run answered with the built-in Grep. On this question the
   tools were not chosen at all, so agent mode measured Grep four times.
 - About 52k of context a turn before any answer (system prompt, built-in tools, the desktop
   build's own skills and deferred tools), the same on every arm.
 - Isolation also drops what each tool's install adds outside its plugin or server: codegraph's
   CLAUDE.md block ("reach for it before grep"), Graphify's `graphify claude install` section and
-  its PreToolUse hook. unitygraph ships no CLAUDE.md (SPEC.md Decisions #7); its skill and hooks
+  its PreToolUse hook. ungrep ships no CLAUDE.md (SPEC.md Decisions #7); its skill and hooks
   came through `--plugin-dir`, and its PreToolUse hook does not match Grep.
 - All four answers were right; the key was not. It asked for Awake and OnEnable, and every answer
   named the `OnDied` handlers, three of them with `:92` after another line of the same file. The
@@ -482,7 +482,7 @@ build's `claude` 2.1.295. 4 runs, $0.68 in all, no subagents.
 
 ### Agent mode, B1f skill description, 2026-10-11
 
-On the user's yes (9 runs, about $1-1.50 quoted): N3, N4 and A5 on the unitygraph arm, 3 repeats,
+On the user's yes (9 runs, about $1-1.50 quoted): N3, N4 and A5 on the ungrep arm, 3 repeats,
 `claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, the skill description of the B1 fixes.
 9 runs, $1.55 in all (`total_cost_usd`; the first run of each question about $0.30, cache
 written, the rest $0.09-0.11), no subagents.
@@ -505,7 +505,7 @@ written, the rest $0.09-0.11), no subagents.
   item matched the bare name. The item now takes C2_Central named as excluded (Suites); all three
   pass it, checked by hand. The results file keeps the score of the run.
 
-### Script mode after B1g, unitygraph, 2026-10-11
+### Script mode after B1g, ungrep, 2026-10-11
 
 purge-squad 9ce9995, `ug` with B1g (`calls` edges say how a member is used: read, write,
 subscribe, unsubscribe, raise, delegate, with the handler), navigation and asset questions.
@@ -526,7 +526,7 @@ the readers and writers itself. `--baseline` the four-arm run: no regression, 10
 
 ### Agent mode after B1g, 2026-10-11
 
-On the user's yes (6 runs, about $1 quoted): N3 and N5 on the unitygraph arm, 3 repeats,
+On the user's yes (6 runs, about $1 quoted): N3 and N5 on the ungrep arm, 3 repeats,
 `claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, `ug` with B1g, the B1f skill description.
 6 runs, $0.79 in all (the first N5 run $0.31, cache written, the rest $0.10), no subagents.
 `bench/results/purge-squad-agent-2026-10-11-b1g.json`.
@@ -547,7 +547,7 @@ On the user's yes (6 runs, about $1 quoted): N3 and N5 on the unitygraph arm, 3 
 ### Agent mode with the session hint, 2026-10-11
 
 On the user's yes ("b1f before release", 9 runs, about $1.20 quoted): N3, N4 and N5 on the
-unitygraph arm, 3 repeats, `claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, `ug` 0.9.0 with
+ungrep arm, 3 repeats, `claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, `ug` 0.9.0 with
 the SessionStart hint (SPEC-query, Session hint). 9 runs, $1.13, no subagents.
 `bench/results/purge-squad-agent-2026-10-11-hint.json`.
 
