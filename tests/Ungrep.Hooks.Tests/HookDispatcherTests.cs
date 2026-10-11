@@ -96,10 +96,12 @@ public sealed class HookDispatcherTests : IDisposable
     [Fact]
     public void Slow_handler_times_out_silently()
     {
-        var (exitCode, output) = Run("Stop", Payload("Stop"), TimeSpan.FromMilliseconds(100), new SlowHandler());
+        // Long enough for the dispatcher to find the project first, even on a slow CI runner: a timeout
+        // before that has no project to log to.
+        var (exitCode, output) = Run("Stop", Payload("Stop"), TimeSpan.FromSeconds(1), new SlowHandler());
 
         Assert.Equal((0, ""), (exitCode, output));
-        Assert.Equal("2026-09-29T12:00:00Z Stop timed out after 0.1 s\n", File.ReadAllText(ErrorLog));
+        Assert.Equal("2026-09-29T12:00:00Z Stop timed out after 1 s\n", File.ReadAllText(ErrorLog));
     }
 
     [Fact]

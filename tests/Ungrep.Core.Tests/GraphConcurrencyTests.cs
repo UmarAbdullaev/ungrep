@@ -24,9 +24,14 @@ public sealed class GraphConcurrencyTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_root))
+        try
         {
             Directory.Delete(_root, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Windows can hold the killed writer's graph.db a moment after it exits. A leftover
+            // temp folder is harmless.
         }
     }
 
