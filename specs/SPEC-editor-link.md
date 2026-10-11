@@ -501,6 +501,14 @@ pause, and a pause ending a running action's hold. Package and `Bridge.Version` 
 name on an older bridge, which would ignore the parameters and just play; plain `ug play` and
 every other command keep working on older bridges.
 
+## Bridge 0.14.0 (F4)
+
+`ug test` hung on a modified scene: the test runner asks to save it first, a dialog batch mode
+never answers and a GUI user may answer Save. The bridge now refuses `/tests` while a loaded scene
+is modified, and `/tests/result` answers `stopped` with a reason for a run that the test runner
+canceled or ended on an error (SPEC-unity-loop, Modified scenes and stopped runs). No new request
+or flag, so `ug` gates nothing on it.
+
 ## Performance targets
 
 | Operation | Target |

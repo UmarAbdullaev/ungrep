@@ -446,6 +446,6 @@ namespace UnityGraph.Bridge
             return modified.Count > 0 ? Answer.Error("unsaved changes in " + string.Join(", ", modified) + ": ug save, or --additive to keep them open") : null;
         }
 
-        private static string Name(Scene scene) => string.IsNullOrEmpty(scene.path) ? "untitled scene" : scene.path;
+        internal static string Name(Scene scene) => string.IsNullOrEmpty(scene.path) ? "untitled scene" : scene.path;
     }
 }

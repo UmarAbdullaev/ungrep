@@ -113,7 +113,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.13.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.14.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -386,7 +386,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.13.0  local", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.14.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
@@ -732,6 +732,15 @@ public sealed partial class EditorEndToEndTests : IDisposable
             "using NUnit.Framework;\nnamespace E2E\n{\n    public class RedTests\n    {\n        [Test] public void Passes() { }\n\n"
             + "        [Test] public void Fails() { Assert.AreEqual(3, 2); }\n    }\n}\n");
         Assert.Matches(@"^compiled in \d+\.\d s: 0 errors\n$", Ug(log, "compile"));
+
+        // The test runner would ask to save a modified scene, a dialog batch mode never answers: refused at once, then undone.
+        Assert.StartsWith("created Unsaved", Ug(log, "object", "create", "Unsaved"), StringComparison.Ordinal);
+        clock.Restart();
+        string refused = Ug(log, "test", "--filter", "E2E");
+        Report("ug test with a modified scene (refused)", clock.Elapsed);
+        Assert.Equal("not run: unsaved changes in Assets/Scenes/Main.unity (the test runner would ask to save them): ug save or ug undo first\n", refused);
+        Assert.Equal("undid ug object create\n", Ug(log, "undo"));
+        Assert.DoesNotContain("modified", Ug(log, "scene"), StringComparison.Ordinal);
 
         clock.Restart();
         string red = Ug(log, "test", "--filter", "E2E");

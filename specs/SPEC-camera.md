@@ -215,8 +215,8 @@ Nothing in `manage_camera` is left without a `ug` command, flag or named equival
   names (a Unity project's `Library/PackageCache`, e.g. purge-squad's: no download; the camera
   part is skipped when it is unset or lacks one of them) plus the physics module, and runs those
   EditMode tests in the open editor through `ug test`, then a few `ug camera` calls and their
-  undos. It saves the copy's scene first: the test runner asks to save modified scenes before a
-  run, a dialog batch mode never answers (the run hangs until `ug test`'s timeout).
+  undos. It saves the copy's scene first: `ug test` refuses while a scene is modified, since the
+  test runner would ask to save it (SPEC-unity-loop, Modified scenes and stopped runs).
 
 ## Measured on purge-squad
 

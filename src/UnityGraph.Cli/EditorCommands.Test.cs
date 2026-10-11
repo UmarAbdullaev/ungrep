@@ -73,6 +73,11 @@ internal static partial class EditorCommands
             return (0, "the last test run is still running\n");
         }
 
+        if (result.IsStopped)
+        {
+            return (0, "last run: " + result.Reason + "\n");
+        }
+
         var answer = new Answer(BudgetOf(config, budget));
         IReadOnlyList<TestFailure> failed = result.Failures ?? [];
         if (name == null)
@@ -190,11 +195,17 @@ internal static partial class EditorCommands
     }
 
     /// <summary>
-    /// The run's counts and up to 20 failure rows. <paramref name="full"/>: the bridge keeps every
-    /// failure whole, so the answer names `--failures` for the rest and `--failure` for a cut row.
+    /// The run's counts and up to 20 failure rows, or why a stopped run has none.
+    /// <paramref name="full"/>: the bridge keeps every failure whole, so the answer names
+    /// `--failures` for the rest and `--failure` for a cut row.
     /// </summary>
     internal static string TestAnswer(string platform, TestRunResult result, bool full = false)
     {
+        if (result.IsStopped)
+        {
+            return platform + ": " + result.Reason + "\n";
+        }
+
         var text = new StringBuilder(platform).Append(": ").Append(TestCounts(result)).Append('\n');
         IReadOnlyList<TestFailure> failures = result.Failures ?? [];
         foreach (TestFailure failure in failures.Take(MaxFailureLines))

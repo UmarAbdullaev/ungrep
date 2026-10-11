@@ -663,7 +663,8 @@ Boot has already started loading GalaxyMap), and an error scrolls past while the
    element from its UXML on its next enable, and the answer says `live element only: not saved,
    no undo` (SPEC-play-input, UI Toolkit).
 2. **No saving unasked.** Scene edits mark the scene modified and stay unsaved until `ug save`.
-   ScriptableObject edits mark the asset dirty, saved by `ug save` too.
+   ScriptableObject edits mark the asset dirty, saved by `ug save` too. `ug test` refuses while a
+   loaded scene is modified, since the test runner would ask to save it (SPEC-unity-loop).
 3. **Prefab assets** have no unsaved state outside prefab mode. Edits to
    `Assets/X.prefab:...` load the prefab contents, apply the edit and write the asset at once
    (`PrefabUtility.LoadPrefabContents` / `SaveAsPrefabAsset`); the answer says `written

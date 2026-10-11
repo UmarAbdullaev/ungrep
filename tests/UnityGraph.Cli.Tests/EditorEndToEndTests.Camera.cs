@@ -38,7 +38,7 @@ public sealed partial class EditorEndToEndTests
     // ug camera: the Cinemachine tests, then a follow camera on Main.unity's only camera, tuned, forced, released and undone.
     private void CameraCommands(string log)
     {
-        // The test runner asks to save modified scenes before a run, a dialog batch mode never answers.
+        // ug test refuses while a scene is modified (the test runner would ask to save it), and the steps before left Main.unity modified.
         Ug(log, "save");
         var clock = Stopwatch.StartNew();
         string tests = Ug(log, "test", "--filter", "CinemachineOpsTests");
