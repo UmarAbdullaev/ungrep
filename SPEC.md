@@ -191,8 +191,9 @@ under 10%.
      graph answers might lower retries. That is not measured and would need a rerun before
      interception is turned back on.
 5. **Graph viewer for people.** `ug view <symbol|asset> [--depth N]` writes a self-contained,
-   offline HTML page (Cytoscape.js bundled) to `Library/unitygraph/view.html` and opens it. Claude
-   sees one line (the path): 0 tokens of graph. Built after the step-3 checkpoint.
+   offline HTML page (Cytoscape.js bundled) to `Library/unitygraph/view.html`; `--open` opens it
+   (the plan was to always open it; changed 2026-10-11, `specs/SPEC-viewer.md`). Claude sees one line (the
+   path): 0 tokens of graph. Built after the step-3 checkpoint.
 6. **Dropped (2026-10-11, user):** the worker subagent was built (W1) and removed after its dry
    run: priced in dollars, it saved only on long chores in large sessions
    (`specs/SPEC-worker-agent.md`, Removed). The number stays so references to later decisions hold.
