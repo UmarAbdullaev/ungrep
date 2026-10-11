@@ -18,7 +18,6 @@ C# and GUID-linked YAML).
 unitygraph cuts that cost without changing how the user works. It:
 
 - answers code **and** asset-wiring questions in one call from a local graph;
-- keeps multi-step Unity chores out of the main conversation (a worker subagent);
 - makes the compile loop automatic, and silent when the build is clean;
 - keeps Unity output compact;
 - stops mistakes that cost a rework round (lost serialized data, broken `.meta` files, edits
@@ -71,7 +70,10 @@ sessions, are excluded), so `ug stats --until 2026-09-28T11:00Z` reproduces it.
 
 Simulation assumptions: the worker starts at ~15k context and returns a verdict of at most 800
 tokens; compacted outputs are half their size; "realistic" means a navigation streak takes 2
-calls. Module `bench` replaces these estimates with measurements.
+calls. Module `bench` replaces these estimates with measurements. Measured in W1's dry run
+(`specs/SPEC-worker-agent.md`): a worker starts at ~34k context, and verdicts came to 486 and 738
+tokens. Priced in dollars, the worker saved only on long chores in large sessions, and it was
+removed (2026-10-11, user): Claude Code's own subagents run a chore when asked.
 
 ## Design rules
 
@@ -79,7 +81,7 @@ calls. Module `bench` replaces these estimates with measurements.
    session. Answers are capped (default ~1,200 tokens) and end with an explicit "more" handle.
 2. **One call per question.** An answer carries the definition, callers, inspector wiring,
    serialized data and Unity entry points together. Several queries can share one call.
-3. **Zero idle cost.** No MCP server: a CLI, one on-demand skill, one subagent, and hooks that
+3. **Zero idle cost.** No MCP server: a CLI, one on-demand skill, and hooks that
    say nothing unless they have something to say. The plugin adds at most 300 tokens to a
    session's baseline.
 4. **Point Claude at `ug` before it searches.** The `unity` skill tells Claude which `ug`
@@ -89,8 +91,8 @@ calls. Module `bench` replaces these estimates with measurements.
    the next query. A stale answer is worse than grep.
 6. **Exact over guessed, and say which.** Every edge is `exact` (Roslyn, GUID) or `heuristic`
    (string dispatch, name match).
-7. **Chores stay out of the main context.** Multi-step Unity work runs in the worker; the main
-   thread gets a verdict.
+7. **Dropped (2026-10-11, user):** chores in a worker subagent; see Decisions #6. The number stays
+   so references to later rules hold.
 8. **Cache-safe.** Never rewrite earlier context; only append.
 9. **Fail open.** If Unity, the index or the plugin itself fails, the session carries on with a
    one-line notice.
@@ -103,19 +105,17 @@ measures each one, and `bench` fails a release that breaks one.
 
 | Overhead | Budget | Why it stays small |
 | --- | --- | --- |
-| Skill and agent descriptions, loaded every session | ≤ 300 tokens | ~0.1% of context on purge-squad's sessions |
-| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 596, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
+| Skill description, loaded every session | ≤ 300 tokens (measured: 27, bytes / 4) | ~0.1% of context on purge-squad's sessions |
+| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 600, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
 | Compile gate | 0 tokens when clean; ≤ 20 lines on errors | replaces 3–4 turns of recompile, wait and console |
-| Worker delegation | only chores of 3 or more steps; verdict ≤ 800 tokens | a 1-step chore costs more delegated than done inline |
 | Index builds and updates | 0 tokens: deterministic, no LLM | unlike Graphify's LLM extraction |
 
 Ways the plugin could end up costing more, and the check for each:
 
 - A wrong or stale answer makes Claude redo the work: reindex on every edit, confidence tags;
   `bench` measures the redo rate.
-- A worker verdict missing a detail makes the main thread repeat the chore: verdicts carry
-  evidence anchors (`file:line`, object paths); redo rate measured.
-- One-step chores delegated anyway: the 3-step rule; `stats` counts short delegations.
+- Subagents reading more than they save: `stats` sums what every subagent read in its own
+  transcript, beside the main thread's context.
 - Hooks firing on the wrong calls: narrow triggers, replay tests on recorded transcripts,
   false-trigger count in `stats`.
 
@@ -191,10 +191,12 @@ under 10%.
      graph answers might lower retries. That is not measured and would need a rerun before
      interception is turned back on.
 5. **Graph viewer for people.** `ug view <symbol|asset> [--depth N]` writes a self-contained,
-   offline HTML page (Cytoscape.js bundled) to `Library/unitygraph/view.html` and opens it. Claude
-   sees one line (the path): 0 tokens of graph. Built after the step-3 checkpoint.
-6. **Worker subagent defaults to Sonnet** (configurable). `bench` measures the redo rate with
-   Haiku; if it stays under ~5%, the default moves to Haiku.
+   offline HTML page (Cytoscape.js bundled) to `Library/unitygraph/view.html`; `--open` opens it
+   (the plan was to always open it; changed 2026-10-11, `specs/SPEC-viewer.md`). Claude sees one line (the
+   path): 0 tokens of graph. Built after the step-3 checkpoint.
+6. **Dropped (2026-10-11, user):** the worker subagent was built (W1) and removed after its dry
+   run: priced in dollars, it saved only on long chores in large sessions
+   (`specs/SPEC-worker-agent.md`, Removed). The number stays so references to later decisions hold.
 7. **Dropped (2026-10-01, user):** no generated project map, so no `project-map` module and no
    writes into `CLAUDE.md` files. The number stays so references to later decisions hold.
 8. Name `unitygraph`, CLI `ug`. Name availability (GitHub, plugin directory) is checked before
@@ -216,7 +218,7 @@ Standing assumptions:
 
 | Module id | Responsibility | Depends on |
 | --- | --- | --- |
-| `stats` | Reads local Claude Code transcripts; attributes context tokens by category; before/after report. Also the measuring tool for `bench`. | — |
+| `stats` | Reads local Claude Code transcripts; attributes context tokens by category; what subagents read in their own transcripts, by agent type; before/after report. Also the measuring tool for `bench`. | — |
 | `plugin-shell` | Plugin manifest, `ug` launcher and .NET runtime resolution, config file, hook dispatcher (`ug hook <event>`), the on-demand `unity` skill. | — |
 | `graph-core` | SQLite store: node and edge schema with confidence, file hashes, incremental updates, freshness checks. | — |
 | `code-index` | Roslyn over Unity's generated `.csproj` files: types, members, serialized fields (by Unity's rules), calls, overrides, implementations, attributes, engine entry points, string dispatch (heuristic). | `graph-core` |
@@ -227,7 +229,7 @@ Standing assumptions:
 | `unity-loop` | Compile gate (edit tracking + Stop hook, silent when clean); compact `ug console`, `ug test`, `ug log` (digest of the last play session). | `editor-link` |
 | `play-input` | Play the game through the bridge: `ug ui` (interactable uGUI and UI Toolkit elements with positions), `ug click`, `ug nav`, `ug press`, `ug stick`, `ug tap`, `ug swipe`, `ug wait`, `ug play --step`; a one-line digest after each action; play mode only, nothing saved, held input released when play stops. UI Toolkit (U2): `ug tree --ui`, element addresses in `ug inspect`/`ug set`, panels in `ug shot`. | `editor-ops`, `unity-loop` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
-| `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract. | `query`, `unity-loop`, `editor-link` |
+| `worker-agent` | Removed 2026-10-11 (user) after its dry run: in dollars, delegating saved only on long chores in large sessions; Claude Code's own subagents run a chore when asked (`specs/SPEC-worker-agent.md`). | — |
 | `viewer` | `ug view`: self-contained HTML graph for people; nodes coloured by kind, `exact` edges solid and `heuristic` dashed, filter and search. 0 tokens to Claude. | `query` |
 | `bench` | Question suites on purge-squad and 2–3 open Unity projects; arms: grep baseline, codegraph, Graphify, unitygraph; scores calls, tokens and correctness. | `stats`, all feature modules |
 
@@ -236,7 +238,7 @@ Standing assumptions:
 1. Spikes S1–S3, then `stats`, `plugin-shell`, `graph-core`
 2. `code-index`, `asset-index`, `editor-link`, `editor-ops` (added 2026-09-30, user)
 3. `query`, `unity-loop`
-4. `worker-agent`, `guards`
+4. `worker-agent` (built, then removed 2026-10-11), `guards`
 5. `viewer`
 6. `bench`, then release
 
@@ -295,8 +297,7 @@ it. Comments and trailing commas are allowed; an unknown setting or module is an
   "answerBudget": 1200,           // tokens per query answer, 200 to 8000
   "modules": {                    // defaults: all on
     "asset-index": true, "code-index": true, "editor-link": true, "guards": true,
-    "play-input": true, "query": true, "unity-loop": true, "viewer": true,
-    "worker-agent": true
+    "play-input": true, "query": true, "unity-loop": true, "viewer": true
   }
 }
 ```
@@ -342,8 +343,7 @@ specs/SPEC-<module-id>.md       one spec per module, written after the map is ap
 tasks/plan.md, tasks/todo.md    plan and task list per phase
 research/transcript-analysis/   the scripts behind the Evidence section (prototype of stats)
 .claude-plugin/                 plugin.json; marketplace.json for local dev installs
-skills/unity/                   on-demand skill: CLI usage, delegation rules, Unity traps
-agents/unity-worker.md          the worker subagent
+skills/unity/                   on-demand skill: CLI usage, Unity traps
 hooks/hooks.json                hook wiring, every hook calls `ug hook <event>`
 bin/                            launchers that find a .NET runtime and start ug
 src/UnityGraph.Cli              commands and output rendering

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:">
+<title>@@TITLE@@</title>
+<style>@@STYLE@@</style>
+</head>
+<body>
+<header>
+  <h1><span class="muted">ug view</span> <span id="query"></span></h1>
+  <p id="stamp"></p>
+</header>
+<nav id="toolbar" aria-label="View controls">
+  <input id="search" type="search" placeholder="Search nodes (Enter: first match)" autocomplete="off" spellcheck="false" aria-label="Search nodes">
+  <label class="depth">Depth <input id="depth" type="range" min="1" step="1" aria-describedby="depth-value"> <output id="depth-value"></output></label>
+  <label><input id="heuristic" type="checkbox" checked> Heuristic edges</label>
+  <button id="fit" type="button">Fit</button>
+  <button id="reset" type="button">Reset</button>
+</nav>
+<main>
+  <div id="graph" role="img" aria-label="Graph of the neighbourhood"></div>
+  <aside id="panel">
+    <section id="details" aria-live="polite"></section>
+    <section id="results" hidden></section>
+    <section>
+      <h2>Nodes</h2>
+      <ul id="legend-nodes" class="legend"></ul>
+      <h2>Edges</h2>
+      <ul id="legend-edges" class="legend"></ul>
+      <p class="muted small">Solid: exact. Dashed: heuristic. Arrows point from source to target. A box holds what it contains. A count after a name (<q>+3</q>) is neighbours in this page not drawn yet: double-click the node to draw them. Double-click a <q>+N more</q> node to draw its group.</p>
+    </section>
+    <section id="notes" class="small"></section>
+  </aside>
+</main>
+<footer>
+  <details id="licences"><summary>Licences</summary>@@NOTICES@@</details>
+</footer>
+<script type="application/json" id="ug-data">@@DATA@@</script>
+@@VENDOR@@
+<script>@@SCRIPT@@</script>
+</body>
+</html>

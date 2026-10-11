@@ -25,6 +25,7 @@
       "contextTokens": 7002
     }
   ],
+  "subagents": [],
   "toolCalls": 3,
   "chargedContextTokens": 26004
 }
