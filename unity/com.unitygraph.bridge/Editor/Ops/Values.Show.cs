@@ -41,6 +41,38 @@ namespace UnityGraph.Bridge
             return text;
         }
 
+        /// <summary>
+        /// A sequence that is its own enumerator too (a LINQ query, an iterator method declared
+        /// `IEnumerable`) as the array `ToArray()` gives, at most <see cref="CountLimit"/> items,
+        /// enumerated once where it is called; anything else as it is.
+        /// </summary>
+        public static object Materialize(object value)
+        {
+            if (!(value is IEnumerable items) || !(value is IEnumerator))
+            {
+                return value;
+            }
+
+            Type element = value.GetType().GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                ?.GetGenericArguments()[0] ?? typeof(object);
+            var kept = new ArrayList();
+            IEnumerator it = items.GetEnumerator();
+            try
+            {
+                while (kept.Count < CountLimit && it.MoveNext())
+                {
+                    kept.Add(it.Current);
+                }
+            }
+            finally
+            {
+                (it as IDisposable)?.Dispose();
+            }
+
+            return kept.ToArray(element);
+        }
+
         private sealed class ShowState
         {
             public Caps Caps;
