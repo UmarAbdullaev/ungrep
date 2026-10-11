@@ -65,7 +65,8 @@ internal sealed class FakeBridge : IDisposable
                 return;
             }
 
-            ThreadPool.QueueUserWorkItem(_ => Serve(client));
+            // Its own thread, not the pool: a busy CI runner can starve the pool past the client's 2 s.
+            new Thread(() => Serve(client)) { IsBackground = true }.Start();
         }
     }
 
@@ -84,7 +85,11 @@ internal sealed class FakeBridge : IDisposable
                 }
 
                 string[] lines = head.ToString().Split("\r\n");
-                string target = lines[0].Split(' ')[1];
+                if (lines[0].Split(' ') is not [_, string target, ..])
+                {
+                    return; // The client gave up before it sent the request line.
+                }
+
                 Requests.Enqueue(target);
                 Tokens.Enqueue(lines.FirstOrDefault(l => l.StartsWith("X-UG-Token:", StringComparison.OrdinalIgnoreCase))?["X-UG-Token:".Length..].Trim());
                 if (lines.FirstOrDefault(l => l.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) is { } length)
