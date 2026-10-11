@@ -660,6 +660,155 @@ Windows 11): fresh-process `ug status` 128 ms, `ug tree` 125 ms, `ug inspect` 12
 until edit mode 0.26 s. In process, reads and edits take 8–37 ms (`ug save` 37 ms); the rest of
 a fresh process's time is .NET start-up.
 
+## Three-way measurement (O10)
+
+The measured reason the Objective asks for. The question (user, 2026-10-10) is which editor side
+to keep: A. `ug` does everything (current); B. `ug` graph only + MCP for Unity; C. `ug` graph only
++ Unity's CLI; D. hybrid, `ug` commands served through Unity's Pipeline (`[CliCommand]`), dropping
+our bridge and transport. Decision rule agreed that day: if `ug` is not clearly cheaper than the
+best other leg (about 25% fewer tokens at equal correctness), the report says D with the numbers
+and D is not started. The choice is the user's.
+
+**Legs.**
+
+- `ug` (bridge 0.9.0 copied into purge-squad), from Bash.
+- Unity's CLI, `unity` 1.0.0-beta.8 with `com.unity.pipeline` 0.7.0-exp.1 (in purge-squad's
+  manifest since the user's commit 1a422d2), two ways in: `unity command <name> --<param> <value>`
+  from Bash (the `unity:unity-cli` skill's syntax; beta.8 rejects the skill's `--caller` and
+  `--skill` flags, so they are left off), and `unity mcp`, the user-level MCP server
+  `unity-editor-mcp`. Both reach the same editor commands.
+- MCP for Unity (CoplayDev): its Unity package comes from a git URL and its server runs under
+  `uv`, both a network use and a package add, so it is installed only on the user's yes; without
+  it, only its idle cost is measured, from its documented tools.
+
+**Chores** on purge-squad's open editor (`Assets/Scenes/Boot.unity` open, nothing saved):
+
+1. Find the progress bar `Bar` and read its live `ProgressBar` values.
+2. Set `Boot/AdOverlay/Bar` `ProgressBar._value` to 0.5 and read it back.
+3. Create a cube `Probe` under `Boot` at 1,2,3 with a `Rigidbody`.
+4. Instantiate `Assets/Prefabs/UI/ButtonPrimary.prefab`, override a value on the instance, list
+   the instance's overrides, revert them. (Apply writes the prefab asset, which purge-squad's
+   unchanged `git status` rules out; revert is the same call shape.)
+5. Enter play mode, read the console errors that are new, stop.
+6. Break a script (a missing name), recompile, read the error, put the file back, recompile
+   clean.
+7. A game-view picture and a viewpoint of `Probe` from 4,4,-4.
+8. Run the EditMode tests and read the failures.
+9. One second of play-mode profiling with the top markers.
+10. In play mode, click `DEPLOY` on the galaxy map and confirm the screen changed (the loading
+    window opens on the way to `Arena_Greybox`), stop.
+11. Graph, the editor not needed: which prefabs and scenes use `ProgressBar`. Only `ug` answers
+    from the graph; the other legs fall back to Bash (find the script's GUID, grep the YAML).
+
+**Method.** Deterministic first: per leg and chore, the call sequence an informed agent would use
+(the leg's own command when it has one, its `eval` when it has none, counted like any call), run
+for real; recorded are calls, request + answer bytes / 4 (a Bash call: the command line and its
+output; an MCP call: the tool name, the arguments' JSON and the result's text), wall time, and
+correctness, checked by a `ug` read after the chore. Pictures are counted by their answer text;
+the PNG Claude reads costs the same image tokens on every leg at the same size. Polls (tests,
+recompile, waits) count as calls. Idle cost per leg: `ug`'s skill description and SKILL.md body;
+each MCP server's `tools/list` over stdio (bytes / 4 of the full schemas) and its deferred names
+list; the `unity:unity-cli` skill's description and body, which Claude reads before a `unity`
+call. Before numbers: `ug stats` on purge-squad's past sessions. Between legs every edit is undone
+(`ug undo` until the scene is unmodified); `git -C D:\Projects\Unity\purge-squad status` is the
+same before and after (the bridge copy is uncommitted there and stays). The Frame Debugger is
+refused in the user's `-automated` editor and is left out.
+
+Optional, on the user's yes only (it spends their usage): the same chores as `claude -p` runs, one
+leg at a time (`--strict-mcp-config`, the other legs' tools disallowed), tokens and tool calls read
+from the JSON output, to see whether a thin toolset pushes Claude to `eval`.
+
+### Results (2026-10-11)
+
+Per chore: calls / tokens (bytes / 4) / seconds. A Bash `sleep N` an agent needs between calls
+counts as one call of 7 bytes. The Edit tool's break and fix in chore 6 is the same on every leg
+and left out.
+
+| chore | `ug` | `unity-editor-mcp` | `unity command` |
+|---|---|---|---|
+| 1 find, read | 2 / 80 / 0.4 | 2 / 399 / 0.5 | 2 / 370 / 2.0 |
+| 2 set | 1 / 36 / 0.7 | 1 / 89 / 0.3 | 1 / 131 / 1.0 |
+| 3 cube | 1 / 144 / 0.5 | 1 / 396 / 0.5 | 1 / 409 / 1.0 |
+| 4 prefab | 1 / 249 / 0.4 | 4 / 342 / 0.9 | 4 / 550 / 4.7 |
+| 5 play errors | 1 / 19 / 27.5 | 9 / 468 / 21.4 | 7 / 510 / 11.1 |
+| 6 compile | 3 / 80 / 24.3 | 4 / 180 / 7.7 | 6 / 395 / 6.9 |
+| 7 pictures | 6 / 410 / 1.4 | 2 / 297 / 0.2 | 2 / 527 / 2.2 |
+| 8 tests | 1 / 9 / 4.6 | failed | failed |
+| 9 profile | 3 / 338 / 8.7 | 8 / 673 / 6.9 | 7 / 1,163 / 12.8 |
+| 10 click | 6 / 167 / 15.2 | 11 / 523 / 6.7 | 9 / 665 / 12.9 |
+| 11 graph | 1 / 419 / 0.4 | 2 / 157 / 1.3 (grep) | 2 / 157 / 1.3 (grep) |
+| **all but 8** | **25 / 1,939 / 79.5** | **44 / 3,524 / 46.4** | **41 / 4,877 / 55.9** |
+
+Idle cost, tokens:
+
+| leg | always in context | on first use |
+|---|---|---|
+| `ug` | skill description 25 | SKILL.md body 600 |
+| `unity-editor-mcp` | 151 deferred names 1,509 (641 without the `mcp__unity-editor-mcp__` prefix) | schemas of the 19 tools used 2,927 (all 151: 24,023 when not deferred) |
+| `unity command` | skill description 166 | skill body 8,977 |
+| MCP for Unity | skill description 91 | skill body 3,543, tools reference 15,157; 33 documented tools, `tools/list` not measured (not installed) |
+
+A session doing these ten chores, chores plus idle: `ug` 2,564, `unity-editor-mcp` 7,960,
+`unity command` 14,020.
+
+**Correctness**, each chore checked by a `ug` read (values, `Probe`'s transform and `Rigidbody`,
+no overrides after revert, the picture files, the active scene, the profiler's top markers):
+
+- All three legs did chores 1-7 and 9-11 right.
+- Chore 8 failed on both Pipeline legs, in the user's `-automated` editor. Pipeline's `run_tests`
+  listed 167 tests and never ran one.
+  - The synchronous form timed out after 360 s. Every later Pipeline command then timed out until
+    a domain reload (`EditorUtility.RequestScriptReload` through `ug eval`).
+  - The async form returned "Total 0" (CLI) or never returned (MCP, 7 min 47 s). `test_status`
+    stayed `running` for 45 polls, and `cancel_tests` cleared it.
+  - `ug test` ran the 167 tests green in 4.6 s.
+- Chore 6, `ug`: the second `compile` ran into the domain reload and answered "Unity not reachable
+  (Unity is busy)" after 20.6 s. A third `compile` answered clean. All three calls are counted.
+- Chore 6, CLI: `unity command recompile` answers `compiling` straight away, so the CLI leg polls
+  `recompile_status`. MCP's `recompile` waits and answers with the errors.
+- Chore 7, `ug`: `shot --from --look` copies the scene camera. In `Boot` that camera's culling
+  mask is Nothing, so the picture was blank. It took 4 more calls: inspect, set the mask, shot,
+  undo. The other legs' `eval` made a new `Camera`, whose default mask renders everything.
+- Chore 10, MCP: on the first run, `list_open_scenes` still showed `GalaxyMap` 3 s after the
+  click, a timing miss. The rerun is the recorded one. Its active-`LoadingWindow` check found
+  nothing; `Arena_Greybox` confirmed the change.
+- Chore 11:
+  - `ug impact ProgressBar` names the 6 assets (4 prefabs, 2 scenes) and the field that holds
+    each. `ug explain` names only `ProgressBar.prefab`, because the instances live in other assets.
+  - Grepping the script's GUID finds the same 6 here only because every instance has a stripped
+    stub carrying `m_Script`. A complete fallback adds the prefab-GUID hop: 2 more calls, 142 more
+    tokens.
+  - Unity Search `ref:` (MCP, 1 call, 555 tokens) missed `MapNode.prefab` and
+    `ProgressBar.prefab`, and added 2 transitive users.
+  - Grep was cheaper than `ug` on this chore.
+- Wall time: `ug` was slower overall.
+  - Chore 5: `play --for 3` took 27.5 s, because entering play mode varies from 6 to 26 s in this
+    project.
+  - Chore 6: the busy `compile` above.
+
+**Before numbers**, `ug stats` on purge-squad (all time: 45 sessions, 3,866 turns, 4,630 tool
+calls). Editor work was 36.8% of context:
+
+- `eval`/`run_script`: 663 calls, 14.6%;
+- compile, refresh and status: 5.0%;
+- reading Unity YAML: 5.7%;
+- console: 3.3%;
+- play and screenshot: 3.2%;
+- other MCP: 2.2%;
+- tests: 2.1%;
+- other CLI: 0.7%.
+
+**Verdict against the rule.**
+
+- On the chores, `ug` used 45% fewer tokens than the best other leg, `unity-editor-mcp`: 1,939
+  against 3,524. With idle cost counted it used 68% fewer: 2,564 against 7,960. It also made 43%
+  fewer calls.
+- Its correctness was equal or better: both Pipeline legs failed chore 8.
+- The rule does not point to D. On these numbers, A holds.
+- B cannot be judged per chore until MCP for Unity is installed.
+- The `claude -p` runs were not made.
+- Both are open on the user's yes. The choice is the user's.
+
 ## Testing
 
 - EditMode tests in the package (BridgeHost, batch mode): addressing (paths, `#n`, scene prefix,
