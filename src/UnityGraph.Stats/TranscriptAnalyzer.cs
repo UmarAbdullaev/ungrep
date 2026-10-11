@@ -23,30 +23,30 @@ public sealed record CategoryTotals(int Calls, double ContextTokens);
 
 /// <summary>
 /// One transcript file: context tokens per main-thread model turn (input + cache read + cache
-/// write), where they went, and the chores handed to the worker subagent.
+/// write) and where they went.
 /// </summary>
 public sealed record SessionStats(
     string Id,
     IReadOnlyList<long> TurnContext,
     IReadOnlyList<int> CompactionTurns,
-    IReadOnlyDictionary<string, CategoryTotals> Categories,
-    WorkerTotals Worker)
+    IReadOnlyDictionary<string, CategoryTotals> Categories)
 {
     public long ContextTokens => TurnContext.Sum();
 }
 
 /// <summary>
 /// Totals over a project's sessions. Sessions with no model turn inside the window are left out.
+/// Subagents are counted apart: their turns run in their own context, not the main thread's.
 /// </summary>
 public sealed class UsageStats
 {
-    public UsageStats(IReadOnlyList<SessionStats> sessions)
+    public UsageStats(IReadOnlyList<SessionStats> sessions, IReadOnlyList<SubagentRow>? subagents = null)
     {
         Sessions = sessions;
+        Subagents = SubagentRow.Merge(subagents ?? []);
         Turns = sessions.Sum(s => s.TurnContext.Count);
         ContextTokens = sessions.Sum(s => s.ContextTokens);
         Compactions = sessions.Sum(s => s.CompactionTurns.Count);
-        Worker = sessions.Aggregate(WorkerTotals.None, (sum, s) => sum.Add(s.Worker));
 
         var firstTurns = sessions.Select(s => s.TurnContext[0]).Order().ToList();
         FirstTurnMedian = firstTurns.Count == 0 ? 0 : firstTurns[firstTurns.Count / 2];
@@ -78,7 +78,8 @@ public sealed class UsageStats
 
     public IReadOnlyDictionary<string, CategoryTotals> Categories { get; }
 
-    public WorkerTotals Worker { get; }
+    /// <summary>Subagent runs and the context they read, one row per agent type.</summary>
+    public IReadOnlyList<SubagentRow> Subagents { get; }
 }
 
 /// <summary>
@@ -91,6 +92,9 @@ public static class TranscriptAnalyzer
     /// <summary>A drop of more than 40% between consecutive turns is taken as a compaction.</summary>
     public const double CompactionRatio = 0.6;
 
+    /// <summary>The type of a subagent whose `.meta.json` is missing or names none.</summary>
+    public const string UnknownAgentType = "unknown";
+
     public static UsageStats AnalyzeDirectory(string transcriptDirectory, TimeWindow window)
     {
         var sessions = new List<SessionStats>();
@@ -99,37 +103,60 @@ public static class TranscriptAnalyzer
             return new UsageStats(sessions);
         }
 
+        var subagents = new List<SubagentRow>();
         var files = Directory.GetFiles(transcriptDirectory, "*.jsonl").Order(StringComparer.Ordinal);
         foreach (string file in files)
         {
             string id = Path.GetFileNameWithoutExtension(file);
-            string workers = Path.Combine(transcriptDirectory, id, "subagents");
-            SessionStats? session = AnalyzeSession(id, ReadLines(file), window, agentId => WorkerTranscript(workers, agentId));
+            SessionStats? session = AnalyzeSession(id, ReadLines(file), window);
             if (session is not null)
             {
                 sessions.Add(session);
             }
+
+            // A background subagent can run on inside the window after its session's last turn.
+            subagents.AddRange(AnalyzeSubagents(Path.Combine(transcriptDirectory, id, "subagents"), window));
         }
 
-        return new UsageStats(sessions);
+        return new UsageStats(sessions, subagents);
     }
 
+    /// <summary>Returns null when no model turn falls inside the window.</summary>
+    public static SessionStats? AnalyzeSession(string id, IEnumerable<string> lines, TimeWindow window) =>
+        Analyze(id, lines, window, subagent: false);
+
     /// <summary>
-    /// Returns null when no model turn falls inside the window. <c>workerTranscript</c> gives a
-    /// worker's own transcript by agent id, or null when it is gone.
+    /// A session's subagents, one row per agent type: every `agent-&lt;id&gt;.jsonl` in its
+    /// `subagents` folder, its turns summed like the main thread's. The type is `agentType` in the
+    /// `.meta.json` beside the transcript. A subagent with no turn inside the window is left out.
+    /// Claude Code's recorded `totalTokens` is only a subagent's last context, not what it read.
     /// </summary>
-    public static SessionStats? AnalyzeSession(
-        string id,
-        IEnumerable<string> lines,
-        TimeWindow window,
-        Func<string, IEnumerable<string>?>? workerTranscript = null)
+    public static IReadOnlyList<SubagentRow> AnalyzeSubagents(string subagentDirectory, TimeWindow window)
+    {
+        var rows = new List<SubagentRow>();
+        if (!Directory.Exists(subagentDirectory))
+        {
+            return rows;
+        }
+
+        foreach (string file in Directory.GetFiles(subagentDirectory, "agent-*.jsonl").Order(StringComparer.Ordinal))
+        {
+            if (Analyze(Path.GetFileNameWithoutExtension(file), ReadLines(file), window, subagent: true) is { } run)
+            {
+                rows.Add(new SubagentRow(AgentType(Path.ChangeExtension(file, ".meta.json")), 1, run.ContextTokens));
+            }
+        }
+
+        return SubagentRow.Merge(rows);
+    }
+
+    private static SessionStats? Analyze(string id, IEnumerable<string> lines, TimeWindow window, bool subagent)
     {
         var turns = new List<long>();
         var seenMessages = new HashSet<string>(StringComparer.Ordinal);
         var pending = new List<string>();
         var calls = new Dictionary<string, int>(StringComparer.Ordinal);
         var context = new Dictionary<string, double>(StringComparer.Ordinal);
-        var worker = new WorkerDelegations();
 
         foreach (string line in lines)
         {
@@ -145,13 +172,7 @@ public static class TranscriptAnalyzer
             }
 
             JsonElement entry = doc.RootElement;
-            if (IsMainThread(entry, "user"))
-            {
-                worker.Read(entry);
-                continue;
-            }
-
-            if (!IsAssistantTurn(entry, window, out JsonElement message, out JsonElement content))
+            if (!IsAssistantTurn(entry, window, subagent, out JsonElement message, out JsonElement content))
             {
                 continue;
             }
@@ -196,13 +217,6 @@ public static class TranscriptAnalyzer
                     ? n.GetString()!
                     : "";
                 block.TryGetProperty("input", out JsonElement input);
-                if (WorkerDelegations.IsWorker(name, input)
-                    && block.TryGetProperty("id", out JsonElement callId)
-                    && callId.ValueKind == JsonValueKind.String)
-                {
-                    worker.Started(callId.GetString()!);
-                }
-
                 string category = Categorizer.Categorize(name, input);
                 pending.Add(category);
                 calls[category] = calls.GetValueOrDefault(category) + 1;
@@ -229,58 +243,23 @@ public static class TranscriptAnalyzer
             categories[category] = new CategoryTotals(count, context.GetValueOrDefault(category));
         }
 
-        return new SessionStats(
-            id,
-            turns,
-            compactions,
-            categories,
-            worker.Totals(agentId => workerTranscript?.Invoke(agentId) is { } workerLines ? WorkerContext(workerLines) : 0));
+        return new SessionStats(id, turns, compactions, categories);
     }
 
-    /// <summary>
-    /// What a worker read over its turns, summed like the main thread's context. Every entry of a
-    /// worker's transcript is a sidechain entry; a delegation started inside the window counts whole.
-    /// </summary>
-    public static long WorkerContext(IEnumerable<string> lines)
-    {
-        long sum = 0;
-        var seenMessages = new HashSet<string>(StringComparer.Ordinal);
-        foreach (string line in lines)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
-
-            using JsonDocument? doc = TryParse(line);
-            if (doc is null
-                || doc.RootElement.ValueKind != JsonValueKind.Object
-                || !doc.RootElement.TryGetProperty("type", out JsonElement type)
-                || !type.ValueEquals("assistant")
-                || !doc.RootElement.TryGetProperty("message", out JsonElement message)
-                || message.ValueKind != JsonValueKind.Object
-                || !message.TryGetProperty("usage", out JsonElement usage)
-                || !message.TryGetProperty("id", out JsonElement idElement)
-                || idElement.ValueKind != JsonValueKind.String
-                || !seenMessages.Add(idElement.GetString()!))
-            {
-                continue;
-            }
-
-            sum += Tokens(usage, "input_tokens")
-                + Tokens(usage, "cache_read_input_tokens")
-                + Tokens(usage, "cache_creation_input_tokens");
-        }
-
-        return sum;
-    }
-
-    private static bool IsAssistantTurn(JsonElement entry, TimeWindow window, out JsonElement message, out JsonElement content)
+    private static bool IsAssistantTurn(JsonElement entry, TimeWindow window, bool subagent, out JsonElement message, out JsonElement content)
     {
         message = default;
         content = default;
 
-        if (!IsMainThread(entry, "assistant"))
+        // Subagent turns run in their own context; they are not the main thread's cost.
+        if (!subagent && entry.TryGetProperty("isSidechain", out JsonElement sidechain) && sidechain.ValueKind == JsonValueKind.True)
+        {
+            return false;
+        }
+
+        if (!entry.TryGetProperty("type", out JsonElement type)
+            || type.ValueKind != JsonValueKind.String
+            || !type.ValueEquals("assistant"))
         {
             return false;
         }
@@ -299,19 +278,30 @@ public static class TranscriptAnalyzer
             && content.ValueKind == JsonValueKind.Array;
     }
 
-    /// <summary>Subagent turns run in their own context; they are not the main thread's cost.</summary>
-    private static bool IsMainThread(JsonElement entry, string type) =>
-        !(entry.TryGetProperty("isSidechain", out JsonElement sidechain) && sidechain.ValueKind == JsonValueKind.True)
-        && entry.TryGetProperty("type", out JsonElement t)
-        && t.ValueKind == JsonValueKind.String
-        && t.ValueEquals(type);
-
     private static long Tokens(JsonElement usage, string property) =>
         usage.ValueKind == JsonValueKind.Object
         && usage.TryGetProperty(property, out JsonElement value)
         && value.TryGetInt64(out long tokens)
             ? tokens
             : 0;
+
+    private static string AgentType(string metaPath)
+    {
+        try
+        {
+            using JsonDocument meta = JsonDocument.Parse(File.ReadAllText(metaPath));
+            return meta.RootElement.ValueKind == JsonValueKind.Object
+                && meta.RootElement.TryGetProperty("agentType", out JsonElement type)
+                && type.ValueKind == JsonValueKind.String
+                && type.GetString() is { Length: > 0 } name
+                    ? name
+                    : UnknownAgentType;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return UnknownAgentType;
+        }
+    }
 
     private static JsonDocument? TryParse(string line)
     {
@@ -324,21 +314,6 @@ public static class TranscriptAnalyzer
             // A session still being written can end in a partial line.
             return null;
         }
-    }
-
-    /// <summary>
-    /// `&lt;session&gt;/subagents/agent-&lt;id&gt;.jsonl`. The id comes from the transcript, so anything but
-    /// letters, digits, `-` and `_` is not looked up.
-    /// </summary>
-    private static IEnumerable<string>? WorkerTranscript(string directory, string agentId)
-    {
-        if (agentId.Length == 0 || !agentId.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
-        {
-            return null;
-        }
-
-        string path = Path.Combine(directory, "agent-" + agentId + ".jsonl");
-        return File.Exists(path) ? ReadLines(path) : null;
     }
 
     /// <summary>Claude Code may be appending to the file; share it rather than lock it.</summary>

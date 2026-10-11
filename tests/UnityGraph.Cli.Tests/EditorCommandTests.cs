@@ -63,32 +63,6 @@ public sealed partial class EditorCommandTests : IDisposable
     }
 
     [Fact]
-    public void Status_says_when_the_worker_agent_is_off_and_only_then()
-    {
-        _bridge.Publish(_root);
-        _bridge.Handle = _ => (200, FakeBridge.Status("idle", 0));
-        Directory.CreateDirectory(Path.Combine(_root, ".claude"));
-        File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), "{ \"modules\": { \"worker-agent\": false } }");
-
-        Assert.Equal(
-            "Unity 6000.3.14f1  idle  bridge 0.1.0\n  last compile  none since the editor opened\n"
-            + "worker-agent is off in .claude/unitygraph.json: chores run inline, not in unity-worker\n",
-            Run("status").Output);
-
-        File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), "{ \"modules\": { \"worker-agent\": true } }");
-        Assert.DoesNotContain("worker-agent", Run("status").Output, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Status_with_the_editor_out_of_reach_still_says_the_worker_agent_is_off()
-    {
-        Directory.CreateDirectory(Path.Combine(_root, ".claude"));
-        File.WriteAllText(Path.Combine(_root, ".claude", "unitygraph.json"), "{ \"modules\": { \"worker-agent\": false } }");
-
-        Assert.EndsWith("\nworker-agent is off in .claude/unitygraph.json: chores run inline, not in unity-worker\n", Run("status").Output, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Status_with_an_installed_bridge_and_a_dead_editor_names_the_pid()
     {
         _bridge.Publish(_root, pid: 4242);

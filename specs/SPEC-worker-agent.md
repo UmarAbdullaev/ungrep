@@ -1,8 +1,35 @@
 # Spec: worker-agent
 
-Part of unitygraph (see `../SPEC.md`, module table). Status: **built 2026-10-11** (W1). Builds on
-`query`, `editor-link`, `editor-ops`, `play-input` and `unity-loop`: the worker does with `ug`
-what the main thread would, in its own context.
+Part of unitygraph (see `../SPEC.md`, module table). Status: **removed 2026-10-11** (user), after
+it was built the same day (W1). Kept as the record of the dry run; nothing below ships.
+
+## Removed
+
+Priced in dollars rather than tokens, delegating cost more than it saved on the chores it was
+for. Cache reads cost the same on Opus 5.5 and Sonnet 5.5 ($0.20 per million tokens, 2026-10), and
+re-reading context is most of a chore's cost, so a Sonnet worker saves only by not re-reading the
+main thread's context once per step. Decision 7 and the Dry run's closing paragraph below priced
+the worker's context as cheaper per token; for cache reads it is not.
+
+| Chore (dry run) | Inline: turns, cost, wall | Delegated: cost, wall |
+|---|---|---|
+| 1. Play until room 1 is cleared | 5, $0.18, ~47 s | ~$0.37, 112 s |
+| 2. AudioSource on `Boot`, check, undo | 10, $0.36, ~52 s | ~$0.30, 83 s |
+
+Inline: this session's own turns at ~112k main context, priced from their recorded usage
+(Opus 5.5: cache read $0.20, cache write 1 h $8, output $20 per million). Delegated: the worker's
+measured cost plus two main-thread turns at the same context. At purge-squad's average 245k:
+$0.32 vs $0.42 and $0.62 vs $0.35. Break-even ≈ 9 inline calls at 110k main context, ≈ 5 at
+245k; the worker made 1.7× to 4.5× the calls of an inline run, and it was slower each time.
+
+`ug` answers are already small (~1k tokens left in context per chore here), so keeping them out
+of the main thread saved little. Claude Code's built-in subagents run a chore when asked ("do it
+in a subagent", "in the background"); `ug` keeps edits to Undo and saves only when told, which
+holds in any agent. Removed: the agent, the delegation line in `SKILL.md` and `worker.md`, the
+`worker-agent` switch (a config naming it now fails as an unknown module, which `ug doctor`
+names), and the delegation counts in `ug stats`. Kept and widened: `ug stats` sums what every
+subagent read in its own transcript (`<session>/subagents/agent-<id>.jsonl`, typed by the
+`.meta.json` beside it), by agent type, next to the main thread's context.
 
 ## Objective
 

@@ -4,9 +4,9 @@ using System.Text;
 namespace UnityGraph.Stats;
 
 /// <summary>
-/// Plain-text `ug stats` report, written for Claude and people alike: a summary line, worker
-/// delegations when there were any, then where the context went by category, with deltas when a
-/// baseline report is given. Stays under 30 lines whatever the transcripts hold.
+/// Plain-text `ug stats` report, written for Claude and people alike: a summary line, subagents
+/// when there were any, then where the context went by category, with deltas when a baseline
+/// report is given. Stays under 30 lines whatever the transcripts hold.
 /// </summary>
 public static class StatsText
 {
@@ -43,7 +43,7 @@ public static class StatsText
             .Append('\n');
         text.Append(Invariant($"context charged to tool calls {Tokens(report.ChargedContextTokens)} ({Share(report.ChargedContextTokens, report.ContextTokens)})"))
             .Append('\n');
-        AppendWorker(text, report.Worker ?? WorkerTotals.None, baseline?.Worker);
+        AppendSubagents(text, report, baseline);
         text.Append('\n');
 
         AppendCategories(text, report, baseline);
@@ -51,27 +51,26 @@ public static class StatsText
     }
 
     /// <summary>
-    /// One line, only when this report or its baseline has delegations: the 3-step rule, what the
-    /// workers read in their own context, and the verdict budget of SPEC-worker-agent.
+    /// One line, only when this report or its baseline ran subagents: what they read in their own
+    /// context, which the main thread's figures above leave out, and the two summed.
     /// </summary>
-    private static void AppendWorker(StringBuilder text, WorkerTotals worker, WorkerTotals? before)
+    private static void AppendSubagents(StringBuilder text, StatsReport report, StatsReport? baseline)
     {
-        if (worker.Delegations == 0 && (before?.Delegations ?? 0) == 0)
+        IReadOnlyList<SubagentRow> now = report.Subagents ?? [];
+        IReadOnlyList<SubagentRow>? before = baseline?.Subagents;
+        if (now.Count == 0 && (before?.Count ?? 0) == 0)
         {
             return;
         }
 
-        text.Append(Invariant($"{WorkerDelegations.AgentName} {worker.Delegations} delegations{CountDelta(worker.Delegations, before?.Delegations)}"))
-            .Append(Invariant($" | {worker.Short} short (under {WorkerDelegations.ShortBelow} tool calls)"))
-            .Append(Invariant($" | worker context {Tokens(worker.ContextTokens)}{PercentDelta(worker.ContextTokens, before?.ContextTokens)}"));
-        if (worker.Finished > 0)
+        int runs = now.Sum(r => r.Runs);
+        long context = now.Sum(r => r.ContextTokens);
+        text.Append(Invariant($"subagents {runs} runs{CountDelta(runs, before?.Sum(r => r.Runs))}"))
+            .Append(Invariant($" | context {Tokens(context)}{PercentDelta(context, before?.Sum(r => r.ContextTokens))}"))
+            .Append(Invariant($" | main + subagents {Tokens(report.ContextTokens + context)}"));
+        if (now.Count > 0)
         {
-            text.Append(Invariant($" | verdict avg {worker.VerdictTokens / worker.Finished} tokens, {worker.OverBudget} over {WorkerDelegations.VerdictBudget}"));
-        }
-
-        if (worker.NoResult > 0)
-        {
-            text.Append(Invariant($" | {worker.NoResult} without a result"));
+            text.Append(" | ").AppendJoin(", ", now.Select(r => Invariant($"{r.Type} {r.Runs} run{(r.Runs == 1 ? "" : "s")} {Tokens(r.ContextTokens)}")));
         }
 
         text.Append('\n');

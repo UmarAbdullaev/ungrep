@@ -1,7 +1,7 @@
 # Spec: editor-link
 
 Part of unitygraph (see `../SPEC.md`, Decisions #3). Status: **draft** (2026-09-29). Used by
-`unity-loop` (compile gate, `ug console`, `ug test`, `ug log`) and later `worker-agent`.
+`unity-loop` (compile gate, `ug console`, `ug test`, `ug log`).
 
 ## Objective
 

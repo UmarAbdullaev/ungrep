@@ -9,9 +9,24 @@ namespace UnityGraph.Stats;
 public sealed record CategoryRow(string Name, int Calls, long ContextTokens);
 
 /// <summary>
+/// Subagent runs of one agent type and the context they read in their own transcripts: what they
+/// cost on top of the main thread.
+/// </summary>
+public sealed record SubagentRow(string Type, int Runs, long ContextTokens)
+{
+    /// <summary>One row per type, most context first.</summary>
+    public static IReadOnlyList<SubagentRow> Merge(IEnumerable<SubagentRow> rows) =>
+        rows.GroupBy(r => r.Type, StringComparer.Ordinal)
+            .Select(g => new SubagentRow(g.Key, g.Sum(r => r.Runs), g.Sum(r => r.ContextTokens)))
+            .OrderByDescending(r => r.ContextTokens)
+            .ThenBy(r => r.Type, StringComparer.Ordinal)
+            .ToList();
+}
+
+/// <summary>
 /// What `ug stats --json` writes and `--baseline` reads back. Aggregates only: no paths, session
-/// ids, prompts or code, so a report can be kept in a repository or shared. `Worker` is null in a
-/// report written before worker delegations were counted.
+/// ids, prompts or code, so a report can be kept in a repository or shared. `Subagents` is null in
+/// a report written before subagents were counted.
 /// </summary>
 public sealed record StatsReport(
     int Version,
@@ -24,7 +39,7 @@ public sealed record StatsReport(
     int Compactions,
     long FirstTurnMedian,
     IReadOnlyList<CategoryRow> Categories,
-    WorkerTotals? Worker = null)
+    IReadOnlyList<SubagentRow>? Subagents = null)
 {
     public const int CurrentVersion = 1;
 
@@ -58,7 +73,7 @@ public sealed record StatsReport(
             stats.Compactions,
             stats.FirstTurnMedian,
             categories,
-            stats.Worker);
+            stats.Subagents);
     }
 
     /// <summary>Indented JSON with '\n' line endings on every OS.</summary>

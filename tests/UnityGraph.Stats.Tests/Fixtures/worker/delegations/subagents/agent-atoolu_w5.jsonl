@@ -1,2 +1,0 @@
-{"parentUuid":null,"isSidechain":true,"agentId":"atoolu_w5","type":"user","message":{"role":"user","content":"Chore"},"timestamp":"2026-10-11T08:00:17.000Z","sessionId":"w"}
-{"parentUuid":null,"isSidechain":true,"agentId":"atoolu_w5","type":"assistant","message":{"id":"f1","role":"assistant","content":[{"type":"text","text":"step"}],"usage":{"input_tokens":2,"cache_creation_input_tokens":1000,"cache_read_input_tokens":16998,"output_tokens":50}},"timestamp":"2026-10-11T08:00:18.000Z","sessionId":"w"}
