@@ -483,6 +483,13 @@ a viewpoint or sheet whose source camera's culling mask is Nothing draws every l
 (SPEC-editor-ops, Viewpoints), and `ug inspect` on a prefab instance root counts its overrides
 as `ug prefab overrides` lists them (SPEC-editor-ops, C1). An older bridge keeps the old answers.
 
+## Bridge 0.11.0 (O14 DontDestroyOnLoad)
+
+In play mode the loaded scenes include DontDestroyOnLoad while it holds objects: addresses,
+`find --live`, `tree` and `ug scene` reach it, and `--scene DontDestroyOnLoad` moves objects there
+(SPEC-editor-ops, DontDestroyOnLoad). No new request or flag, so `ug` gates nothing on it; an older
+bridge keeps answering "not found" for kept objects, and `ug status` naming 0.11.0 tells the two apart.
+
 ## Performance targets
 
 | Operation | Target |

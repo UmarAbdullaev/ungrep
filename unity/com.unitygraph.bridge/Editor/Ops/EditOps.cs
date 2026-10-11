@@ -927,11 +927,7 @@ namespace UnityGraph.Bridge
             }
         }
 
-        private static Scene FindScene(string name)
-        {
-            name = name.Trim();
-            return Addresses.LoadedScenes().FirstOrDefault(s => s.path == name || s.name == name);
-        }
+        private static Scene FindScene(string name) => Addresses.SceneNamed(name.Trim());
 
         private static string Shown(UnityEngine.Object target)
         {

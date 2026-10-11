@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -16,9 +18,13 @@ namespace UnityGraph.Bridge
     internal static class Addresses
     {
         public const string PrefabSeparator = ".prefab:";
+        public const string DontDestroyOnLoad = "DontDestroyOnLoad";
 
         private const int MaxCandidates = 10;
         private const int MaxNear = 5;
+
+        private static readonly MethodInfo _dontDestroyOnLoadGetter = typeof(EditorSceneManager).GetMethod(
+            "GetDontDestroyOnLoadScene", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
 
         // While an edit has a prefab asset's contents loaded: its root and path, so addresses
         // inside name the asset (`Assets/X.prefab:Child`) and answers say the asset is written.
@@ -102,7 +108,33 @@ namespace UnityGraph.Bridge
             }
 
             string path = string.Join("/", segments);
-            return SceneManager.sceneCount > 1 && target.scene.IsValid() ? target.scene.name + ":" + path : path;
+            return NamesScene(target) ? target.scene.name + ":" + path : path;
+        }
+
+        // The scene name leads an address with several scene files open, or with one scene file
+        // when it and DontDestroyOnLoad both hold a root of this object's root name (O14).
+        private static bool NamesScene(GameObject target)
+        {
+            if (!target.scene.IsValid())
+            {
+                return false;
+            }
+
+            if (SceneManager.sceneCount > 1)
+            {
+                return true;
+            }
+
+            Scene kept = DontDestroyOnLoadScene();
+            Scene played = SceneManager.GetSceneAt(0);
+            if (!kept.IsValid() || (target.scene != kept && target.scene != played))
+            {
+                return false;
+            }
+
+            Scene other = target.scene == kept ? played : kept;
+            string root = target.transform.root.name;
+            return other.isLoaded && other.GetRootGameObjects().Any(g => g.name == root);
         }
 
         /// <summary>Loads a prefab asset's contents for an edit; <see cref="UnloadContents"/> ends it.</summary>
@@ -129,7 +161,7 @@ namespace UnityGraph.Bridge
         public static string ContentsPath(GameObject target) =>
             _contentsRoot != null && target != null && target.transform.root.gameObject == _contentsRoot ? _contentsPath : null;
 
-        /// <summary>The loaded scenes in hierarchy order.</summary>
+        /// <summary>The loaded scenes in hierarchy order, then in play mode DontDestroyOnLoad while it holds objects.</summary>
         public static IEnumerable<Scene> LoadedScenes()
         {
             for (int i = 0; i < SceneManager.sceneCount; i++)
@@ -139,6 +171,53 @@ namespace UnityGraph.Bridge
                 {
                     yield return scene;
                 }
+            }
+
+            Scene kept = DontDestroyOnLoadScene();
+            if (kept.IsValid())
+            {
+                yield return kept;
+            }
+        }
+
+        /// <summary>A loaded scene by path or name; in play mode `DontDestroyOnLoad` also while it is empty.</summary>
+        public static Scene SceneNamed(string name)
+        {
+            Scene scene = LoadedScenes().FirstOrDefault(s => s.path == name || s.name == name);
+            return scene.IsValid() || name != DontDestroyOnLoad || !EditorApplication.isPlaying ? scene : KeptScene();
+        }
+
+        /// <summary>Play mode's DontDestroyOnLoad scene while it holds objects, else an invalid scene.</summary>
+        public static Scene DontDestroyOnLoadScene()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                return default;
+            }
+
+            Scene kept = KeptScene();
+            return kept.IsValid() && kept.isLoaded && kept.rootCount > 0 ? kept : default;
+        }
+
+        // Unity has no public handle on DontDestroyOnLoad; EditorSceneManager's internal getter
+        // (2022.3 to 6000.3) reads it without touching it, the probe stands in where it is gone.
+        private static Scene KeptScene() =>
+            _dontDestroyOnLoadGetter != null && _dontDestroyOnLoadGetter.ReturnType == typeof(Scene)
+                ? (Scene)_dontDestroyOnLoadGetter.Invoke(null, null)
+                : ProbeDontDestroyOnLoad();
+
+        /// <summary>The scene for a Unity without the internal getter: a hidden object kept, read and destroyed at once.</summary>
+        public static Scene ProbeDontDestroyOnLoad()
+        {
+            var probe = new GameObject("ug probe") { hideFlags = HideFlags.HideAndDontSave };
+            try
+            {
+                UnityEngine.Object.DontDestroyOnLoad(probe);
+                return probe.scene;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(probe);
             }
         }
 
