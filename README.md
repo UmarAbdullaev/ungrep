@@ -169,7 +169,7 @@ How to read them:
 - **Calls matter more than tokens.** Every tool call starts a turn, and every turn re-reads the whole conversation, so a call saved is worth far more than the bytes of its answer.
 - **These are scripted calls,** written by someone who knew where to look. That flatters grep: its numbers are its floor.
 - **In real sessions Claude chooses for itself.** In 24 runs where Claude picked its own tools (`--mode agent`), it used `ug` for 11, mostly the structural questions: what a change breaks, serialized data, implementers through interfaces. For questions one grep pattern answers, it used Grep, at about the same cost. Every answer was right either way.
-- **Always-on cost:** about 160 tokens a session (the skill's listing line and a one-line note at session start). A Unity MCP server's tool list costs about 1,500.
+- **Always-on cost:** about 80 tokens a session (the skill's listing line). A Unity MCP server's tool list costs about 1,500.
 - **Not measured yet:** savings over whole real sessions. `ug stats` measures them on your project.
 
 The suite, keys and every result are in [`bench/`](https://github.com/UmarAbdullaev/unitygraph/tree/main/bench), the method in [`specs/SPEC-bench.md`](https://github.com/UmarAbdullaev/unitygraph/blob/main/specs/SPEC-bench.md).
@@ -241,3 +241,5 @@ claude --plugin-dir .
 ## License
 
 [MIT](LICENSE). Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+unitygraph is an independent project, not affiliated with or endorsed by Unity Technologies. Unity is a trademark or registered trademark of Unity Technologies or its affiliates.

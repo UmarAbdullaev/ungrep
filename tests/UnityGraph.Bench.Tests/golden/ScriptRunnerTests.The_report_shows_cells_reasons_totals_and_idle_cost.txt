@@ -11,4 +11,4 @@ totals over 2 questions every arm ran (other ran none)
 grep            5      48      0.5      2/2     2
 unitygraph      2      18      0.4      2/2     0
 unitygraph vs grep: calls -60%, tokens -62%
-idle tokens (always + on use)  grep 13 + 17  other 0 + 0  unitygraph 86 + 2
+idle tokens (always + on use)  grep 13 + 17  other 0 + 0  unitygraph 9 + 2

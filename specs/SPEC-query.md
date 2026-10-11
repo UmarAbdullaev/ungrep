@@ -435,15 +435,18 @@ A token is estimated as 4 UTF-8 bytes. Lines are added whole until the next one 
 budget; then the answer ends with `  more  <the same command> --budget <2 × budget, max 8000>`.
 The header line always fits. Deterministic: same graph and command, same bytes.
 
-## Session hint (B1f)
+## Session hint (B1f): tried, removed
 
-In a Unity project the SessionStart hook adds one line of context (`SessionHintHandler.Hint`,
-78 tokens, budget 80): `ug refs|explain|impact <X>` answers who calls, uses, subscribes to or
-implements X, what a scene or prefab wires and what breaks, in one call with file:line. The
-skill listing alone left Claude on Grep in most agent runs (SPEC-bench, Agent mode after B1g);
-the hint arrives before the first tool call, where a PreToolUse note comes after Grep is chosen.
-It is a fact, not a block: interception stays dropped (Decisions #4). `query` off: no hint.
-`ug` works bare because Claude Code puts a plugin's `bin/` on the Bash tool's PATH.
+Built 2026-10-11 (c3e2fa9): in a Unity project a SessionStart hook added one line of context,
+78 tokens, saying `ug refs|explain|impact <X>` answers who calls, uses, subscribes to or
+implements X, what a scene or prefab wires and what breaks, in one call with file:line. It was
+meant to arrive before the first tool call, where a PreToolUse note comes after Grep is chosen.
+The agent check (SPEC-bench, Agent mode with the session hint) found it in every run's context
+and no change in the pick: Claude takes `ug` where grep is hard and Grep where one pattern
+answers. Removed before 0.9.0 (Claude's call on the user's "do whatever is best"): 78 tokens in
+every session with no measured gain fails the overhead rule (SPEC Overhead budget). The skill's
+listing line stays the only always-on cost. `ug` works bare in Bash because Claude Code puts a
+plugin's `bin/` on the Bash tool's PATH.
 
 ## Nothing out of reach (C1)
 

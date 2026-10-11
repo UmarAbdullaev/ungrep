@@ -327,8 +327,8 @@ Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 
   arrives as JSON on stdin (`session_id`, `transcript_path`, `cwd`, `hook_event_name`, ...);
   `CLAUDE_PROJECT_DIR` is set. `bin/` is not on `PATH` inside hooks.
 - Wired events (T5, 2026-09-29): PreToolUse on `Bash|PowerShell|Edit|MultiEdit|Write|NotebookEdit`
-  (guards), PostToolUse on the edit tools (reindex on edit, edit tracking), Stop (compile gate);
-  SessionStart (query's session hint, B1f, 2026-10-11).
+  (guards), PostToolUse on the edit tools (reindex on edit, edit tracking), Stop (compile gate).
+  No SessionStart hook: B1f's session hint was measured and removed (SPEC-query, 2026-10-11).
   Grep and Read are not matched: interception was dropped (Decisions #4), and every matched
   call pays the `ug` start. `ug hook` bypasses the command parser, reads and writes UTF-8, and
   exits 0 with no output outside a Unity project, on any exception, and past 2 s (Stop: 40 s, the compile gate waits for Unity); failures go

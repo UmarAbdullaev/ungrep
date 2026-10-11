@@ -564,4 +564,4 @@ the SessionStart hint (SPEC-query, Session hint). 9 runs, $1.13, no subagents.
   `ug` (the plugin's `bin/` is on the Bash PATH). Two runs read or grepped the lines after it.
 - With B1g (no hint) N3 was picked 2 of 3; here 0 of 3. Three repeats are noise, but the hint
   buys nothing measurable: Claude takes `ug` where grep is hard (impact, serialized data) and
-  Grep where one pattern answers.
+  Grep where one pattern answers. Removed before 0.9.0 (SPEC-query, Session hint).

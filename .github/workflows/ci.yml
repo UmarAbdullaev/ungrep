@@ -36,7 +36,7 @@ jobs:
       - name: Format
         run: dotnet format unitygraph.sln --verify-no-changes
 
-      # The launcher on the published build: version, the session hint, one graph query.
+      # The launcher on the published build: version, doctor, one graph query.
       - name: Launcher
         shell: bash
         run: |
@@ -44,5 +44,5 @@ jobs:
           bin/ug --version
           project="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")/fixture"
           cp -R fixtures/CodeProject "$project"
-          echo "{\"cwd\":\"$project\",\"hook_event_name\":\"SessionStart\"}" | bin/ug hook SessionStart | grep -q additionalContext
+          bin/ug doctor --project "$project"
           bin/ug refs Turntable.Rotated --project "$project" | tee /dev/stderr | grep -q "subscribed by"

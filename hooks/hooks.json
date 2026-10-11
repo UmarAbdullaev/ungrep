@@ -1,11 +1,6 @@
 {
   "description": "unitygraph: every hook calls `ug hook <event>`; silent unless a handler has something to say, exit 0 on any failure.",
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/ug\" hook SessionStart", "timeout": 5 }]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell|Edit|MultiEdit|Write|NotebookEdit",
