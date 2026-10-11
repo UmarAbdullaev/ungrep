@@ -1156,7 +1156,8 @@ With idle cost, file form:
 ## Open points
 
 1. Addressing by the graph's `o:` keys (scene file + fileID) through `GlobalObjectId`, so a
-   `ug refs` answer can feed `ug inspect` directly.
+   `ug refs` answer can feed `ug inspect` directly. Not in v1 (user, 2026-10-11: "do not build
+   D1"); the path addresses `ug refs` prints already paste into `ug inspect`.
 2. Whether `ug play --for <s>` (play, wait, stop, digest) belongs here or in unity-loop's
    `ug log`.
 3. Gizmos, icons and the grid in `ug shot scene`: the Scene view window draws them around its

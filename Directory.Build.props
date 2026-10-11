@@ -16,7 +16,7 @@
     <!-- Everything builds under artifacts/, so the repo-root bin/ stays free for the launchers. -->
     <UseArtifactsOutput>true</UseArtifactsOutput>
 
-    <Version>0.1.0</Version>
+    <Version>0.9.0</Version>
     <!-- Keep the git hash out of the version so the version output is deterministic. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

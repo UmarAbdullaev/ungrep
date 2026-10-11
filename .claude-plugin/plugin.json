@@ -1,6 +1,6 @@
 {
   "name": "unitygraph",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "Unity project graph for Claude Code: code and asset questions answered in one call, fewer tokens.",
   "author": {
     "name": "Umar"

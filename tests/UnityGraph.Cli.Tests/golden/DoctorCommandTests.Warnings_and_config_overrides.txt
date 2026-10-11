@@ -3,4 +3,5 @@ ok    unity    <root> (Unity 6000.3.14f1)
 warn  assets   Mixed serialization: binary assets are reported, not indexed; set Force Text in Project Settings > Editor
 ok    config   .claude/unitygraph.json: answer budget 800; on: project-map; off: viewer
 ok    graph    Library/unitygraph/graph.db
+ok    bridge   not installed (optional; ug bridge install --copy adds it)
 doctor: 0 failures, 1 warning

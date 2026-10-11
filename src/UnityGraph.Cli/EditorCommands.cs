@@ -145,21 +145,22 @@ internal static partial class EditorCommands
             return (0, text
                 .Append("The bridge is a Unity package in the plugin: ").Append(Path.Combine(package, "package.json")).Append('\n')
                 .Append("Add it one of two ways; both write into the project:\n")
-                .Append("  1. In Unity: Window > Package Manager > + > Install package from disk..., and pick that file.\n")
-                .Append("     Unity records it in Packages/manifest.json; ug never edits that file.\n")
-                .Append("  2. ug bridge install --copy: copies it to ").Append(CopyFolder.Replace('\\', '/')).Append("/ (vendored, so not indexed).\n")
+                .Append("  1. ug bridge install --copy (recommended): copies it to ").Append(CopyFolder.Replace('\\', '/')).Append("/ (vendored, so not indexed).\n")
+                .Append("     Run it again after a unitygraph update; ug doctor says when the copy is behind.\n")
+                .Append("  2. In Unity: Window > Package Manager > + > Install package from disk..., and pick that file.\n")
+                .Append("     Unity records it in Packages/manifest.json; ug never edits that file. The link points into\n")
+                .Append("     this unitygraph version's folder, which a plugin update removes.\n")
                 .Append("Once Unity has compiled it, ug status shows the editor.\n")
                 .ToString());
         }
 
         if (installed == "Packages/manifest.json")
         {
-            // A file: link already loads the plugin's own folder, so it is always the current bridge.
+            // A copy beside a Package Manager entry would define every bridge type twice.
             string? entry = ManifestEntry(root);
-            return (0, entry != null && entry.StartsWith("file:", StringComparison.Ordinal)
-                ? "the bridge is linked through Package Manager (Packages/manifest.json: " + entry
-                    + "); Unity loads it from that folder, so it is already current and there is nothing to copy\n"
-                : "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it\n");
+            return (0, "the bridge is already added through Package Manager (Packages/manifest.json"
+                + (entry != null && entry.StartsWith("file:", StringComparison.Ordinal) ? ": " + entry : "")
+                + "); a copy would clash with it. To switch to a copy, remove it in Window > Package Manager, then run this again\n");
         }
 
         string destination = Path.Combine(root, CopyFolder);
@@ -750,7 +751,7 @@ internal static partial class EditorCommands
     }
 
     // The bridge's value in Packages/manifest.json (a version, a git URL or file:<folder>), or null.
-    private static string? ManifestEntry(string root)
+    internal static string? ManifestEntry(string root)
     {
         try
         {

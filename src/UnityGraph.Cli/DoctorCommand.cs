@@ -1,13 +1,14 @@
 using System.CommandLine;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using UnityGraph.Core;
 
 namespace UnityGraph.Cli;
 
 /// <summary>
-/// `ug doctor`: checks what the plugin needs (runtime, Unity project, text assets, config, graph)
-/// and says what to fix. Reads only; never writes into the project.
+/// `ug doctor`: checks what the plugin needs (runtime, Unity project, text assets, config, graph,
+/// bridge) and says what to fix. Reads only; never writes into the project.
 /// </summary>
 internal static class DoctorCommand
 {
@@ -67,7 +68,61 @@ internal static class DoctorCommand
             ? new(Status.Ok, "graph", "Library/unitygraph/graph.db")
             : new(Status.Warn, "graph", "not built yet (Library/unitygraph/graph.db)"));
 
+        checks.Add(CheckBridge(unity.Root, EditorCommands.FindPackage()));
         return checks;
+    }
+
+    // The bridge is optional. What goes wrong is where it lives: a Package Manager link into a plugin
+    // version's folder, which an update deletes, or a copy older than the plugin's own (SPEC-release).
+    internal static Check CheckBridge(string root, string? bundled)
+    {
+        string? entry = EditorCommands.ManifestEntry(root);
+        if (entry != null && entry.StartsWith("file:", StringComparison.Ordinal))
+        {
+            string link = entry["file:".Length..];
+            string folder = Path.GetFullPath(Path.IsPathRooted(link) ? link : Path.Combine(root, "Packages", link));
+            if (!File.Exists(Path.Combine(folder, "package.json")))
+            {
+                return new(Status.Fail, "bridge", $"Packages/manifest.json links {entry}, which is gone (an older unitygraph's folder?): remove it in Window > Package Manager, then run ug bridge install --copy");
+            }
+
+            return folder.Replace('\\', '/').Contains("/plugins/cache/", StringComparison.OrdinalIgnoreCase)
+                ? new(Status.Warn, "bridge", $"Packages/manifest.json links {entry}, inside Claude Code's plugin cache, which the next unitygraph update deletes: remove it in Window > Package Manager, then run ug bridge install --copy")
+                : new(Status.Ok, "bridge", $"Packages/manifest.json: {entry}");
+        }
+
+        if (entry != null)
+        {
+            return new(Status.Ok, "bridge", $"Packages/manifest.json: {entry}");
+        }
+
+        string copy = EditorCommands.CopyFolder.Replace('\\', '/');
+        string? copied = PackageVersion(Path.Combine(root, EditorCommands.CopyFolder));
+        if (copied == null)
+        {
+            return new(Status.Ok, "bridge", "not installed (optional; ug bridge install --copy adds it)");
+        }
+
+        string? current = bundled == null ? null : PackageVersion(bundled);
+        return current != null && current != copied
+            ? new(Status.Warn, "bridge", $"{copy}/ is bridge {copied}, this unitygraph ships {current}: run ug bridge install --copy again")
+            : new(Status.Ok, "bridge", $"{copy}/ (bridge {copied})");
+    }
+
+    // package.json's "version", or null when the folder has no readable one.
+    private static string? PackageVersion(string folder)
+    {
+        try
+        {
+            using JsonDocument package = JsonDocument.Parse(File.ReadAllText(Path.Combine(folder, "package.json")));
+            return package.RootElement.TryGetProperty("version", out JsonElement version) && version.ValueKind == JsonValueKind.String
+                ? version.GetString()
+                : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
     }
 
     private static Check CheckConfig(string root)

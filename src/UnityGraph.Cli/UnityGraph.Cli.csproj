@@ -4,6 +4,13 @@
     <AssemblyName>ug</AssemblyName>
     <RootNamespace>UnityGraph.Cli</RootNamespace>
     <RollForward>Major</RollForward>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- dist/ug: the launchers start ug.dll on dotnet, so no apphost, and no API docs. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <UseAppHost>false</UseAppHost>
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
   </PropertyGroup>
 
   <ItemGroup>
