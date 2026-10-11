@@ -105,6 +105,13 @@ as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, 
 
 A failed compile does not reload the domain, so the bridge stays up and answers at once.
 
+A reload already under way (the last compile's, a package change) also refuses the first
+requests, or holds them past their 2 s: `ug compile` connects again, and sends `/refresh` and
+`/compile` again, while the `pid` in `bridge.json` lives, until the same deadline (O10 fix,
+2026-10-11: it used to answer "Unity not reachable (no answer within 2 s: Unity is busy)" after
+20.6 s and read Editor.log). Refused, no answer in time, a lost connection and `503` (the bridge
+stopping) count as a reload; any other answer, or an editor that exits, ends the wait at once.
+
 ## The client
 
 `BridgeClient.Connect(projectRoot)` reads `bridge.json`, checks the `pid` is alive, and returns
@@ -169,7 +176,9 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
   package from disk" on `unity/com.unitygraph.bridge/package.json` in the plugin folder (Unity
   edits its own manifest; we never touch `Packages/`), or `ug bridge install --copy`, which
   copies the package into `Assets/Plugins/UnityGraphBridge/` (a vendored folder, so the graph
-  ignores it). `ug bridge remove` deletes that folder only. The `unity` skill tells Claude to
+  ignores it). When the manifest already has the package, `--copy` copies nothing: a `file:` link
+  loads the plugin folder itself, so it is always current; any other entry would clash. `ug bridge
+  remove` deletes the copied folder only. The `unity` skill tells Claude to
   ask the user before either, as both write into the project (SPEC Boundaries).
 
 ## Running code (R1, X1; bridge 0.5.0)
@@ -353,6 +362,17 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
   in Hub's settings folder, else Hub's default `.../Unity/Hub/Editor`). A ug process reads each
   reference file once and again only after it changes (its write time), so the evals of a `ug
   batch` after the first compile in tens of milliseconds, not 160 ms each (Measured).
+- **Kept builds.** A build that runs is kept in `Library/unitygraph/eval/cache/`, keyed by a
+  SHA-256 of the code, its name (`snippet`, the `--file` path), `--entry`, `--timeout`, the C#
+  version, the defines, ug's own build and every reference file's path, size and write time; so a
+  script compile, a new ug or a changed timeout compiles again. The same code again (a poll of the
+  game's state, a `--file` run twice) skips Roslyn: the kept assembly is given a new
+  `ug-eval-<guid>` name of the same length (the metadata's string heap, offsets unchanged), so it
+  loads as a new assembly with its own statics, as a compile would give. One file per first byte
+  of the key (`00.bin` to `ff.bin`), written over by the next key that shares it, so at most 256
+  files and nothing is ever deleted; a file that cannot be read or written is a miss. Nothing in
+  the answer differs (`--check` on a kept build: `compiled: no errors`). Compile errors are not
+  kept. Measured on purge-squad (2026-10-11): `ug eval "1+1"` 1.02 s the first time, 0.17 s after.
 - **Compile errors** are the answer, nothing runs: `did not run snippet: N compile errors`, then at
   most 10 as `snippet:line:col CSxxxx text` (`--file` shows its path; lines and columns are the
   code's own, the generated wrapper never shows), each cut at 300 characters, then `(+N more:
@@ -455,6 +475,13 @@ by name, before the request goes out: `bridge 0.8.0 is too old for ug inspect --
 bridge install again`. Plain commands keep working on older bridges. `ug compile --all` and the
 exception file need no new request (`--all` formats what the client already gets; an older bridge
 just does not write the file).
+
+## Bridge 0.10.0 (O10 fixes)
+
+Two answers the O10 measurement found wrong, no new request or flag, so `ug` gates nothing on it:
+a viewpoint or sheet whose source camera's culling mask is Nothing draws every layer and says so
+(SPEC-editor-ops, Viewpoints), and `ug inspect` on a prefab instance root counts its overrides
+as `ug prefab overrides` lists them (SPEC-editor-ops, C1). An older bridge keeps the old answers.
 
 ## Performance targets
 

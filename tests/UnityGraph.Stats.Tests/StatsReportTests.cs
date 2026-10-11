@@ -59,6 +59,7 @@ public sealed class StatsReportTests
         string[] lines = StatsText.Render(report, report).TrimEnd('\n').Split('\n');
 
         Assert.True(lines.Length <= 30, $"{lines.Length} lines");
-        Assert.Equal("other (80 categories)", lines[^1][..21]);
+        Assert.Equal("other (80 categories)", lines[^2][..21]);
+        Assert.Equal("  (the smallest, summed; ug stats --json lists each)", lines[^1]);
     }
 }

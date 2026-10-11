@@ -304,10 +304,104 @@ public sealed class BridgeClientTests : IDisposable
     public void Compile_reports_a_refresh_that_fails()
     {
         using BridgeClient client = Connected(path => path == "/refresh"
-            ? (503, "{\"error\":\"the bridge is stopping (domain reload or quit)\"}")
+            ? (500, "{\"error\":\"boom\"}")
             : (200, FakeBridge.Status("idle", 3)));
 
-        Assert.Equal("bridge answered 503: the bridge is stopping (domain reload or quit)", client.Compile(TimeSpan.FromSeconds(5)).Problem);
+        Assert.Equal("bridge answered 500: boom", client.Compile(TimeSpan.FromSeconds(5)).Problem);
+    }
+
+    [Fact]
+    public void Compile_asks_a_stopping_bridge_again_until_the_deadline()
+    {
+        int refreshes = 0;
+        using BridgeClient client = Connected(path =>
+        {
+            if (path != "/refresh")
+            {
+                return (200, FakeBridge.Status("idle", 3));
+            }
+
+            Interlocked.Increment(ref refreshes);
+            return (503, "{\"error\":\"the bridge is stopping (domain reload or quit)\"}");
+        });
+
+        CompileOutcome outcome = client.Compile(TimeSpan.FromMilliseconds(300));
+
+        Assert.Equal("bridge answered 503: the bridge is stopping (domain reload or quit)", outcome.Problem);
+        Assert.True(refreshes > 1, refreshes + " refreshes");
+    }
+
+    [Fact]
+    public void Compile_rides_out_a_reload_that_refuses_the_refresh()
+    {
+        FakeBridge before = Bridge();
+        FakeBridge after = Bridge();
+        after.Handle = path => path switch
+        {
+            "/refresh" => (200, "{\"compiling\":false,\"compile\":4}"),
+            "/compile" => (200, "{\"compile\":4,\"messages\":[]}"),
+            _ => (200, FakeBridge.Status("idle", 4)),
+        };
+        using BridgeClient client = Connected(before, _ => (200, FakeBridge.Status("idle", 3)));
+
+        // The last compile's reload: this bridge is gone before the refresh, the next one comes up later.
+        before.Dispose();
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            Thread.Sleep(300);
+            after.Publish(_root);
+        });
+        CompileOutcome outcome = client.Compile(TimeSpan.FromSeconds(10));
+
+        Assert.Null(outcome.Problem);
+        Assert.Equal(4, outcome.Result!.Compile);
+        Assert.Equal(after.Port, client.Info.Port);
+    }
+
+    [Fact]
+    public void Compile_asks_again_for_a_result_a_busy_editor_held_up()
+    {
+        int results = 0;
+        using BridgeClient client = Connected(path => path switch
+        {
+            "/refresh" => (200, "{\"compiling\":false,\"compile\":4}"),
+            "/compile" => Interlocked.Increment(ref results) == 1
+                ? (503, "{\"error\":\"the bridge is stopping (domain reload or quit)\"}")
+                : (200, OneError),
+            _ => (200, FakeBridge.Status("idle", 4, errors: 1)),
+        });
+
+        CompileOutcome outcome = client.Compile(TimeSpan.FromSeconds(5));
+
+        Assert.Null(outcome.Problem);
+        Assert.Equal("CS0103", outcome.Result!.Messages.Single().Code);
+        Assert.Equal(2, results);
+    }
+
+    [Fact]
+    public void Connect_waiting_rides_out_a_reload_and_stops_for_a_closed_editor()
+    {
+        FakeBridge before = Bridge();
+        before.Publish(_root);
+        before.Dispose();
+        FakeBridge after = Bridge();
+        after.Handle = _ => (200, FakeBridge.Status("idle", 4));
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            Thread.Sleep(300);
+            after.Publish(_root);
+        });
+
+        BridgeConnection connection = BridgeClient.ConnectWaiting(_root, TimeSpan.FromSeconds(10), _ => true, TimeSpan.FromMilliseconds(20));
+        using BridgeClient client = connection.Client ?? throw new InvalidOperationException(connection.Problem);
+
+        Assert.Equal(after.Port, client.Info.Port);
+
+        after.Dispose();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Equal("refused: Unity is starting or reloading scripts", BridgeClient.ConnectWaiting(_root, TimeSpan.FromMilliseconds(200), _ => true, TimeSpan.FromMilliseconds(20)).Problem);
+        Assert.True(clock.Elapsed >= TimeSpan.FromMilliseconds(200));
+        Assert.Equal("stale bridge.json: Unity (pid 4242) is not running", BridgeClient.ConnectWaiting(_root, TimeSpan.FromSeconds(10), _ => false).Problem);
     }
 
     [Fact]

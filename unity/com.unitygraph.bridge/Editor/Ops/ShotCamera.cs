@@ -22,6 +22,13 @@ namespace UnityGraph.Bridge
             {
                 Camera.CopyFrom(source);
                 CopyPipelineData?.Invoke(source, Camera);
+
+                // A source that draws no layer (a boot or UI-only scene's camera) would give a blank picture.
+                if (Camera.cullingMask == 0)
+                {
+                    Camera.cullingMask = ~0;
+                    EveryLayer = true;
+                }
             }
 
             // CopyFrom brings the source's target texture and viewport; the shot renders the whole of its own texture.
@@ -35,6 +42,14 @@ namespace UnityGraph.Bridge
         internal static Action<Camera, Camera> CopyPipelineData { get; set; }
 
         public Camera Camera { get; }
+
+        /// <summary>The source's culling mask was Nothing, so the shot camera draws every layer instead.</summary>
+        public bool EveryLayer { get; }
+
+        /// <summary>Where the settings came from, for the answer: `settings of Main Camera`.</summary>
+        public static string Settings(Camera source, ShotCamera shot) =>
+            source == null ? "Unity's default camera settings"
+            : "settings of " + Addresses.Of(source.gameObject) + (shot != null && shot.EveryLayer ? " but every layer (its culling mask is Nothing)" : "");
 
         public void Dispose()
         {

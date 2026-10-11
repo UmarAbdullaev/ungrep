@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using UnityGraph.Core;
 using UnityGraph.EditorLink;
 
@@ -110,14 +111,16 @@ internal static partial class EditorCommands
 
     public static (int ExitCode, string Text) Compile(string root, bool warnings, TimeSpan timeout, string? editorLog, bool all = false)
     {
-        BridgeConnection connection = BridgeClient.Connect(root, ProcessCheck);
+        // A reload in progress (a package change, the last compile) refuses for a while: wait it out.
+        var clock = Stopwatch.StartNew();
+        BridgeConnection connection = BridgeClient.ConnectWaiting(root, timeout, ProcessCheck);
         if (connection.Client == null)
         {
             return (0, CompileText.Fallback(root, connection.Problem!, editorLog, warnings, all));
         }
 
         using BridgeClient client = connection.Client;
-        CompileOutcome outcome = client.Compile(timeout);
+        CompileOutcome outcome = client.Compile(timeout - clock.Elapsed > TimeSpan.FromSeconds(1) ? timeout - clock.Elapsed : TimeSpan.FromSeconds(1));
         return (0, outcome.Problem == null
             ? CompileText.Format(outcome, warnings, all)
             : CompileText.Fallback(root, outcome.Problem, editorLog, warnings, all));
@@ -151,7 +154,12 @@ internal static partial class EditorCommands
 
         if (installed == "Packages/manifest.json")
         {
-            return (0, "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it\n");
+            // A file: link already loads the plugin's own folder, so it is always the current bridge.
+            string? entry = ManifestEntry(root);
+            return (0, entry != null && entry.StartsWith("file:", StringComparison.Ordinal)
+                ? "the bridge is linked through Package Manager (Packages/manifest.json: " + entry
+                    + "); Unity loads it from that folder, so it is already current and there is nothing to copy\n"
+                : "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it\n");
         }
 
         string destination = Path.Combine(root, CopyFolder);
@@ -707,6 +715,25 @@ internal static partial class EditorCommands
         }
 
         return File.Exists(Path.Combine(root, CopyFolder, "package.json")) ? CopyFolder.Replace('\\', '/') + "/" : null;
+    }
+
+    // The bridge's value in Packages/manifest.json (a version, a git URL or file:<folder>), or null.
+    private static string? ManifestEntry(string root)
+    {
+        try
+        {
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "Packages", "manifest.json")));
+            return manifest.RootElement.TryGetProperty("dependencies", out JsonElement dependencies)
+                && dependencies.ValueKind == JsonValueKind.Object
+                && dependencies.TryGetProperty(PackageName, out JsonElement entry)
+                && entry.ValueKind == JsonValueKind.String
+                ? entry.GetString()
+                : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
     }
 
     private static string InstallHint(string root) =>

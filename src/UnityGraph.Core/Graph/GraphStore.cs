@@ -15,6 +15,10 @@ public sealed class GraphStore : IDisposable
     public const int SchemaVersion = 1;
     public const string RelativePath = "Library/unitygraph/graph.db";
 
+    /// <summary>The meta key whose value <see cref="WholeValues"/> says the graph stores values whole (C1).</summary>
+    public const string ValuesKey = "values";
+    public const string WholeValues = "whole";
+
     private const string Schema = """
         CREATE TABLE meta (
           key   TEXT PRIMARY KEY,
@@ -211,6 +215,7 @@ public sealed class GraphStore : IDisposable
             {
                 if (ReadSchemaVersion(existing) == SchemaVersion.ToString(CultureInfo.InvariantCulture))
                 {
+                    MarkCutValues(existing);
                     return new GraphStore(existing, projectRoot, directory, mode, created: false, writeLock, publishTo);
                 }
             }
@@ -234,6 +239,7 @@ public sealed class GraphStore : IDisposable
                 ("tool_version", tool),
                 ("project_root", Path.GetFullPath(projectRoot)),
                 ("created_by", "ug"),
+                (ValuesKey, WholeValues),
             })
             {
                 using SqliteCommand insert = Command(db2, tx, "INSERT INTO meta(key, value) VALUES ($key, $value)");
@@ -742,6 +748,32 @@ public sealed class GraphStore : IDisposable
 
         Execute(connection, null, pragmas.ToString());
         return connection;
+    }
+
+    // A graph built before C1 cut long values (signatures, message targets, paths, override values,
+    // labels). Its schema is the same, so it is not rebuilt: every file is marked changed once, and
+    // the next update indexes them again with whole values.
+    private static void MarkCutValues(SqliteConnection db)
+    {
+        using (SqliteCommand read = Command(db, null, "SELECT value FROM meta WHERE key = $key"))
+        {
+            read.Parameters.AddWithValue("$key", ValuesKey);
+            if (read.ExecuteScalar() as string == WholeValues)
+            {
+                return;
+            }
+        }
+
+        using SqliteTransaction tx = db.BeginTransaction();
+        Execute(db, tx, "UPDATE files SET size = -1");
+        using (SqliteCommand mark = Command(db, tx, "INSERT OR REPLACE INTO meta(key, value) VALUES ($key, $value)"))
+        {
+            mark.Parameters.AddWithValue("$key", ValuesKey);
+            mark.Parameters.AddWithValue("$value", WholeValues);
+            mark.ExecuteNonQuery();
+        }
+
+        tx.Commit();
     }
 
     private static string? ReadSchemaVersion(SqliteConnection db)

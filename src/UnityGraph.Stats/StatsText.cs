@@ -74,6 +74,7 @@ public static class StatsText
             var now = new CategoryRow("", rest.Sum(n => current.GetValueOrDefault(n)?.Calls ?? 0), rest.Sum(n => current.GetValueOrDefault(n)?.ContextTokens ?? 0));
             var then = new CategoryRow("", rest.Sum(n => before.GetValueOrDefault(n)?.Calls ?? 0), rest.Sum(n => before.GetValueOrDefault(n)?.ContextTokens ?? 0));
             AppendRow(text, Invariant($"other ({rest.Count} categories)"), now, baseline is null ? null : then, report, baseline);
+            text.Append("  (the smallest, summed; ug stats --json lists each)\n");
         }
     }
 

@@ -241,6 +241,29 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void A_source_that_draws_no_layer_gives_a_viewpoint_of_every_layer_and_says_so()
+        {
+            if (!HasGraphics)
+            {
+                Assert.Ignore("no graphics device (-nographics): the PNG is tested where one exists");
+            }
+
+            Camera eye = RedEye();
+            eye.cullingMask = 0;
+            Cube("Box", Vector3.zero);
+
+            StringAssert.Contains("(from 0, 0, -5 looking at Box, settings of Eye but every layer (its culling mask is Nothing))",
+                Ask("/shot", "from", "0,0,-5", "look", "Box", "width", "128", "height", "96"));
+            Texture2D image = Load("view.png");
+            Assert.Less(image.GetPixel(64, 48).r, 0.9f, "the box is drawn");
+            UnityEngine.Object.DestroyImmediate(image);
+            StringAssert.Contains("settings of Eye but every layer (its culling mask is Nothing)", Ask("/shot", "view", "Box", "angles", "true", "width", "64", "height", "64"));
+
+            Assert.AreEqual(0, eye.cullingMask, "the source camera keeps its mask");
+            Assert.IsFalse(LeftOver());
+        }
+
+        [Test]
         public void Look_alone_keeps_the_source_cameras_place_and_a_scene_without_cameras_uses_unitys_defaults()
         {
             if (!HasGraphics)

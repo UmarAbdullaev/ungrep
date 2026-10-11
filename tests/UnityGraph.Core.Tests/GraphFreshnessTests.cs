@@ -149,4 +149,34 @@ public sealed class GraphFreshnessTests : IDisposable
         Assert.Single(report.Touched);
         Assert.Throws<InvalidOperationException>(() => reader.UpdateStats(report.Touched));
     }
+
+    [Fact]
+    public void A_graph_from_before_whole_values_has_every_file_indexed_again_once()
+    {
+        WriteFile("Assets/a.cs", "class A {}");
+        WriteFile("Assets/b.cs", "class B {}");
+        Indexed("Assets/a.cs", "Assets/b.cs").Dispose();
+        using (var db = new SqliteConnection($"Data Source={Full(GraphStore.RelativePath)};Pooling=False"))
+        {
+            db.Open();
+            using SqliteCommand command = db.CreateCommand();
+            command.CommandText = $"DELETE FROM meta WHERE key = '{GraphStore.ValuesKey}'";
+            command.ExecuteNonQuery();
+        }
+
+        using (GraphStore reader = GraphStore.Open(_root, StoreMode.ReadOnly))
+        {
+            Assert.True(reader.CheckFreshness(Stats("Assets/a.cs", "Assets/b.cs")).IsFresh);
+        }
+
+        using (GraphStore store = GraphStore.Open(_root, StoreMode.ReadWrite))
+        {
+            Assert.False(store.Created);
+            Assert.Equal(["Assets/a.cs", "Assets/b.cs"], store.CheckFreshness(Stats("Assets/a.cs", "Assets/b.cs")).Changed.Order(StringComparer.Ordinal));
+        }
+
+        Indexed("Assets/a.cs", "Assets/b.cs").Dispose();
+        using GraphStore again = GraphStore.Open(_root, StoreMode.ReadWrite);
+        Assert.True(again.CheckFreshness(Stats("Assets/a.cs", "Assets/b.cs")).IsFresh);
+    }
 }

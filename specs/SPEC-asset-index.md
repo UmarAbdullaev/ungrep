@@ -155,7 +155,7 @@ Details:
 
 - Values are stored whole (C1): paths, field and event paths, override values, addresses and
   every label (the old caps were 200 / 80 chars and 10 labels). Props are a JSON column, so no
-  schema bump: a graph built before keeps the cut values until `ug index --full`.
+  schema bump: a graph built before is indexed again on its first write open (SPEC-graph-core).
 - `instance_of` points at the script **asset**, not the type: code-index's `script_defines`
   links `a:<script guid>` to the type, so a class rename needs no asset reindex. (This refines
   the `instance_of` row in SPEC-graph-core; the key form is the same.)

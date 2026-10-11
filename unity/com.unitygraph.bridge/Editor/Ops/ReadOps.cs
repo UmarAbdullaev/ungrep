@@ -331,9 +331,8 @@ namespace UnityGraph.Bridge
                 head += "  in prefab instance " + (root == go ? "" : Addresses.Of(root) + " ") + "of " + PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(go);
                 if (root == go)
                 {
-                    int overrides = PrefabUtility.GetObjectOverrides(go).Count + PrefabUtility.GetAddedComponents(go).Count
-                        + PrefabUtility.GetRemovedComponents(go).Count + PrefabUtility.GetAddedGameObjects(go).Count;
-                    head += " (" + Answer.Count(overrides, "override", "overrides") + ")";
+                    // Counted as `ug prefab overrides` lists them: each changed field, added or removed component or object.
+                    head += " (" + Answer.Count(PrefabOps.CountOverrides(go), "override", "overrides") + ")";
                 }
             }
 

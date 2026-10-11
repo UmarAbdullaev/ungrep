@@ -187,7 +187,14 @@ public sealed partial class QueryEngine
         bool isInterface = Names.Prop(type, "subkind") == "interface";
         AddIfAny(lines, isInterface ? "extended by" : "subclasses", Sources(incoming, EdgeKind.Inherits));
         AddIfAny(lines, "implemented by", Sources(incoming, EdgeKind.Implements));
-        AddIfAny(lines, "on", On(incoming.Where(e => e.Kind == EdgeKind.ScriptDefines).Select(e => e.Src)));
+        List<string> scripts = [.. incoming.Where(e => e.Kind == EdgeKind.ScriptDefines).Select(e => e.Src)];
+        AddIfAny(lines, "on", On(scripts));
+        List<string> placed = PlacedIn(scripts);
+        if (placed.Count > 0)
+        {
+            lines.Add(["instances in", Join(placed)]);
+        }
+
         answer.AddRange(Answer.Table(lines, "  "));
 
         if (members)
@@ -499,6 +506,37 @@ public sealed partial class QueryEngine
         [.. scripts.SelectMany(s => In(s).Where(e => e.Kind == EdgeKind.InstanceOf))
             .Select(e => e.Src.StartsWith("a:", StringComparison.Ordinal) ? Label(e.Src) : Path.GetFileName(e.File) + " > " + Label(e.Src))
             .Distinct().Order(StringComparer.Ordinal)];
+
+    // The scenes and prefabs that place an asset a script is on, as a prefab instance or a variant,
+    // nested to any depth: where its components live besides the assets `on` names.
+    private List<string> PlacedIn(IEnumerable<string> scripts)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var queue = new Queue<string>();
+        foreach (Edge on in scripts.SelectMany(s => In(s).Where(e => e.Kind == EdgeKind.InstanceOf)))
+        {
+            if (AssetOf(on.Src) is { } guid && seen.Add(NodeKeys.Asset(guid)))
+            {
+                queue.Enqueue(NodeKeys.Asset(guid));
+            }
+        }
+
+        var placed = new List<string>();
+        while (queue.Count > 0)
+        {
+            foreach (Edge edge in In(queue.Dequeue()))
+            {
+                bool places = edge.Kind == EdgeKind.VariantOf || (edge.Kind == EdgeKind.InstanceOf && Node(edge.Src)?.Kind == NodeKind.PrefabInstance);
+                if (places && AssetOf(edge.Src) is { } holder && seen.Add(NodeKeys.Asset(holder)))
+                {
+                    placed.Add(Label(NodeKeys.Asset(holder)));
+                    queue.Enqueue(NodeKeys.Asset(holder));
+                }
+            }
+        }
+
+        return [.. placed.Order(StringComparer.Ordinal)];
+    }
 
     // The type an `instance_of` edge's script defines; for a script the graph has no code for
     // (a package DLL), the class the object names, else the script's GUID.

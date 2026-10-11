@@ -34,6 +34,9 @@ public sealed class SnippetBuild
 
     public byte[]? Pdb { get; init; }
 
+    /// <summary>The assembly's name: <see cref="SnippetCompiler.AssemblyPrefix"/> and a new GUID for every compile.</summary>
+    public string? Name { get; init; }
+
     /// <summary>The entry's type as `Assembly.GetType` takes it (`Ns.Outer+Inner`).</summary>
     public string? EntryType { get; init; }
 
@@ -60,6 +63,9 @@ public static class SnippetCompiler
     public const string WrapperType = "__UgSnippet";
     public const string WrapperMethod = "Run";
     public const string GuardType = "UnityGraph.Bridge.EvalGuard";
+
+    /// <summary>Every compiled snippet's name starts with it; the bridge leaves those out of its references.</summary>
+    public const string AssemblyPrefix = "ug-eval-";
 
     private static readonly string[] _usings =
     [
@@ -108,7 +114,7 @@ public static class SnippetCompiler
             allowUnsafe: true,
             nullableContextOptions: NullableContextOptions.Disable);
         List<MetadataReference> references = [.. settings.References.Where(File.Exists).Select(Reference)];
-        string assemblyName = "ug-eval-" + Guid.NewGuid().ToString("N");
+        string assemblyName = AssemblyPrefix + Guid.NewGuid().ToString("N");
 
         bool candidate = parts.Candidate != null && !parts.Yields;
         Body body = BodyOf(parts, candidate);
@@ -177,6 +183,7 @@ public static class SnippetCompiler
         {
             Assembly = assembly.ToArray(),
             Pdb = pdb.ToArray(),
+            Name = assemblyName,
             EntryType = build.EntryType,
             EntryMethod = build.EntryMethod,
             Statements = build.Statements,

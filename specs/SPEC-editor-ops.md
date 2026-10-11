@@ -179,7 +179,10 @@ All take `--width`/`--height`. Request: `/shot?view=&from=&look=&rotation=&fov=&
   typeof(Camera))`, disabled (it never draws to the Game view by itself) and destroyed in a `finally`. Its
   settings are `Camera.CopyFrom` of a source camera: `--camera`, else the camera the view names (viewpoints),
   else `Camera.main`, else the enabled Game camera drawn last, else Unity's defaults; the answer names it
-  (`settings of Main Camera`). Under URP the source's `UniversalAdditionalCameraData` is copied too
+  (`settings of Main Camera`). A source whose culling mask is Nothing (a boot or UI-only scene's camera)
+  would give a blank picture: the shot camera draws every layer and the answer says `settings of Main
+  Camera but every layer (its culling mask is Nothing)`; the source keeps its mask (O10 fix, bridge
+  0.10.0). Under URP the source's `UniversalAdditionalCameraData` is copied too
   (`EditorUtility.CopySerialized`: renderer, post-processing, anti-aliasing, volume layers) by the
   sub-assembly `UnityGraph.Bridge.Editor.Urp` (`versionDefines` on `com.unity.render-pipelines.universal`),
   with the camera stack emptied and the render type set to Base: a viewpoint shows the world from that
@@ -492,6 +495,9 @@ flags need bridge 0.9.0 and are refused by name on an older one (SPEC-editor-lin
   <address or path>`), `  Level/Crate  added Rigidbody`, `removed BoxCollider`, `  Level/Crate/Tag
   added object`, `removed object Barrel`. Root name, position and rotation, which every scene
   instance overrides, are left out, as in apply. Every override, no cap; `no overrides` when none.
+  `ug inspect` on the instance root shows the same count in its head (`in prefab instance of
+  Assets/Prefabs/Crate.prefab (4 overrides)`); it used to count objects with overrides instead of
+  overrides, so O10 saw `1 override` beside a list of 4 (fixed in bridge 0.10.0).
   `ug prefab apply|revert` keep their 40-object report, now ending `... N more objects (ug prefab
   overrides <instance> lists every override before an apply or revert)`. MCP parity: MCP for
   Unity's `manage_prefabs` has no override listing (its actions are `get_info`, `get_hierarchy`,

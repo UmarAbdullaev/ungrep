@@ -243,10 +243,16 @@ public sealed partial class EditorCommandTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "Packages", "manifest.json"), "{\"dependencies\":{\"com.unitygraph.bridge\":\"file:../bridge\"}}");
 
         Assert.Equal(
-            "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it\n",
+            "the bridge is linked through Package Manager (Packages/manifest.json: file:../bridge); Unity loads it from that folder, so it is already current and there is nothing to copy\n",
             Run("bridge", "install", "--copy").Output);
         Assert.False(Directory.Exists(Path.Combine(_root, "Assets", "Plugins")));
         Assert.Equal("the bridge was added through Package Manager: remove it there (Window > Package Manager)\n", Run("bridge", "remove").Output);
+
+        File.WriteAllText(Path.Combine(_root, "Packages", "manifest.json"), "{\"dependencies\":{\"com.unitygraph.bridge\":\"0.9.0\"}}");
+        Assert.Equal(
+            "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it\n",
+            Run("bridge", "install", "--copy").Output);
+        Assert.False(Directory.Exists(Path.Combine(_root, "Assets", "Plugins")));
     }
 
     [Fact]

@@ -34,6 +34,9 @@ Out: parsing (indexers), answer formatting and budgets (`query`), anything that 
   `.gitignore` and is safe to delete; deleting it only costs a cold index.
 - The database is a cache. Nothing in it is user data. Any doubt (version mismatch, corruption,
   failed migration) is resolved by deleting it and rebuilding.
+- A same-schema graph without `values = whole` in `meta` was built before C1 stored values whole.
+  The first write open marks every file changed (size -1) and sets the key, so the next update
+  indexes each file again; nothing is deleted. Read-only opens leave it as it is.
 - SQLite settings: `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`,
   `foreign_keys=ON`.
 
@@ -113,7 +116,7 @@ itself once the target is indexed.
 CREATE TABLE meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
-);  -- schema_version, tool_version, project_root, created_by
+);  -- schema_version, tool_version, project_root, created_by, values
 
 CREATE TABLE files (
   id         INTEGER PRIMARY KEY,
@@ -273,7 +276,8 @@ revisit first (keys are stored as text in `edges` and in both edge indexes).
   changed; new file → added; deleted file → removed.
 - Concurrency: a reader running during `ReplaceFile` sees old or new, never partial; two writers
   serialize; a killed writer releases the lock.
-- Version: a database with another `schema_version` is rebuilt, not read.
+- Version: a database with another `schema_version` is rebuilt, not read; one without
+  `values = whole` has every file indexed again once.
 - Performance: a generated graph at the sizes above, checked against the targets in CI (Release
   build, with a margin for slow CI machines).
 - Coverage: ≥ 80% lines.

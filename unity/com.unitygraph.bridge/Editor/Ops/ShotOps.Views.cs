@@ -167,7 +167,7 @@ namespace UnityGraph.Bridge
                     what += ", rotation " + Values.Numbers(euler.Value.x, euler.Value.y, euler.Value.z);
                 }
 
-                return Render(new List<Camera> { camera }, width, height, "view", what + ", " + Settings(source), false);
+                return Render(new List<Camera> { camera }, width, height, "view", what + ", " + ShotCamera.Settings(source, shot), false);
             }
         }
 
@@ -259,7 +259,7 @@ namespace UnityGraph.Bridge
                 }
 
                 Clip(camera, distance, target.Sized ? target.Radius : 1f);
-                string what = target.Label + ", " + layout + ", distance " + Values.Number(Mathf.Round(distance * 10) / 10) + ", " + Settings(source);
+                string what = target.Label + ", " + layout + ", distance " + Values.Number(Mathf.Round(distance * 10) / 10) + ", " + ShotCamera.Settings(source, shot);
                 string name = Name(angles ? "angles-" : "orbit-", view);
                 return RenderSheet(camera, poses, columns, rows, width, height, name, what, legend);
             }
@@ -399,8 +399,6 @@ namespace UnityGraph.Bridge
             source = named != null ? named : Camera.main != null ? Camera.main : Cameras().LastOrDefault();
             return null;
         }
-
-        private static string Settings(Camera source) => source == null ? "Unity's default camera settings" : "settings of " + Addresses.Of(source.gameObject);
 
         // An object in a loaded scene or a point x,y,z; null with why not.
         private static Target Aim(string text, out string error)

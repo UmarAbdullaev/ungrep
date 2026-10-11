@@ -89,6 +89,7 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
   members       7 methods, 6 fields
   used by       Game.EditorTools.LabStageEditor, Game.EditorTools.LabTools.OpenLab
   on            Turntable.prefab > Turntable > LabStage
+  instances in  Assets/Prefabs/Turntable Variant.prefab, Assets/Scenes/Lab.unity
   more  ug explain LabStage --members | ug refs LabStage
 
 $ ug explain LabStage --members
@@ -101,6 +102,7 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
   members       7 methods, 6 fields
   used by       Game.EditorTools.LabStageEditor, Game.EditorTools.LabTools.OpenLab
   on            Turntable.prefab > Turntable > LabStage
+  instances in  Assets/Prefabs/Turntable Variant.prefab, Assets/Scenes/Lab.unity
     Trace        method  7   Trace(int)  public
     ResetMethod  field   10  string  const
     _turntable   field   12  Turntable  serialized

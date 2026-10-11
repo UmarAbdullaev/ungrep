@@ -113,6 +113,10 @@ namespace UnityGraph.Bridge.Tests
             StringAssert.Contains("\"  Turret/Barrel  Transform.m_LocalPosition.y = 1\"", answer);
             StringAssert.Contains("\"  Turret  added Rigidbody\"", answer);
             StringAssert.Contains("\"  Turret/Barrel/Sight  added object\"", answer);
+            StringAssert.Contains("in prefab instance of " + PrefabPath + " (3 overrides)", Ask("/inspect", "object", "Turret"), "inspect counts as the list does");
+            Ask("/set", "object", "Turret/Barrel", "field", "position", "value", "2,1,3");
+            StringAssert.Contains("  5 overrides\"", Ask("/prefab/overrides", "object", "Turret"));
+            StringAssert.Contains("(5 overrides)", Ask("/inspect", "object", "Turret"), "two more fields on the same object count twice, as listed");
             Assert.IsTrue(PrefabUtility.HasPrefabInstanceAnyOverrides(Find("Turret"), false), "a read changes nothing");
             Assert.IsNull(AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath).GetComponent<Rigidbody>());
 

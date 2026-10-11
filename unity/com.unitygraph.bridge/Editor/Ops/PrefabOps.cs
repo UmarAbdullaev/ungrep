@@ -84,6 +84,9 @@ namespace UnityGraph.Bridge
             return Answer.Lines(lines);
         }
 
+        /// <summary>How many lines `/prefab/overrides` lists for an instance root: `ug inspect` shows the same count.</summary>
+        public static int CountOverrides(GameObject root) => Collect(root).Count;
+
         /// <summary>`/prefab/apply?object=`: an instance's overrides written into its prefab asset.</summary>
         public static Reply Apply(Request request) => Instance(request, "prefab apply", (target, asset) =>
         {

@@ -50,7 +50,7 @@ public sealed class SnippetCompilerTests
 
     private static readonly Lazy<(string Path, Assembly Assembly)> _stubs = new(BuildStubs);
 
-    private static SnippetSettings Settings(params string[] defines) =>
+    internal static SnippetSettings Settings(params string[] defines) =>
         new([.. Runtime(), _stubs.Value.Path], defines, "9.0") { GuardSeconds = 5 };
 
     [Theory]
@@ -278,7 +278,7 @@ public sealed class SnippetCompilerTests
         return build;
     }
 
-    private static object? Run(SnippetBuild build)
+    internal static object? Run(SnippetBuild build)
     {
         _ = _stubs.Value;
         Assembly assembly = AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(build.Assembly!), new MemoryStream(build.Pdb!));

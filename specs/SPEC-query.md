@@ -124,7 +124,13 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
 ```
 
 A type with components in scenes or prefabs gets `on  <file> > <GameObject> > <Component>`; a
-method named by UnityEvents gets `unity events  <file> > <owner>: <field>`.
+method named by UnityEvents gets `unity events  <file> > <owner>: <field>`. When an asset `on`
+names is placed elsewhere, as a prefab instance or a variant, nested to any depth, `instances in`
+lists those scenes and prefabs by path (`LabStage` on `Turntable.prefab`: `instances in
+Assets/Prefabs/Turntable Variant.prefab, Assets/Scenes/Lab.unity`), so the answer names every
+asset that holds the component, as `ug impact` does (O10 fix, 2026-10-11: `ProgressBar` named
+only `ProgressBar.prefab`; it now also names the 5 assets `impact` lists and `GalaxyMap.unity`,
+which places `MapNode.prefab`).
 
 Lines with nothing to say are left out, except `used by` / `called from`, which say `(none)`
 (an unused symbol is an answer). Header: display name, kind (the subkind for types), base list,

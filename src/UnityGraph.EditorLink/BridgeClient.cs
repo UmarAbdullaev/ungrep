@@ -129,6 +129,32 @@ public sealed class BridgeClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// <see cref="Connect"/>, tried again while the editor in `bridge.json` lives but its bridge is
+    /// reloading (refused, no answer in time, stopping), until <paramref name="wait"/> has passed.
+    /// </summary>
+    public static BridgeConnection ConnectWaiting(string projectRoot, TimeSpan wait, Func<int, bool>? isAlive = null, TimeSpan? poll = null)
+    {
+        var clock = Stopwatch.StartNew();
+        while (true)
+        {
+            BridgeConnection connection = Connect(projectRoot, isAlive);
+            if (connection.Client != null || !Reloading(connection.Problem) || clock.Elapsed >= wait)
+            {
+                return connection;
+            }
+
+            Thread.Sleep(poll ?? TimeSpan.FromMilliseconds(250));
+        }
+    }
+
+    /// <summary>Whether a failed request looks like a domain reload (or a busy editor) rather than an answer.</summary>
+    public static bool Reloading(string? problem) =>
+        problem != null && (problem == Refused
+            || problem.StartsWith("no answer within ", StringComparison.Ordinal)
+            || problem.StartsWith("connection lost", StringComparison.Ordinal)
+            || problem.StartsWith("bridge answered 503", StringComparison.Ordinal));
+
     public BridgeStatus Status() => BridgeJson.Parse<BridgeStatus>(Get("/status", RequestTimeout));
 
     /// <summary>Refreshes the asset database; a big import can take a while, hence the longer timeout.</summary>
@@ -245,7 +271,8 @@ public sealed class BridgeClient : IDisposable
     }
 
     /// <summary>
-    /// Refreshes and waits for the compile it starts (see Compile flow in the spec). Never throws
+    /// Refreshes and waits for the compile it starts (see Compile flow in the spec). A request that
+    /// meets a domain reload is sent again while the editor lives, until the deadline. Never throws
     /// for a bridge that goes away mid-wait: the outcome says what is known.
     /// </summary>
     public CompileOutcome Compile(TimeSpan timeout)
@@ -254,7 +281,7 @@ public sealed class BridgeClient : IDisposable
         RefreshAnswer refresh;
         try
         {
-            refresh = Refresh(timeout);
+            refresh = Again(() => Refresh(Remaining(clock, timeout)), clock, timeout, "during the compile");
         }
         catch (BridgeUnavailableException e)
         {
@@ -263,7 +290,7 @@ public sealed class BridgeClient : IDisposable
 
         if (!refresh.Compiling)
         {
-            return Answer(changed: false, clock);
+            return Answer(changed: false, clock, timeout);
         }
 
         // A reload refuses connections until the bridge is back, possibly on another port.
@@ -287,7 +314,7 @@ public sealed class BridgeClient : IDisposable
 
             if (status.Compile > refresh.Compile && status.State == "idle")
             {
-                return Answer(changed: true, clock);
+                return Answer(changed: true, clock, timeout);
             }
         }
 
@@ -404,17 +431,43 @@ public sealed class BridgeClient : IDisposable
         }
     }
 
-    private CompileOutcome Answer(bool changed, Stopwatch clock)
+    private CompileOutcome Answer(bool changed, Stopwatch clock, TimeSpan timeout)
     {
         try
         {
-            return new CompileOutcome(changed, LastCompile(), null, false, clock.Elapsed);
+            return new CompileOutcome(changed, Again(LastCompile, clock, timeout, "during the compile"), null, false, clock.Elapsed);
         }
         catch (BridgeUnavailableException e)
         {
             return CompileOutcome.Failed(e.Message, clock.Elapsed);
         }
     }
+
+    // The request, sent again after a domain reload's refusal or a busy editor while the editor
+    // lives and the deadline has not passed; the last failure otherwise.
+    private T Again<T>(Func<T> request, Stopwatch clock, TimeSpan timeout, string during)
+    {
+        while (true)
+        {
+            try
+            {
+                return request();
+            }
+            catch (BridgeUnavailableException e) when (Reloading(e.Message) && clock.Elapsed < timeout)
+            {
+                if (!Reconnect(during, out string? gone))
+                {
+                    throw new BridgeUnavailableException(gone!);
+                }
+
+                Thread.Sleep(PollInterval);
+            }
+        }
+    }
+
+    // What is left of the deadline for one request, at least the usual request timeout.
+    private static TimeSpan Remaining(Stopwatch clock, TimeSpan timeout) =>
+        timeout - clock.Elapsed > RequestTimeout ? timeout - clock.Elapsed : RequestTimeout;
 
     // After a refused request: still waiting while the editor lives; picks up a new port or token.
     // during: when it happened, for the message if the editor is gone ("during the compile").

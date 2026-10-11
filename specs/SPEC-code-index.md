@@ -178,8 +178,8 @@ serialization table test (SPEC Testing strategy).
   single match is `exact`; `nameof(M)` is always exact. `SendMessage` family: every method with
   that name on an indexed `MonoBehaviour` subclass in the caller's compilation or one it
   references (a message can't reach a type the caller's assembly can't see), `heuristic`, every
-  target in key order (no cap since C1; graphs built before keep the old 20 and `truncated: true`
-  until `ug index --full`). No match → no edge.
+  target in key order (no cap since C1; a graph built before is indexed again
+  on its first write open, see SPEC-graph-core). No match → no edge.
 - **`script_defines`:** only when the `.meta` exists, has a `guid:` line, and the file declares
   a top-level (non-nested) class whose name equals the file name; the asset node itself comes
   from `asset-index` (the edge is unresolved until then).

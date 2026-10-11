@@ -112,7 +112,15 @@ internal static partial class EditorCommands
                 return Failed("bridge " + client!.Info.Bridge + " is too old for ug eval: run ug bridge install again\n");
             }
 
-            SnippetBuild build = SnippetCompiler.Compile(code, label, settings, emit: !input.Check);
+            // Code run before with the same settings and references is not compiled again.
+            byte[] key = SnippetCache.Key(code, label, settings);
+            SnippetBuild? cached = SnippetCache.Load(root, key);
+            SnippetBuild build = cached ?? SnippetCompiler.Compile(code, label, settings, emit: !input.Check);
+            if (cached == null && !input.Check)
+            {
+                SnippetCache.Save(root, key, build);
+            }
+
             if (build.Errors.Count > 0)
             {
                 return Failed(CompileErrors(root, label, build.Errors, input.Check));
