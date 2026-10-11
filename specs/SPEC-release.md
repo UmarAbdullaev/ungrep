@@ -62,6 +62,11 @@ update moves it to a new folder and deletes the old one later. So:
 - Nothing project-side may point into the plugin folder. `ug bridge install --copy` (vendored
   copy in `Assets/Plugins/UnityGraphBridge/`) is the recommended way to add the bridge; Package
   Manager's "Add package from disk" is listed second with the warning (SPEC-editor-link).
+- The README also gives Package Manager's git URL,
+  `https://github.com/UmarAbdullaev/unitygraph.git?path=/unity/com.unitygraph.bridge#v<version>`,
+  pinned to the release tag (checked 2026-10-12: Unity 6000.3.14f1 resolved `#v0.9.0` and compiled
+  the bridge in a bare project). `ug doctor` can't tell when it is behind, so the README says to
+  change the tag after an update.
 - `ug doctor`'s `bridge` line fails on a `file:` link to a missing folder, warns on a link into
   `/plugins/cache/` and on a copy whose version differs from the plugin's bundled bridge.
 - The graph and logs live in the project's `Library/unitygraph/`, so an update keeps them; a
