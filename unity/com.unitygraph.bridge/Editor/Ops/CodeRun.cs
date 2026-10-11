@@ -84,7 +84,7 @@ namespace UnityGraph.Bridge
             int group = Undo.GetCurrentGroup();
             try
             {
-                run.Result = call.Invoke();
+                run.Result = Values.Materialize(call.Invoke());
                 run.Wait = Wait.For(run.Result);
                 if (run.Wait != null && !run.Wait.Step())
                 {
@@ -327,7 +327,7 @@ namespace UnityGraph.Bridge
 
         private static string Clip(string text, int max) => text.Length > max ? text.Substring(0, max - 3) + "..." : text;
 
-        /// <summary>What a call returned that finishes later: an awaitable or an IEnumerator.</summary>
+        /// <summary>What a call returned that finishes later: an awaitable or an IEnumerator that is not also an IEnumerable.</summary>
         private abstract class Wait
         {
             public object Result;
@@ -356,7 +356,7 @@ namespace UnityGraph.Bridge
                     }
                 }
 
-                return value is IEnumerator steps ? new Stepped(steps) : null;
+                return value is IEnumerator steps && !(value is IEnumerable) ? new Stepped(steps) : null;
             }
         }
 
@@ -384,7 +384,7 @@ namespace UnityGraph.Bridge
 
                 try
                 {
-                    Result = _result.Invoke(_awaiter, null);
+                    Result = Values.Materialize(_result.Invoke(_awaiter, null));
                 }
                 catch (TargetInvocationException e) when (e.InnerException != null)
                 {

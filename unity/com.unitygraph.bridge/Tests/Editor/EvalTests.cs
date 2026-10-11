@@ -45,7 +45,8 @@ namespace UnityGraph.Bridge.Tests
                 + "public static class __UgSnippet { public static object Run() {\n"
                 + "int total = 0; for (int i = 0; i < 3; i++) { global::UnityGraph.Bridge.EvalGuard.Check(60D); total += i; }\n"
                 + "throw new System.InvalidOperationException(\"from the snippet \" + total);\n"
-                + "} private static int Twice(int x, int times = 2) => x * times; }\n");
+                + "} private static int Twice(int x, int times = 2) => x * times;\n"
+                + "private static object Paths() => System.Linq.Enumerable.Select(new[] { \"A\", \"B\" }, s => \"Assets/\" + s + \".asset\"); }\n");
             var options = new List<string> { "-nologo", "-noconfig", "-nostdlib", "-target:library", "-debug:portable", "-out:\"" + Path.Combine(Scratch, name + ".dll") + "\"" };
             options.AddRange(Refs().refs.Select(r => "-r:\"" + r + "\""));
             options.Add("\"" + source + "\"");
@@ -234,6 +235,9 @@ namespace UnityGraph.Bridge.Tests
             Assert.AreEqual("ran __UgSnippet.Twice(int x, int times) in N ms\n  result: 42", Eval(_snippet, "__UgSnippet.Twice", null, "Tools/Lab.cs", "21"));
             Assert.AreEqual("ran __UgSnippet.Twice(int x, int times) in N ms\n  result: 63", Eval(_snippet, "__UgSnippet.Twice", null, "Tools/Lab.cs", "21", "times=3"));
             Assert.AreEqual("error: did not run Tools/Lab.cs: no static method Thrice on __UgSnippet", Eval(_snippet, "__UgSnippet.Thrice", null, "Tools/Lab.cs"));
+
+            // A LINQ query is a list, not a coroutine (purge-squad, 2026-10-11).
+            Assert.AreEqual("ran __UgSnippet.Paths() in N ms\n  result: string[2] [\"Assets/A.asset\", \"Assets/B.asset\"]", Eval(_snippet, "__UgSnippet.Paths", null, "Tools/Lab.cs"));
 
             // What the code logs later is located the same way: a name an eval ran under stays own.
             Assert.AreEqual("Tools/Lab.cs:5", StackFrames.OwnFrame("Lab:Go () (at Tools/Lab.cs:5)", Bridge.ProjectRoot));

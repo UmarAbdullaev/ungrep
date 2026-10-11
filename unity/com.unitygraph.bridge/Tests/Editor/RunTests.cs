@@ -103,6 +103,33 @@ namespace UnityGraph.Bridge.Tests
             yield return Inner();
         }
 
+        public static int Doubles;
+
+        // Sequences that are their own enumerators too: printed, not stepped.
+        public static IEnumerable<string> Names()
+        {
+            yield return "a";
+            yield return "b";
+        }
+
+        public static IEnumerable<int> Doubled() => Enumerable.Range(1, 12).Select(i =>
+        {
+            Doubles++;
+            return i * 2;
+        });
+
+        public static IEnumerable<int> Broken() => new[] { 1, 0 }.Select(i => 1 / i);
+
+        public static IEnumerable<int> Endless()
+        {
+            while (true)
+            {
+                yield return 0;
+            }
+        }
+
+        public static Task<IEnumerable<int>> Ready() => Task.FromResult(Enumerable.Range(1, 3).Select(i => i * 2));
+
         public static TaskCompletionSource<bool> Pending;
 
         public static Task Forever() => Pending.Task;
@@ -453,6 +480,21 @@ namespace UnityGraph.Bridge.Tests
             }
 
             Assert.AreEqual("waiting|waiting|waiting|waiting|ran UnityGraph.Bridge.Tests.RunTargets.Steps() in N ms\n  result: finished after 3 steps", string.Join("|", polls));
+        }
+
+        [Test]
+        public void A_sequence_that_is_also_an_enumerator_is_enumerated_once_inside_the_call()
+        {
+            Assert.AreEqual("ran UnityGraph.Bridge.Tests.RunTargets.Names() in N ms\n  result: string[2] [\"a\", \"b\"]", Run("RunTargets.Names"));
+
+            // Cut, so the result file is written too: still one enumeration.
+            RunTargets.Doubles = 0;
+            Assert.AreEqual("  result: int[12] [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, ... +2 more] (+more: Library/unitygraph/result.txt)", Last(Run("RunTargets.Doubled")));
+            Assert.AreEqual(12, RunTargets.Doubles);
+
+            Assert.AreEqual("  result: int[3] [2, 4, 6]", Last(Run("RunTargets.Ready")));
+            StringAssert.StartsWith("  result: int[100000+] [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ... +99990 more]", Last(Run("RunTargets.Endless")));
+            StringAssert.StartsWith("error: UnityGraph.Bridge.Tests.RunTargets.Broken() threw after N ms: DivideByZeroException: ", Run("RunTargets.Broken"));
         }
 
         [UnityTest]

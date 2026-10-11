@@ -254,7 +254,11 @@ Game.Tools  3 static methods
   field is missing); anything else waits one update. A `Task<T>` prints its result (a plain `Task`
   none), an `IEnumerator` `finished after N steps` (N yields, nested ones counted). `--timeout`
   (default 60 s) bounds the wait: past it the answer is `<what> still running after 60 s; it goes
-  on in the editor`. Neither can be stopped from outside.
+  on in the editor`. Neither can be stopped from outside. A returned or awaited value that is
+  `IEnumerable` as well as `IEnumerator` (a LINQ query, an iterator method declared `IEnumerable`)
+  is a sequence, not a coroutine: it is enumerated once inside the call (its throw is the call's),
+  at most 100,000 items, and prints as the array `ToArray()` gives (purge-squad, 2026-10-11:
+  `FindAssets(...).Select(...)` answered `finished after 0 steps`).
 - **Synchronous code** runs on the main thread inside the request: the editor waits for it. A
   method that never returns freezes the editor; ug gives up after `--timeout` plus 5 s and says
   the method may still be running. Nothing stops it from outside: `Thread.Abort` on Unity's main
