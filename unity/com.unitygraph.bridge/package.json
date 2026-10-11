@@ -1,6 +1,6 @@
 {
   "name": "com.unitygraph.bridge",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "displayName": "unitygraph bridge",
   "description": "Editor-only bridge that lets the unitygraph CLI (ug) read the editor's state, compile, console and test results, run static editor methods, and open, inspect and edit scenes (through Undo, saved only when asked). Listens on 127.0.0.1 only.",
   "unity": "2022.3",

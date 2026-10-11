@@ -220,7 +220,7 @@ internal static partial class EditorCommands
         /// <summary>A C1 escape (`ug console --whole`, `ug inspect --field`, `--all`, ...): needs bridge 0.9.0.</summary>
         public bool Full { get; init; }
 
-        /// <summary>Play-mode debugging (`ug play --paused`, `--pause-on-error`): needs bridge 0.11.0.</summary>
+        /// <summary>Play-mode debugging (`ug play --paused`, `--pause-on-error`): needs bridge 0.13.0.</summary>
         public bool PlayDebug { get; init; }
 
         /// <summary>A request asked after the answer (and its wait), whose lines are printed instead: `/play/state`.</summary>
@@ -385,6 +385,7 @@ internal static partial class EditorCommands
     private static IEnumerable<Command> OpsCommands()
     {
         const string Address = "Object address: Player/Gun, Enemy#2, Main:Player, Assets/X.prefab:Child, or an asset path.";
+        const string OrComponent = " Or a component in place of --component: Player:Rigidbody (bridge 0.12.0).";
 
         Command scene = Ops("scene", "scene", "Loaded scenes: active, modified, root count; and the play state.", [], _ => new OpRequest("/scene"));
         Argument<string> openPath = Required("path", "Scene asset path, like Assets/Scenes/Main.unity.");
@@ -411,8 +412,8 @@ internal static partial class EditorCommands
         var playFor = new Option<int?>("--for") { Description = "Stay in play mode this many seconds (1 to 600), then stop and print the ug log digest." };
         var playStep = new Option<int?>("--step") { Description = "While paused, advance this many frames (1 to 600, default 1) and print what changed.", Arity = ArgumentArity.ZeroOrOne };
         Option<bool> playWhole = Flag("--whole", "With --for: the log's rows with their ids, whole messages and stacks (bridge 0.9.0).");
-        Option<bool> playPaused = Flag("--paused", "Start stopped on the first frame and print the frame and what loaded; then --step, inspect, eval (bridge 0.11.0).");
-        Option<bool> playOnError = Flag("--pause-on-error", "Pause at the first error or exception and print it, its frame and console id; the game stays paused. Alone, with --paused, or with --for (bridge 0.11.0).");
+        Option<bool> playPaused = Flag("--paused", "Start stopped on the first frame and print the frame and what loaded; then --step, inspect, eval (bridge 0.13.0).");
+        Option<bool> playOnError = Flag("--pause-on-error", "Pause at the first error or exception and print it, its frame and console id; the game stays paused. Alone, with --paused, or with --for (bridge 0.13.0).");
         yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log; --step advances paused frames; --paused starts on frame 1; --pause-on-error stops at the first error.", [playTimeout, playFor, playStep, playWhole, playPaused, playOnError], (root, config, r) =>
             Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor), r.GetResult(playStep) == null ? null : r.GetValue(playStep) ?? 1, r.GetValue(playWhole), r.GetValue(playPaused), r.GetValue(playOnError)));
         Option<int> stopTimeout = Seconds();
@@ -426,7 +427,7 @@ internal static partial class EditorCommands
         yield return Ops("tree", "tree", "The live hierarchy under an object: names, components, active state; --ui for a UI Toolkit visual tree.", [treeObject, depth, treeUi], r =>
             new OpRequest(Query("/tree", ("object", r.GetValue(treeObject)), ("depth", Number(r.GetValue(depth))), ("ui", r.GetValue(treeUi)))) { UiToolkit = r.GetValue(treeUi) != null, Option = r.GetValue(treeUi) != null ? "--ui" : null });
 
-        Argument<string> inspected = Required("object", Address + " Or a UI Toolkit element: Menu/Play.");
+        Argument<string> inspected = Required("object", Address + OrComponent + " Or a UI Toolkit element: Menu/Play.");
         Option<string?> inspectComponent = Text("--component", "Show this component's fields: its type name, #n for the n-th.");
         Option<bool> inspectImporter = Flag("--importer", "Show an asset's import settings.");
         Option<string?> inspectField = Text("--field", "One field whole, as ug set names it (waves, waves[2].count): every element and level (bridge 0.9.0).");
@@ -487,7 +488,7 @@ internal static partial class EditorCommands
             new OpRequest(Query("/component/remove", ("object", r.GetValue(removeFrom)), ("component", r.GetValue(component))), r.GetValue(removeFrom))));
         yield return components;
 
-        Argument<string> target = Required("object", Address + " Or a UI Toolkit element (live only, no undo): Menu/Play.");
+        Argument<string> target = Required("object", Address + OrComponent + " Or a UI Toolkit element (live only, no undo): Menu/Play.");
         Argument<string> field = Required("field", "Serialized or display name: speed, m_LocalPosition, waves[2].count, list.size. An element: text, tooltip, name, enabled, display, visibility, class (+a -b ~c), value, style.<uss name>.");
         Argument<string> value = Required("value", "Number, true/false, text, enum name, 1,2,3, #ff8800, an object address, an asset path, or null.");
         Option<string?> setComponent = Text("--component", "The component with the field. Default: the object, then the one component that has it.");
@@ -498,12 +499,12 @@ internal static partial class EditorCommands
                 r.GetValue(target)));
 
         var events = new Command("event", "List, add and remove the persistent calls of a UnityEvent field, like Button.onClick (unsaved until ug save).");
-        Argument<string> eventsOf = Required("object", Address);
+        Argument<string> eventsOf = Required("object", Address + OrComponent);
         Argument<string?> listedEvent = Optional("event", "Only this event, like onClick. Default: every event that has calls.");
         Option<string?> listComponent = Text("--component", "The component with the event.");
         events.Subcommands.Add(Ops("list", "event list", "Show the calls of an object's events.", [eventsOf, listedEvent, listComponent], r =>
             new OpRequest(Query("/event/list", ("object", r.GetValue(eventsOf)), ("event", r.GetValue(listedEvent)), ("component", r.GetValue(listComponent))))));
-        Argument<string> eventHolder = Required("object", Address);
+        Argument<string> eventHolder = Required("object", Address + OrComponent);
         Argument<string> eventName = Required("event", "The event field: onClick, onValueChanged, ...");
         Argument<string> eventTarget = Required("target", "Whose method to call: Canvas:UiHandler (a component), or an object address when one component has the method.");
         Argument<string> eventMethod = Required("method", "A public void method, or a property to set (enabled, text).");
@@ -513,7 +514,7 @@ internal static partial class EditorCommands
             new OpRequest(
                 Query("/event/add", ("object", r.GetValue(eventHolder)), ("event", r.GetValue(eventName)), ("target", r.GetValue(eventTarget)), ("method", r.GetValue(eventMethod)), ("component", r.GetValue(eventComponent)), ("arg", r.GetValue(eventArg))),
                 r.GetValue(eventHolder))));
-        Argument<string> eventFrom = Required("object", Address);
+        Argument<string> eventFrom = Required("object", Address + OrComponent);
         Argument<string> eventRemoved = Required("event", "The event field: onClick, ...");
         Argument<string?> eventIndex = Optional("index", "Which call (ug event list); optional when the event has one.");
         Option<string?> removeComponent = Text("--component", "The component with the event.");

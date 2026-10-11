@@ -132,7 +132,7 @@ namespace UnityGraph.Bridge
         // A component as `address:Component`, the form `ug set` takes; anything else as a reference.
         private static string ShowObject(UnityEngine.Object value) =>
             value is Component component
-                ? Reference(component.gameObject, 0) + ":" + Addresses.ComponentName(component)
+                ? ComponentReference(component)
                 : Reference(value, value.GetInstanceID());
 
         // Unity's value types as `ug inspect` prints them; null for other types.

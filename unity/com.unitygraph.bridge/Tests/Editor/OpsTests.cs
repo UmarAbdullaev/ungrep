@@ -157,6 +157,242 @@ namespace UnityGraph.Bridge.Tests
         }
     }
 
+    /// <summary>
+    /// `X:Y` read as an object and as a component (SPEC-editor-ops, Addressing objects). The scene
+    /// `Main` gets a root object `Main` with an AudioSource, as purge-squad's `Boot` has.
+    /// </summary>
+    public class ComponentAddressTests : OpsFixture
+    {
+        private const string Unsaved = "  (Main.unity modified, not saved)";
+        private const string Both = "ambiguous: Main:AudioSource is the object Main:/AudioSource or the component Main:Main:AudioSource";
+
+        private AudioSource _source;
+
+        [SetUp]
+        public void AddAnObjectNamedAfterTheScene()
+        {
+            _source = new GameObject("Main").AddComponent<AudioSource>();
+        }
+
+        private static Object Resolve(string address)
+        {
+            Object found = Addresses.FindObjectOrComponent(address, out string error);
+            Assert.IsNull(error, error);
+            return found;
+        }
+
+        private static string Problem(string address)
+        {
+            Assert.IsNull(Addresses.FindObjectOrComponent(address, out string error));
+            return error;
+        }
+
+        [Test]
+        public void Only_the_component_reading_names_the_component()
+        {
+            UgProbe probe = Find("Level/Player").GetComponent<UgProbe>();
+            Assert.AreSame(_source, Resolve("Main:AudioSource"));
+            Assert.AreSame(probe, Resolve("Level/Player:UgProbe"));
+            Assert.AreSame(probe, Resolve("Main:Level/Player:ugprobe"));
+            Assert.AreSame(Find("Camera").transform, Resolve("Camera:Transform#1"));
+            Assert.AreSame(Find(PrefabPath + ":Barrel").transform, Resolve(PrefabPath + ":Barrel:Transform"));
+        }
+
+        [Test]
+        public void Only_the_object_reading_names_the_object()
+        {
+            Assert.AreSame(Find("Camera"), Resolve("Main:Camera"));
+            Assert.AreSame(Find("Level/Player"), Resolve("Main:Level/Player"));
+            Assert.AreSame(Find(PrefabPath + ":Barrel"), Resolve(PrefabPath + ":Barrel"));
+            Assert.IsInstanceOf<Material>(Resolve(MaterialPath));
+        }
+
+        [Test]
+        public void Both_readings_are_ambiguous_and_each_answered_form_names_one()
+        {
+            var named = new GameObject("AudioSource");
+
+            Assert.AreEqual(Both, Problem("Main:AudioSource"));
+            Assert.AreSame(named, Resolve("Main:/AudioSource"));
+            Assert.AreSame(_source, Resolve("Main:Main:AudioSource"));
+        }
+
+        [Test]
+        public void A_reading_that_finds_several_still_matches()
+        {
+            new GameObject("AudioSource");
+            new GameObject("AudioSource");
+            Assert.AreEqual(Both, Problem("Main:AudioSource"));
+            Assert.AreEqual("ambiguous: AudioSource (2 in Main): AudioSource#1, AudioSource#2", Problem("Main:/AudioSource"));
+
+            Object.DestroyImmediate(Find("AudioSource#1"));
+            Object.DestroyImmediate(Find("AudioSource"));
+            _source.gameObject.AddComponent<AudioSource>();
+            Assert.AreEqual("ambiguous: Main has 2 AudioSource: AudioSource#1, AudioSource#2", Problem("Main:AudioSource"));
+            Assert.AreSame(_source, Resolve("Main:AudioSource#1"));
+        }
+
+        [Test]
+        public void An_ambiguous_object_before_the_last_colon_is_a_reading_that_finds_several()
+        {
+            Scene other = EditorSceneManager.OpenScene(OtherPath, OpenSceneMode.Additive);
+            Assert.AreEqual("ambiguous: Camera (2 in the loaded scenes): Main:Camera, Other:Camera", Problem("Camera:Transform"));
+            Assert.AreSame(Find("Main:Camera").transform, Resolve("Main:Camera:Transform"));
+            Assert.AreEqual("not found: Camera:Nothing in the loaded scenes", Problem("Camera:Nothing"));
+
+            new GameObject("Other");
+            SceneManager.MoveGameObjectToScene(new GameObject("Other"), other);
+            SceneManager.MoveGameObjectToScene(new GameObject("Transform"), other);
+            Assert.AreEqual(
+                "ambiguous: Other:Transform is the object Other:/Transform or a component of Other (2 in the loaded scenes): Main:Other, Other:Other",
+                Problem("Other:Transform"));
+            Assert.AreSame(Find("Other:Other").transform, Resolve("Other:Other:Transform"));
+            Assert.AreEqual("Transform", ((GameObject)Resolve("Other:/Transform")).name);
+        }
+
+        [Test]
+        public void A_prefab_roots_component_is_named_with_an_empty_path_when_a_child_has_its_name()
+        {
+            string path = Folder + "/Probe.prefab";
+            var made = new GameObject("Probe");
+            made.AddComponent<UgProbe>();
+            new GameObject("UgProbe").transform.SetParent(made.transform);
+            PrefabUtility.SaveAsPrefabAsset(made, path);
+            Object.DestroyImmediate(made);
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            GameObject child = root.transform.GetChild(0).gameObject;
+
+            Assert.AreEqual(
+                "ambiguous: " + path + ":UgProbe is the object " + path + ":/UgProbe or the component " + path + "::UgProbe",
+                Problem(path + ":UgProbe"));
+            Assert.AreSame(child, Resolve(path + ":/UgProbe"));
+            Assert.AreSame(root.GetComponent<UgProbe>(), Resolve(path + "::UgProbe"));
+            Assert.AreEqual(path + ":/UgProbe", Addresses.Of(child));
+            Assert.AreEqual(path + "::UgProbe", Addresses.Of(root.GetComponent<UgProbe>()));
+
+            StringAssert.StartsWith("{\"lines\":[\"" + path + "  UgProbe.speed  5 -> 9", Ask("/set", "object", path + "::UgProbe", "field", "speed", "value", "9"));
+            Assert.AreEqual(9f, AssetDatabase.LoadAssetAtPath<GameObject>(path).GetComponent<UgProbe>().speed);
+        }
+
+        [Test]
+        public void Printed_addresses_read_back_one_way()
+        {
+            UgProbe probe = Find("Level/Player").GetComponent<UgProbe>();
+            var named = new GameObject("AudioSource");
+            Assert.AreEqual("AudioSource", Addresses.Of(named));
+            Assert.AreEqual("Main:Main:AudioSource", Addresses.Of(_source));
+            Assert.AreEqual("Level/Player:UgProbe", Addresses.Of(probe));
+            Object.DestroyImmediate(named);
+            Assert.AreEqual("Main:AudioSource", Addresses.Of(_source));
+
+            EditorSceneManager.OpenScene(OtherPath, OpenSceneMode.Additive);
+            named = new GameObject("AudioSource");
+            Assert.AreEqual("Main:/AudioSource", Addresses.Of(named));
+            Assert.AreEqual("Main:Camera", Addresses.Of(Find("Main:Camera")));
+            Assert.AreEqual("Main:Main:AudioSource", Addresses.Of(_source));
+            Assert.AreEqual("Main:Level/Player:UgProbe", Addresses.Of(probe));
+            Assert.AreSame(named, Resolve(Addresses.Of(named)));
+            Assert.AreSame(_source, Resolve(Addresses.Of(_source)));
+            Assert.AreSame(probe, Resolve(Addresses.Of(probe)));
+        }
+
+        [Test]
+        public void Events_take_a_component_address_as_the_holder()
+        {
+            Find("Level/Player").AddComponent<UgEvents>();
+            Assert.AreEqual(
+                Lines("Level/Player  UgEvents.fired  + Main:AudioSource.Stop()" + Unsaved),
+                Ask("/event/add", "object", "Level/Player:UgEvents", "event", "fired", "target", "Main:AudioSource", "method", "Stop"));
+            Assert.AreEqual(Ask("/event/list", "object", "Level/Player", "component", "UgEvents"), Ask("/event/list", "object", "Level/Player:UgEvents"));
+
+            _source.gameObject.AddComponent<UgEvents>();
+            new GameObject("UgEvents");
+            string both = "ambiguous: Main:UgEvents is the object Main:/UgEvents or the component Main:Main:UgEvents";
+            Assert.AreEqual(Err(both), Ask("/event/list", "object", "Main:UgEvents"));
+            Assert.AreEqual(Err(both), Ask("/event/add", "object", "Main:UgEvents", "event", "fired", "target", "Main:Main:AudioSource", "method", "Stop"));
+            Assert.AreEqual(Err("Main  UgEvents.fired has no calls"), Ask("/event/remove", "object", "Main:Main:UgEvents", "event", "fired"));
+            Assert.AreEqual(Err("not found: Nobody:UgEvents in the loaded scenes"), Ask("/event/list", "object", "Nobody:UgEvents"));
+
+            Assert.AreEqual(
+                Lines("Level/Player  UgEvents.fired  - Main:AudioSource.Stop()" + Unsaved),
+                Ask("/event/remove", "object", "Level/Player:UgEvents", "event", "fired"));
+        }
+
+        [Test]
+        public void Neither_reading_says_what_each_missed()
+        {
+            Assert.AreEqual("not found: AudioSrc in Main; Main has no AudioSrc (has: Transform, AudioSource)", Problem("Main:AudioSrc"));
+            Assert.AreEqual("Camera has no Rigidbody (has: Transform)", Problem("Camera:Rigidbody"));
+            Assert.AreEqual("Main has 1 AudioSource, not 2", Problem("Main:Main:AudioSource#2"));
+            Assert.AreEqual("not found: Nobody:Rigidbody in the loaded scenes", Problem("Nobody:Rigidbody"));
+            Assert.AreEqual("not found: Nobody:Rigidbody in Main", Problem("Main:Nobody:Rigidbody"));
+            Assert.AreEqual(
+                "not found: Barel in " + PrefabPath + " (near: Barrel); " + PrefabPath + " has no Barel (has: Transform)",
+                Problem(PrefabPath + ":Barel"));
+            Assert.AreEqual("no object given", Problem(" "));
+        }
+
+        [Test]
+        public void Set_and_inspect_take_a_component_address_as_the_flag()
+        {
+            string byAddress = Ask("/set", "object", "Main:AudioSource", "field", "volume", "value", "0.25");
+            StringAssert.StartsWith("{\"lines\":[\"Main  AudioSource.", byAddress);
+            StringAssert.EndsWith(Unsaved + "\"]}", byAddress);
+            Assert.AreEqual(0.25f, _source.volume);
+            Undo.PerformUndo();
+            Assert.AreEqual(1f, _source.volume);
+            Assert.AreEqual(Ask("/set", "object", "Main", "component", "AudioSource", "field", "volume", "value", "0.25"), byAddress);
+
+            Assert.AreEqual(Ask("/inspect", "object", "Level/Player", "component", "UgProbe"), Ask("/inspect", "object", "Level/Player:UgProbe"));
+            Assert.AreEqual(
+                Ask("/inspect", "object", "Main", "component", "AudioSource", "field", "volume"),
+                Ask("/inspect", "object", "Main:AudioSource", "field", "volume"));
+            StringAssert.StartsWith("{\"lines\":[\"Main  AudioSource  volume  ", Ask("/inspect", "object", "Main:AudioSource", "field", "volume"));
+        }
+
+        [Test]
+        public void With_the_component_flag_the_address_is_an_object()
+        {
+            Assert.AreEqual(Err("not found: AudioSource in Main"), Ask("/set", "object", "Main:AudioSource", "component", "AudioSource", "field", "volume", "value", "0.5"));
+            Assert.AreEqual(Err("not found: AudioSource in Main"), Ask("/inspect", "object", "Main:AudioSource", "component", "AudioSource"));
+            Assert.AreEqual(1f, _source.volume);
+        }
+
+        [Test]
+        public void Set_and_inspect_answer_both_readings_and_the_neither_case()
+        {
+            new GameObject("AudioSource");
+            Assert.AreEqual(Err(Both), Ask("/set", "object", "Main:AudioSource", "field", "volume", "value", "0.25"));
+            Assert.AreEqual(Err(Both), Ask("/inspect", "object", "Main:AudioSource"));
+            Assert.AreEqual(1f, _source.volume);
+
+            StringAssert.StartsWith("{\"lines\":[\"Main  AudioSource.", Ask("/set", "object", "Main:Main:AudioSource", "field", "volume", "value", "0.25"));
+            Assert.AreEqual(0.25f, _source.volume);
+            Assert.AreEqual(Err("not found: AudioSrc in Main; Main has no AudioSrc (has: Transform, AudioSource)"), Ask("/inspect", "object", "Main:AudioSrc"));
+        }
+
+        [Test]
+        public void References_event_targets_and_memory_read_both_ways_too()
+        {
+            Find("Level/Player").AddComponent<UgEvents>();
+            Assert.AreEqual(
+                Lines("Level/Player  UgEvents.fired  + Main:AudioSource.Stop()" + Unsaved),
+                Ask("/event/add", "object", "Level/Player", "event", "fired", "target", "Main:AudioSource", "method", "Stop"));
+            StringAssert.StartsWith("{\"lines\":[\"Main:AudioSource  AudioSource  ", Ask("/perf/memory", "object", "Main:AudioSource"));
+
+            new GameObject("AudioSource");
+            StringAssert.Contains(Both, Ask("/set", "object", "Level/Player", "component", "UgProbe", "field", "target", "value", "Main:AudioSource"));
+            StringAssert.Contains(Both, Ask("/event/add", "object", "Level/Player", "event", "fired", "target", "Main:AudioSource", "method", "Stop"));
+            Assert.AreEqual(Err(Both), Ask("/perf/memory", "object", "Main:AudioSource"));
+            Assert.AreEqual(
+                Lines("Level/Player  UgProbe.target  null -> AudioSource" + Unsaved),
+                Ask("/set", "object", "Level/Player", "component", "UgProbe", "field", "target", "value", "Main:/AudioSource"));
+            Assert.AreEqual(
+                Lines("Level/Player  UgEvents.fired  + Main:Main:AudioSource.Stop()" + Unsaved),
+                Ask("/event/add", "object", "Level/Player", "event", "fired", "target", "Main:Main:AudioSource", "method", "Stop"));
+        }
+    }
+
     public class SceneOpsTests : OpsFixture
     {
         [Test]

@@ -112,7 +112,7 @@ with `--for <s>` (1 to 600) it then waits `s` seconds, runs `ug stop`, and print
 digest: one call instead of play, sleep, stop, log. A refusal from `play` (compile errors, already
 playing) ends it there; if the editor was stopped meanwhile, the stop answer says so and the digest
 is still printed. Under 30 lines of code: no new bridge request. With `--pause-on-error` (bridge
-0.11.0) the wait ends early when the editor pauses at the first error: the error is printed and the
+0.13.0) the wait ends early when the editor pauses at the first error: the error is printed and the
 game left paused (SPEC-editor-ops, Play-mode debugging).
 
 ## Bridge change

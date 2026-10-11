@@ -41,8 +41,8 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge with the C1 escapes: whole console and test failures, `--field`/`--from`, `--all`, prefab overrides (SPEC-editor-link, Bridge 0.9.0).</summary>
     public const string MinimumFullBridge = "0.9.0";
 
-    /// <summary>The oldest bridge with play-mode debugging: `/play?paused=&amp;onerror=`, `/play/state` (SPEC-editor-link, Bridge 0.11.0).</summary>
-    public const string MinimumPlayDebugBridge = "0.11.0";
+    /// <summary>The oldest bridge with play-mode debugging: `/play?paused=&amp;onerror=`, `/play/state` (SPEC-editor-link, Bridge 0.13.0).</summary>
+    public const string MinimumPlayDebugBridge = "0.13.0";
 
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 

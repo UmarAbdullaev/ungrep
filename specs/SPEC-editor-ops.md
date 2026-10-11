@@ -92,6 +92,43 @@ and a field typed `Object` (like `UnityEvent`'s `m_Target`) gets the component, 
 object. A game object address in a component-typed field still means that object's component of
 the field's type. Reads print a component held in an `Object` field the same way, `Canvas:UiHandler`.
 
+From bridge 0.12.0 a component address is also the `<object>` of `ug inspect`, `ug set` and
+`ug event list|add|remove` when no `--component` is given: `ug set Boot:AudioSource volume 0.25`
+is `ug set Boot volume 0.25 --component AudioSource`, `ug inspect Canvas:UiHandler` lists that
+component's fields, and `ug event list Canvas:UiHandler` that component's events. With
+`--component` the address is an object address, as before. Before 0.12.0 these commands read the
+whole address as an object (`not found: Canvas:UiHandler in the loaded scenes`).
+
+`X:Y` reads two ways, and every place that takes a component address (the object of `inspect`,
+`set` and `event`, a reference value in `set`, an event target, `perf memory --object`) tries both:
+
+- the object reading: the whole address as an object, `Y` in the loaded scene or prefab asset `X`
+  (or, when `X` is neither, an object whose name holds the `:`);
+- the component reading: the part after the last `:` is a component of the object the part
+  before it names.
+
+A reading matches when it finds what it names, or finds several (its own `ambiguous:` answer; for
+the component reading also when the part before the last `:` names several objects and the part
+after it is a component type's name, as `Camera:Transform` with two scenes loaded, each with a
+`Camera`: `Main:Camera:Transform` picks one).
+
+| Matches | Answer |
+| --- | --- |
+| Only the object reading | That object. `Main:Player` in a project without an object `Main`. |
+| Only the component reading | That component. `Boot:AudioSource` where scene `Boot` has no root `AudioSource` and the object `Boot` has an AudioSource. |
+| Both | `ambiguous: Boot:AudioSource is the object Boot:/AudioSource or the component Boot:Boot:AudioSource`. Each form matches one reading only: the object form puts a `/` after the scene or prefab, so nothing after the last `:` can be a component type; the component form names its object with the scene in front, so the object reading looks for one object named `Boot:AudioSource`. A component of a prefab asset's root is given as `Assets/X.prefab::Rigidbody` (the empty path after `Assets/X.prefab:` is the root). An object before the last `:` that is itself ambiguous gives its candidates instead: `... or a component of Other (2 in the loaded scenes): Main:Other, Other:Other`. |
+| Neither | The object reading's `not found:` when the part before the last `:` names no object; else that object's `<object> has no Y (has: ...)`, after the object reading's `not found: Y in X (near: ...)` and `; ` when `X` is a loaded scene or a prefab asset (`Boot:AudioSrc` is a typo of either). |
+
+Answers print addresses that read one way only, so a printed address can be passed back as is.
+An object prints as `Main:/Camera` (two or more scenes loaded) or `Assets/X.prefab:/Camera` when
+`Main:Camera` would also read as the Camera of an object `Main`, or `Assets/X.prefab:Camera` as
+the prefab root's Camera; a component prints as `Main:Main:AudioSource` or
+`Assets/X.prefab::AudioSource` when the short form would also name an object. Otherwise the short
+forms print, as before 0.12.0.
+
+An object whose name holds a `:` can match both readings under any form: rename it (as names with
+`/`, which `ug` refuses).
+
 ## Endpoints
 
 All `GET` with query parameters, token and origin checks as in editor-link, answered on the main
@@ -106,9 +143,9 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/scene` | Loaded scenes: path, active, modified, loaded, root count; play state. |
 | `/scene/open?path=&additive=` | Opens a scene. Refused while playing, and (without `additive`) while any loaded scene is modified: the answer names them. |
 | `/save?path=` | Saves modified loaded scenes (or the one given) and dirty assets. The only request that writes scene or asset files. |
-| `/play`, `/stop`, `/pause` | Sets `EditorApplication.isPlaying`/`isPaused`. `/play` is refused while compile errors exist. Answers at once; the client waits for the state (domain reloads handled as in the compile flow). `/stop` answers the play session's time and error/warning counts. Bridge 0.11.0 adds `/play?paused=&onerror=` and `/play/state`: Play-mode debugging. |
+| `/play`, `/stop`, `/pause` | Sets `EditorApplication.isPlaying`/`isPaused`. `/play` is refused while compile errors exist. Answers at once; the client waits for the state (domain reloads handled as in the compile flow). `/stop` answers the play session's time and error/warning counts. Bridge 0.13.0 adds `/play?paused=&onerror=` and `/play/state`: Play-mode debugging. |
 | `/tree?object=&depth=` | Children of an object (or the roots of the loaded scenes) to `depth` (default 2): name, active, components, child count past the depth. At most 200 lines. |
-| `/inspect?object=&component=` | Components of an object, or one component's visible serialized fields: name, type, value (object references as addresses or asset paths; arrays with length and the first 10 items). At most 150 lines. Bridge 0.9.0 adds `field=` (one field whole) and `from=` (paging): Nothing out of reach. |
+| `/inspect?object=&component=` | Components of an object, or one component's visible serialized fields: name, type, value (object references as addresses or asset paths; arrays with length and the first 10 items). At most 150 lines. Bridge 0.9.0 adds `field=` (one field whole) and `from=` (paging): Nothing out of reach. From bridge 0.12.0 `object` may be a component address when `component` is empty (Addressing objects). |
 | `/object/create?name=&parent=&prefab=&primitive=` | New empty object, primitive, or a prefab instance kept linked to its prefab. |
 | `/object/delete?object=` | Deletes an object and its children. |
 | `/object/rename?object=&name=` | |
@@ -116,10 +153,10 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/object/active?object=&value=` | `SetActive`. |
 | `/component/add?object=&type=` | Refused for types that are not components or not found. |
 | `/component/remove?object=&component=` | Refused when another component requires it. |
-| `/event/list?object=&event=&component=` | The persistent calls of the UnityEvents on an object (`Button.onClick`, a script's `UnityEvent` fields): `addr  Comp.event`, then `  0  Target:Comp.Method(arg)` per call, `(event argument)` for a dynamic call, `off` or `editor and runtime` when the call state is not runtime only. Without `event`, every event that has calls; with it, that event (also when empty). `component` when two components have the event. |
-| `/event/add?object=&event=&target=&method=&arg=&component=` | Appends one call through `SerializedObject` (one Undo group, `ug event add`, RuntimeOnly state as in the inspector). `target` is a component address (`Canvas:UiHandler`) or a game object address (the component with the method; the game object itself for `SetActive`). `method` is a public instance `void` method with no argument, or one `int`, `float`, `string`, `bool` or `Object` argument (`arg` is then required), or the event's own argument type (taken from the event when `arg` is absent); a property is `set_<name>` or just `<name>`. Inside a prefab asset the target must be in the same prefab (`Assets/X.prefab:Obj:Comp`); the asset is written at once. Refusals name the methods the target has. |
-| `/event/remove?object=&event=&index=&component=` | Removes one call (the only one, or `index`; several without `index` is refused with the count). |
-| `/set?object=&component=&field=&value=` | Sets one serialized field through `SerializedObject`. Without `component`, the field is looked up on the game object (name, tag, layer, active, static) and then on its components; two components with the field is ambiguous. |
+| `/event/list?object=&event=&component=` | The persistent calls of the UnityEvents on an object (`Button.onClick`, a script's `UnityEvent` fields): `addr  Comp.event`, then `  0  Target:Comp.Method(arg)` per call, `(event argument)` for a dynamic call, `off` or `editor and runtime` when the call state is not runtime only. Without `event`, every event that has calls; with it, that event (also when empty). `component` when two components have the event. From bridge 0.12.0 `object` may be a component address when `component` is empty (Addressing objects). |
+| `/event/add?object=&event=&target=&method=&arg=&component=` | Appends one call through `SerializedObject` (one Undo group, `ug event add`, RuntimeOnly state as in the inspector). `target` is a component address (`Canvas:UiHandler`) or a game object address (the component with the method; the game object itself for `SetActive`). `method` is a public instance `void` method with no argument, or one `int`, `float`, `string`, `bool` or `Object` argument (`arg` is then required), or the event's own argument type (taken from the event when `arg` is absent); a property is `set_<name>` or just `<name>`. Inside a prefab asset the target must be in the same prefab (`Assets/X.prefab:Obj:Comp`); the asset is written at once. Refusals name the methods the target has. From bridge 0.12.0 `object` may be a component address when `component` is empty (Addressing objects). |
+| `/event/remove?object=&event=&index=&component=` | Removes one call (the only one, or `index`; several without `index` is refused with the count). From bridge 0.12.0 `object` may be a component address when `component` is empty (Addressing objects). |
+| `/set?object=&component=&field=&value=` | Sets one serialized field through `SerializedObject`. Without `component`, the field is looked up on the game object (name, tag, layer, active, static) and then on its components; two components with the field is ambiguous. From bridge 0.12.0 `object` may be a component address when `component` is empty (Addressing objects). |
 
 Added for parity (O6–O9; same rules, same answer shape):
 
@@ -534,7 +571,7 @@ flags need bridge 0.9.0 and are refused by name on an older one (SPEC-editor-lin
   items, two levels, 200 members); the play digest's object snapshot (20,000 objects:
   SPEC-play-input, Digest). Each says where it cut.
 
-## Play-mode debugging (I5, bridge 0.11.0)
+## Play-mode debugging (I5, bridge 0.13.0)
 
 Requested by the user on 2026-10-11: stop the game where a problem starts, then read it with
 `ug inspect`, `ug tree`, `ug eval` and `ug play --step`. Play mode only, nothing saved, answers in
@@ -609,7 +646,7 @@ Boot has already started loading GalaxyMap), and an error scrolls past while the
   (at most 5 s) and is refused in edit mode with `not playing: ug play first`. The client asks
   `/play/state` after `/play` (and its wait) whenever `--paused` or `--pause-on-error` is given,
   and after `--for` sees a pause. An older bridge refuses the flags by name before any request:
-  `bridge 0.10.0 is too old for ug play --paused: run ug bridge install again`. `ug batch` takes
+  `bridge 0.12.0 is too old for ug play --paused: run ug bridge install again`. `ug batch` takes
   them as steps.
 - **Usage errors** (exit 1): `--paused and --for cannot be used together`, `--step cannot be used
   with --paused or --pause-on-error` (`ug play --paused --pause-on-error`, then `--step`).
@@ -999,9 +1036,10 @@ With idle cost, file form:
 ## Testing
 
 - EditMode tests in the package (BridgeHost, batch mode): addressing (paths, `#n`, scene prefix,
-  prefab contents, ambiguity), every endpoint, each safety rule (undo reverts, nothing saved,
-  modified scene blocks `open`, refused while compiling is covered by the handler check), value
-  parsing per field type.
+  prefab contents, ambiguity; component addresses and their two readings, each row of that table,
+  each answered form resolving to its reading alone, printed addresses reading back one way),
+  every endpoint, each safety rule (undo reverts, nothing saved, modified scene blocks `open`,
+  refused while compiling is covered by the handler check), value parsing per field type.
 - Client and CLI tests against the fake bridge: answer formatting and refusals.
 - `UG_UNITY` end to end on a copy of BridgeHost (`Assets/Scenes/Main.unity`,
   `Assets/Prefabs/Turret.prefab`, `Assets/Scripts/Turret.cs`): open a scene, tree, inspect,

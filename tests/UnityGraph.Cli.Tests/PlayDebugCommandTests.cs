@@ -87,10 +87,10 @@ public sealed class PlayDebugCommandTests : LoopFixture
     [InlineData("--pause-on-error")]
     public void An_older_bridge_refuses_the_flags_by_name_before_any_request(string flag)
     {
-        Serve(_ => null, bridge: "0.10.0");
+        Serve(_ => null, bridge: "0.12.0");
 
-        Assert.Equal("bridge 0.10.0 is too old for ug play " + flag + ": run ug bridge install again\n", Run("play", flag).Output);
-        Assert.Equal("bridge 0.10.0 is too old for ug play --pause-on-error: run ug bridge install again\n", Run("play", "--for", "2", "--pause-on-error").Output);
+        Assert.Equal("bridge 0.12.0 is too old for ug play " + flag + ": run ug bridge install again\n", Run("play", flag).Output);
+        Assert.Equal("bridge 0.12.0 is too old for ug play --pause-on-error: run ug bridge install again\n", Run("play", "--for", "2", "--pause-on-error").Output);
         Assert.DoesNotContain(Bridge.Requests, r => r.StartsWith("/play", StringComparison.Ordinal));
     }
 
@@ -178,7 +178,7 @@ public sealed class PlayDebugCommandTests : LoopFixture
     }
 
     // A bridge answering with handle; null answers the status as idle.
-    private void Serve(Func<string, (int, string)?> handle, string bridge = "0.11.0")
+    private void Serve(Func<string, (int, string)?> handle, string bridge = "0.13.0")
     {
         Bridge.Publish(Root, bridge);
         Bridge.Handle = path => handle(path) ?? (200, FakeBridge.Status("idle", 3));

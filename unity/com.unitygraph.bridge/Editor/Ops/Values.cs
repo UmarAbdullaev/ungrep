@@ -226,11 +226,10 @@ namespace UnityGraph.Bridge
                 case SerializedPropertyType.Color:
                     return Numbers(p.colorValue.r, p.colorValue.g, p.colorValue.b, p.colorValue.a);
                 case SerializedPropertyType.ObjectReference:
-                    string reference = Reference(p.objectReferenceValue, p.objectReferenceInstanceIDValue);
                     // A field typed plain Object (a UnityEvent target) names which component it holds.
                     return p.objectReferenceValue is Component held && ReferenceType(p) == typeof(UnityEngine.Object)
-                        ? reference + ":" + Addresses.ComponentName(held)
-                        : reference;
+                        ? ComponentReference(held)
+                        : Reference(p.objectReferenceValue, p.objectReferenceInstanceIDValue);
                 case SerializedPropertyType.ExposedReference:
                     return Reference(p.exposedReferenceValue, 0);
                 case SerializedPropertyType.LayerMask:
@@ -420,12 +419,12 @@ namespace UnityGraph.Bridge
             }
 
             GameObject owner = value as GameObject ?? (value as Component)?.gameObject;
-            string path = AssetDatabase.GetAssetPath(value);
-            if (owner != null && (!EditorUtility.IsPersistent(owner) || path.EndsWith(".prefab", StringComparison.Ordinal)))
+            if (owner != null && Addressed(owner))
             {
                 return Addresses.Of(owner);
             }
 
+            string path = AssetDatabase.GetAssetPath(value);
             if (string.IsNullOrEmpty(path))
             {
                 return value.name + " (not saved)";
@@ -438,6 +437,14 @@ namespace UnityGraph.Bridge
 
             return AssetDatabase.IsMainAsset(value) ? path : path + ":" + value.name;
         }
+
+        /// <summary>A component as the address `ug set` takes (`Canvas:UiHandler`); its object as <see cref="Reference"/> names it otherwise.</summary>
+        public static string ComponentReference(Component component) =>
+            Addressed(component.gameObject) ? Addresses.Of(component) : Reference(component.gameObject, 0) + ":" + Addresses.ComponentName(component);
+
+        // Scene objects and prefab objects print as addresses; other assets' objects by asset path.
+        private static bool Addressed(GameObject owner) =>
+            !EditorUtility.IsPersistent(owner) || AssetDatabase.GetAssetPath(owner).EndsWith(".prefab", StringComparison.Ordinal);
 
         public static string Number(float value) => value.ToString("G7", CultureInfo.InvariantCulture);
 
@@ -549,14 +556,10 @@ namespace UnityGraph.Bridge
                 return found;
             }
 
-            found = Addresses.FindObject(text, out error);
+            found = Addresses.FindObjectOrComponent(text, out error);
             if (found == null)
             {
-                found = FindComponent(text, ref error);
-                if (found == null)
-                {
-                    return null;
-                }
+                return null;
             }
 
             if (wanted.IsInstanceOfType(found))
@@ -580,26 +583,6 @@ namespace UnityGraph.Bridge
 
             error = text + " has no " + wanted.Name;
             return null;
-        }
-
-        // `Canvas:UiHandler` or `Main:Canvas/Button:Button#2`: a component of the object named before the last colon.
-        private static Component FindComponent(string text, ref string error)
-        {
-            int colon = text.LastIndexOf(':');
-            if (colon <= 0 || colon == text.Length - 1)
-            {
-                return null;
-            }
-
-            GameObject owner = Addresses.Find(text.Substring(0, colon), out _);
-            if (owner == null)
-            {
-                return null;
-            }
-
-            Component component = Addresses.Component(owner, text.Substring(colon + 1), out string problem);
-            error = component == null ? problem : null;
-            return component;
         }
 
         internal static string LayerMaskText(int mask)

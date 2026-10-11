@@ -187,7 +187,7 @@ background). Answer `waited 2.0 s`.
 With the editor paused, advances `N` frames (1 to 600, default 1, one `EditorApplication.Step` each
 update) and prints the digest. Answer `stepped 5 frames (frame 1042)`. Refused when not paused:
 `not paused: ug pause first`. `--step` and `--for` together are a usage error (exit 1). With an error
-pause armed it stops at the frame that paused (`ug play --paused --pause-on-error`, bridge 0.11.0:
+pause armed it stops at the frame that paused (`ug play --paused --pause-on-error`, bridge 0.13.0:
 SPEC-editor-ops, Play-mode debugging).
 
 ### Digest and `--shot` (I4)
@@ -212,7 +212,7 @@ Parts, in this order, joined with `; `, left out when empty; with none: `nothing
   = more than 0.01); at most 3 named, then `+N more (Library/unitygraph/digest.txt)` (C1). Component values are not compared
   (`ug inspect` reads them). Above 20,000 objects the part is `objects not compared (over 20000, ...)` (C1).
 - **play**: `play stopped` when the game left play mode meanwhile (a script quit, an exception
-  stopped it): the answer ends there. From bridge 0.11.0, `paused at the first error #4105 (frame
+  stopped it): the answer ends there. From bridge 0.13.0, `paused at the first error #4105 (frame
   214)` when an armed error pause fired meanwhile, else `paused` when the editor paused under the
   action; a pause ends the action's hold at once, since no frame will come (SPEC-editor-ops,
   Play-mode debugging).
