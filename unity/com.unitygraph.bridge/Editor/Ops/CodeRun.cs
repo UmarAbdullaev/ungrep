@@ -356,7 +356,8 @@ namespace UnityGraph.Bridge
                     }
                 }
 
-                return value is IEnumerator steps ? new Stepped(steps) : null;
+                // A sequence is a value: the object C# makes for an IEnumerable<T> iterator is its IEnumerator too.
+                return value is IEnumerator steps && !(value is IEnumerable) ? new Stepped(steps) : null;
             }
         }
 

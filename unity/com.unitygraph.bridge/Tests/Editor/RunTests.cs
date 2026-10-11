@@ -103,6 +103,12 @@ namespace UnityGraph.Bridge.Tests
             yield return Inner();
         }
 
+        public static IEnumerable<int> Sequence()
+        {
+            yield return 1;
+            yield return 2;
+        }
+
         public static TaskCompletionSource<bool> Pending;
 
         public static Task Forever() => Pending.Task;
@@ -453,6 +459,13 @@ namespace UnityGraph.Bridge.Tests
             }
 
             Assert.AreEqual("waiting|waiting|waiting|waiting|ran UnityGraph.Bridge.Tests.RunTargets.Steps() in N ms\n  result: finished after 3 steps", string.Join("|", polls));
+        }
+
+        [Test]
+        public void A_returned_sequence_prints_its_items_though_its_object_is_an_enumerator_too()
+        {
+            Assert.IsInstanceOf<IEnumerator>(RunTargets.Sequence());
+            Assert.AreEqual("ran UnityGraph.Bridge.Tests.RunTargets.Sequence() in N ms\n  result: IEnumerable<int>[2] [1, 2]", Run("RunTargets.Sequence"));
         }
 
         [UnityTest]
