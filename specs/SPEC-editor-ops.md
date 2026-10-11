@@ -74,9 +74,9 @@ Every command that takes an `<object>` accepts:
 
 | Form | Means |
 | --- | --- |
-| `Player/Model/Hand` | A game object in the loaded scenes, by names from the root. A leading `/` is allowed. |
+| `Player/Model/Hand` | A game object in the loaded scenes, by names from the root. A leading `/` is allowed. In play mode the loaded scenes include `DontDestroyOnLoad` while it holds objects (O14). |
 | `Enemy#2` (any segment) | The second sibling named `Enemy` (1-based, hierarchy order). Plain `Enemy` among several is ambiguous. |
-| `Main:Player/Model` | Only in the loaded scene named `Main` (file name without `.unity`), for names found in several scenes. |
+| `Main:Player/Model` | Only in the loaded scene named `Main` (file name without `.unity`), for names found in several scenes; `DontDestroyOnLoad:Boot` in play mode's kept objects. |
 | `Assets/Prefabs/Turret.prefab` | A prefab asset's root; `Assets/Prefabs/Turret.prefab:Barrel/Muzzle` an object inside it. |
 | `Assets/Data/Wave1.asset` | A ScriptableObject or other asset's main object (for `inspect` and `set`). |
 
@@ -140,7 +140,7 @@ appends the time taken (`playing (entered in 2.1 s)`).
 
 | Request | Does |
 | --- | --- |
-| `/scene` | Loaded scenes: path, active, modified, loaded, root count; play state. |
+| `/scene` | Loaded scenes: path, active, modified, loaded, root count; play state. In play mode `DontDestroyOnLoad` and its root count after them, while it holds objects (O14). |
 | `/scene/open?path=&additive=` | Opens a scene. Refused while playing, and (without `additive`) while any loaded scene is modified: the answer names them. |
 | `/save?path=` | Saves modified loaded scenes (or the one given) and dirty assets. The only request that writes scene or asset files. |
 | `/play`, `/stop`, `/pause` | Sets `EditorApplication.isPlaying`/`isPaused`. `/play` is refused while compile errors exist. Answers at once; the client waits for the state (domain reloads handled as in the compile flow). `/stop` answers the play session's time and error/warning counts. Bridge 0.13.0 adds `/play?paused=&onerror=` and `/play/state`: Play-mode debugging. |
@@ -651,6 +651,45 @@ Boot has already started loading GalaxyMap), and an error scrolls past while the
 - **Usage errors** (exit 1): `--paused and --for cannot be used together`, `--step cannot be used
   with --paused or --pause-on-error` (`ug play --paused --pause-on-error`, then `--step`).
 
+## DontDestroyOnLoad (O14)
+
+Found on purge-squad (2026-10-11): `GameBoot` moves the `Boot` root to DontDestroyOnLoad on play,
+and then `ug inspect Boot` answered `not found: Boot in the loaded scenes`, `ug find --live
+AudioSource` missed Boot's AudioSource and `ug scene` listed only GalaxyMap. The bridge walked
+`SceneManager`'s scenes, and those never include DontDestroyOnLoad.
+
+- **Where it counts.** In play mode, while DontDestroyOnLoad holds a root object, it is one of the
+  loaded scenes, after the scene files, wherever the bridge walks them: every address (`inspect`,
+  `set`, `tree`, `object`, `component`, `event`, `select`, `click`, `prefab`, `camera`, `shot
+  <camera>`, `perf memory --object`, references in `set` and `run`), `find --live`, `ug tree` with
+  no object, `ug camera`'s lists and `ug perf`'s object counts. Addresses that `ug ui`, `eval`
+  and `run` print already named objects there and now resolve. Edit mode is unchanged: Unity keeps
+  the scene empty outside play mode.
+- **How the bridge reaches it.** `EditorSceneManager.GetDontDestroyOnLoadScene()`, internal, by
+  reflection (in 2022.3 and 6000.3): a plain read. Checked in BridgeHost (6000.3.14f1): the scene
+  always exists, edit mode included, with one fixed handle and 0 roots outside play mode; its name
+  and `path` are both `DontDestroyOnLoad`. A Unity without that method gets the scene from a
+  probe: a `HideAndDontSave` object given to `Object.DontDestroyOnLoad`, read, and destroyed in
+  the same call (play mode only, never on the Undo stack).
+- **`ug scene`** lists it after the scene files with its roots, `DontDestroyOnLoad  1 root`, and
+  never `active` or `modified` (Unity cannot make it active, and it has no file to save).
+- **Addresses** still resolve back to their object. With several scene files loaded every address
+  names its scene, as before, DontDestroyOnLoad's too (`DontDestroyOnLoad:Boot`). With one scene
+  file, addresses stay short (`Boot`, `Canvas/Button`), and only when both scenes hold a root of
+  the same name do the objects under those roots carry their scene's name (`GalaxyMap:Boot`,
+  `DontDestroyOnLoad:Boot`), as an ambiguous answer lists them. `DontDestroyOnLoad:<path>` is
+  always accepted.
+- **`ug tree`** with no object heads each scene's roots with its name, as for several scenes
+  (`GalaxyMap:`, then `DontDestroyOnLoad:`).
+- **Scene targets.** `--scene DontDestroyOnLoad` on `ug object move` and `ug object create` puts an
+  object there in play mode, also while it is still empty (what `Object.DontDestroyOnLoad` does,
+  through Undo, lost when play stops like every play-mode edit), and `--scene <scene file>` takes
+  it back. `ug scene active DontDestroyOnLoad` is refused, `DontDestroyOnLoad cannot be the active
+  scene` (Unity throws). `ug scene open|new|close` and `ug save` stay refused in play mode.
+- **Unchanged.** The play digest's `scene` part (SPEC-play-input, Digest) names scene files loaded
+  and unloaded, so an object kept across a load does not read as a scene change; its object counts
+  already took every scene. `ug eval`'s `changed:` line is edit mode only.
+
 ## Safety rules
 
 1. **Undo.** Every edit goes through Unity's Undo (`RegisterCreatedObjectUndo`,
@@ -1095,6 +1134,13 @@ With idle cost, file form:
   holds no error but the batch editor's missing graphics device. The Frame Debugger's events are
   checked live in BridgeHost started with its window and `-force-gfx-mt` (MultiThreaded Direct3D12),
   in edit and play mode (below).
+  DontDestroyOnLoad (O14): EditMode tests that enter play mode (the Test Framework's `EnterPlayMode`,
+  which works in the batch editor) with a kept root holding an AudioSource and a child: `inspect`,
+  `set`, `find --live`, `tree` with and without an object, `scene`, the prefixed form, a root name in
+  both scenes (each address resolves back, and the ambiguity lists both), `object move|create
+  --scene DontDestroyOnLoad` and back, the `scene active` refusal, the probe giving the scene the
+  internal getter gives, and edit mode answering as before. Then live on purge-squad with the bridge
+  copied in: the repro's three commands.
 
 ## Boundaries
 

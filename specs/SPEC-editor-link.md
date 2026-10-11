@@ -509,6 +509,13 @@ is modified, and `/tests/result` answers `stopped` with a reason for a run that 
 canceled or ended on an error (SPEC-unity-loop, Modified scenes and stopped runs). No new request
 or flag, so `ug` gates nothing on it.
 
+## Bridge 0.15.0 (O14 DontDestroyOnLoad)
+
+In play mode the loaded scenes include DontDestroyOnLoad while it holds objects: addresses,
+`find --live`, `tree` and `ug scene` reach it, and `--scene DontDestroyOnLoad` moves objects there
+(SPEC-editor-ops, DontDestroyOnLoad). No new request or flag, so `ug` gates nothing on it; an older
+bridge keeps answering "not found" for kept objects, and `ug status` naming 0.15.0 tells the two apart.
+
 ## Performance targets
 
 | Operation | Target |

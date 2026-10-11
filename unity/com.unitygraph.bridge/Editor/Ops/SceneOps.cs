@@ -144,10 +144,15 @@ namespace UnityGraph.Bridge
         public static Reply Activate(Request request)
         {
             string path = request.Get("path");
-            Scene scene = Addresses.LoadedScenes().FirstOrDefault(s => s.path == path || s.name == path);
+            Scene scene = Addresses.SceneNamed(path);
             if (!scene.IsValid())
             {
                 return Answer.Error(path + " is not open");
+            }
+
+            if (scene.path == Addresses.DontDestroyOnLoad)
+            {
+                return Answer.Error(Addresses.DontDestroyOnLoad + " cannot be the active scene");
             }
 
             SceneManager.SetActiveScene(scene);
@@ -407,7 +412,10 @@ namespace UnityGraph.Bridge
             return lines;
         }
 
-        /// <summary>`Assets/Scenes/Main.unity  active  modified  12 roots` per loaded scene, then the play state.</summary>
+        /// <summary>
+        /// `Assets/Scenes/Main.unity  active  modified  12 roots` per loaded scene, `DontDestroyOnLoad  1 root`
+        /// in play mode while it holds objects, then the play state.
+        /// </summary>
         public static List<string> SceneLines()
         {
             var lines = new List<string>();
@@ -428,6 +436,12 @@ namespace UnityGraph.Bridge
 
                 line += scene.isLoaded ? "  " + Answer.Count(scene.rootCount, "root", "roots") : "  not loaded";
                 lines.Add(line);
+            }
+
+            Scene kept = Addresses.DontDestroyOnLoadScene();
+            if (kept.IsValid())
+            {
+                lines.Add(Addresses.DontDestroyOnLoad + "  " + Answer.Count(kept.rootCount, "root", "roots"));
             }
 
             lines.Add(PlayState());
