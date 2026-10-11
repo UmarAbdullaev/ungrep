@@ -264,7 +264,10 @@ Game.Tools  3 static methods
   `CustomYieldInstruction` for `keepWaiting`, `WaitForSeconds` and `WaitForSecondsRealtime` for
   their time in real seconds (the first through its internal `m_Seconds` field: one update when the
   field is missing); anything else waits one update. A `Task<T>` prints its result (a plain `Task`
-  none), an `IEnumerator` `finished after N steps` (N yields, nested ones counted). `--timeout`
+  none), an `IEnumerator` `finished after N steps` (N yields, nested ones counted). A returned
+  sequence (`IEnumerable`) is a value and prints its items, though the object C# makes for a
+  `yield` method that returns `IEnumerable<T>` is an `IEnumerator` too (bridge 0.15.0; 0.14.0
+  stepped it from before its start and answered `finished after 0 steps`). `--timeout`
   (default 60 s) bounds the wait: past it the answer is `<what> still running after 60 s; it goes
   on in the editor`. Neither can be stopped from outside.
 - **Synchronous code** runs on the main thread inside the request: the editor waits for it. A
@@ -329,7 +332,10 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
     has no `result:` line (`Debug.Log("hi");`). A body with `await` becomes `async Task<object>`
     (`async Task` without a value) and is awaited, one with `yield` an `IEnumerator` that is
     stepped, both as `ug run` waits (`--timeout`, default 60 s). Local functions (`static int
-    Sq(int x) => x * x;` too) stay local functions. A directive pair (`#if UNITY_EDITOR` ...
+    Sq(int x) => x * x;` too) stay local functions, and their `await`, `yield` and `return x`,
+    like a lambda's, are their own: they do not make the body async, an iterator or one with a
+    value (`IEnumerator Wait() { yield return null; } return Wait();` returns the enumerator,
+    stepped as above). A directive pair (`#if UNITY_EDITOR` ...
     `#endif`) may span statements; one that spans statements and types does not survive the
     split. (A top-level member with an access modifier, `public static int Sq...`, goes into the
     generated class as written, but Roslyn reads the statements after it as members: write it
@@ -444,7 +450,7 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
   | component | `address:Component`, the form `ug set` takes for references |
   | other `UnityEngine.Object` | asset path, `path:sub`, `builtin <name>` or `<name> (not saved)` |
   | dictionaries | `Dictionary<string, int>[3] {a: 1, b: 2, c: 3}` |
-  | other collections | `List<int>[25] [1, 2, 3, ... +15 more]`, the first 10 items (an array `GameObject[3] [...]`); a collection that overrides `ToString` (a Newtonsoft `JObject`) prints that text on one line |
+  | other collections | `List<int>[25] [1, 2, 3, ... +15 more]`, the first 10 items (an array `GameObject[3] [...]`, a compiler-made sequence such as an iterator by its interface, `IEnumerable<int>[2] [1, 2]`, from bridge 0.15.0); a collection that overrides `ToString` (a Newtonsoft `JObject`) prints that text on one line |
   | `Type`, delegates | the type's full name; `delegate Type.Method` |
   | `IFormattable` and `IConvertible` values (`DateTime`, `Guid`, `TimeSpan`, Newtonsoft `JValue`) | `ToString` with the invariant culture |
   | other objects | `TypeName {field: value, prop: value}`: public instance fields and properties one level deep, at most 20; deeper values print as their type name, or their `ToString` when the type overrides it; a getter that throws prints `<threw X>` |

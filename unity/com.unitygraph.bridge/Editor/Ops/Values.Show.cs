@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using UnityEngine;
 
@@ -224,8 +225,7 @@ namespace UnityGraph.Bridge
                 (it as IDisposable)?.Dispose();
             }
 
-            Type type = items.GetType();
-            string head = ApiOps.TypeName(type.IsArray ? type.GetElementType() : type) + "[" + count.ToString(CultureInfo.InvariantCulture) + (count == CountLimit ? "+" : "") + "]";
+            string head = SequenceName(items.GetType()) + "[" + count.ToString(CultureInfo.InvariantCulture) + (count == CountLimit ? "+" : "") + "]";
             if (count == 0)
             {
                 return head + " []";
@@ -238,6 +238,23 @@ namespace UnityGraph.Bridge
             }
 
             return head + " [" + string.Join(", ", parts) + More(count - parts.Count, state) + "]";
+        }
+
+        // An array by its element type, a compiler-made sequence (an iterator, `<Gen>d__3`) by its IEnumerable<T>.
+        private static string SequenceName(Type type)
+        {
+            if (type.IsArray)
+            {
+                return ApiOps.TypeName(type.GetElementType());
+            }
+
+            if (type.IsDefined(typeof(CompilerGeneratedAttribute), false))
+            {
+                Type sequence = type.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+                return sequence != null ? ApiOps.TypeName(sequence) : "IEnumerable";
+            }
+
+            return ApiOps.TypeName(type);
         }
 
         // `TypeName {field: value, prop: value}`: public instance fields and properties.
