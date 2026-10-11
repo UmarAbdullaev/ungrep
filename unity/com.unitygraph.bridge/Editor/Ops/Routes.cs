@@ -20,7 +20,8 @@ namespace UnityGraph.Bridge
                 { "/scene/close", (r, c) => Checked(() => SceneOps.Close(r)) },
                 { "/scene/active", (r, c) => Checked(() => SceneOps.Activate(r)) },
                 { "/save", (r, c) => Checked(() => SceneOps.Save(r)) },
-                { "/play", (r, c) => Checked(SceneOps.Play) },
+                { "/play", (r, c) => Checked(() => SceneOps.Play(r)) },
+                { "/play/state", (r, c) => Deferred(() => SceneOps.State(c)) },
                 { "/pause", (r, c) => Now(SceneOps.Pause()) },
                 { "/stop", (r, c) => Now(SceneOps.Stop(c)) },
 

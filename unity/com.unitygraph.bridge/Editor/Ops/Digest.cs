@@ -39,6 +39,8 @@ namespace UnityGraph.Bridge
         private readonly List<string> _scenes;
         private readonly Dictionary<int, Item> _items = new Dictionary<int, Item>();
         private readonly bool _over;
+        private readonly bool _paused;
+        private readonly int _fires;
 
         private Digest(ConsoleBuffer console)
         {
@@ -51,6 +53,8 @@ namespace UnityGraph.Bridge
 
             _scenes = LoadedScenes(out _active);
             _over = !Scan(_items);
+            _paused = EditorApplication.isPaused;
+            _fires = ErrorPause.Current?.Fires ?? 0;
         }
 
         /// <summary>The state to compare against; take it before the action starts.</summary>
@@ -62,7 +66,7 @@ namespace UnityGraph.Bridge
             bool playing = EditorApplication.isPlaying && !stopped;
             var parts = new List<string>();
             var rows = new List<string>();
-            string console = ConsolePart(rows);
+            string console = ConsolePart(_console, _consoleId, _tail, rows);
             if (console.Length > 0)
             {
                 parts.Add(console);
@@ -72,6 +76,7 @@ namespace UnityGraph.Bridge
             {
                 AddIfAny(parts, Scene());
                 AddIfAny(parts, Objects());
+                AddIfAny(parts, Paused());
             }
             else
             {
@@ -91,10 +96,26 @@ namespace UnityGraph.Bridge
             }
         }
 
-        // `1 error, 3 warnings`, with up to two of the new errors as folded rows like `ug console`'s.
-        private string ConsolePart(List<string> rows)
+        // `paused at the first error #4105 (frame 214)` when the error pause fired meanwhile, `paused` when someone paused. Internal for the tests.
+        internal string Paused()
         {
-            if (_console == null)
+            ErrorPause errors = ErrorPause.Current;
+            if (errors != null && errors.Fires != _fires)
+            {
+                return errors.PlayPart();
+            }
+
+            return EditorApplication.isPaused && !_paused ? "paused" : "";
+        }
+
+        /// <summary>
+        /// `1 error, 3 warnings` logged after console id <paramref name="after"/>, with up to two of the
+        /// errors as folded rows like `ug console`'s added to <paramref name="rows"/>. A repeat of
+        /// <paramref name="tail"/>, the entry newest at <paramref name="after"/>, counts only its new repeats.
+        /// </summary>
+        internal static string ConsolePart(ConsoleBuffer console, long after, ConsoleBuffer.Entry tail, List<string> rows)
+        {
+            if (console == null)
             {
                 return "";
             }
@@ -103,13 +124,13 @@ namespace UnityGraph.Bridge
             var cutTexts = new HashSet<(string Text, string Frame)>();
             int errorCount = 0;
             int warningCount = 0;
-            foreach (ConsoleBuffer.Entry entry in _console.Query(_consoleId, 500, null))
+            foreach (ConsoleBuffer.Entry entry in console.Query(after, 500, null))
             {
                 // A repeat of the entry that was last at the snapshot folds into it: count only the new ones.
                 int count = entry.Count;
-                if (_tail != null && entry.Count > _tail.Count && entry.Type == _tail.Type && entry.Text == _tail.Text && entry.Frame == _tail.Frame)
+                if (tail != null && entry.Count > tail.Count && entry.Type == tail.Type && entry.Text == tail.Text && entry.Frame == tail.Frame)
                 {
-                    count -= _tail.Count;
+                    count -= tail.Count;
                 }
 
                 if (entry.Type == "warning")
@@ -138,7 +159,7 @@ namespace UnityGraph.Bridge
             }
 
             // A row cut at 160 characters or at its first line adds --whole to the line that names the console.
-            string again = "ug console --after " + _consoleId.ToString(CultureInfo.InvariantCulture) + (cut ? " --whole" : "");
+            string again = "ug console --after " + after.ToString(CultureInfo.InvariantCulture) + (cut ? " --whole" : "");
             if (errors.Count > ErrorRows)
             {
                 rows.Add("  +" + (errors.Count - ErrorRows).ToString(CultureInfo.InvariantCulture) + " more errors: " + again);
@@ -311,7 +332,7 @@ namespace UnityGraph.Bridge
             return true;
         }
 
-        private static string FirstLine(string text)
+        internal static string FirstLine(string text)
         {
             string line = (text ?? "").Replace("\r\n", "\n").Split('\n')[0].Trim();
             return line.Length > TextLimit ? line.Substring(0, TextLimit - 3) + "..." : line;

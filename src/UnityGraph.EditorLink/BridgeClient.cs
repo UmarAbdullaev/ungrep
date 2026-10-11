@@ -41,6 +41,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge with the C1 escapes: whole console and test failures, `--field`/`--from`, `--all`, prefab overrides (SPEC-editor-link, Bridge 0.9.0).</summary>
     public const string MinimumFullBridge = "0.9.0";
 
+    /// <summary>The oldest bridge with play-mode debugging: `/play?paused=&amp;onerror=`, `/play/state` (SPEC-editor-link, Bridge 0.11.0).</summary>
+    public const string MinimumPlayDebugBridge = "0.11.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -88,6 +91,9 @@ public sealed class BridgeClient : IDisposable
 
     /// <summary>Whether the bridge answers the C1 escapes (nothing out of reach).</summary>
     public bool HasFull => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumFullBridge);
+
+    /// <summary>Whether the bridge starts play mode paused, pauses at the first error and answers `/play/state`.</summary>
+    public bool HasPlayDebug => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumPlayDebugBridge);
 
     /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);

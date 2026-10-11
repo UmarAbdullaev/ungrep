@@ -38,6 +38,9 @@ namespace UnityGraph.Bridge
         /// <summary>Whether the digest waits for the game to react (two frames and 0.15 s) after the release; a wait and a step do not.</summary>
         public bool Settle { get; set; } = true;
 
+        /// <summary>Whether it runs while the editor is paused (a step); any other action's hold ends when the editor pauses.</summary>
+        public bool RunsPaused { get; set; }
+
         /// <summary>
         /// A hold of <paramref name="seconds"/> real seconds that is never shorter than <paramref name="frames"/> frames
         /// (an input is read on a frame). <paramref name="move"/> gets 0 to 1 once per frame while it lasts.
@@ -175,8 +178,10 @@ namespace UnityGraph.Bridge
             {
                 if (!run.Settling)
                 {
+                    // Paused (the first error, or someone pausing), no frame will come: the hold ends now.
                     double elapsed = EditorApplication.timeSinceStartup - run.Started;
-                    if (run.Action.Hold != null && !run.Action.Hold(elapsed, Time.frameCount - run.StartFrame))
+                    bool halted = EditorApplication.isPaused && !run.Action.RunsPaused;
+                    if (!halted && run.Action.Hold != null && !run.Action.Hold(elapsed, Time.frameCount - run.StartFrame))
                     {
                         return null;
                     }

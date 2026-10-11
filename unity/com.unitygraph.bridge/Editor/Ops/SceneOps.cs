@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace UnityGraph.Bridge
@@ -17,6 +18,11 @@ namespace UnityGraph.Bridge
     {
         private const string PlayStartKey = "unitygraph.play.start";
         private const string PlayConsoleKey = "unitygraph.play.console";
+        private const double StartingSeconds = 10;
+
+        // A paused or armed play start ug asked for, until play mode begins (editor seconds; 0: none).
+        private static double _starting;
+        private static bool _startingPaused;
 
         /// <summary>Null when the editor can take a request that reads or changes scenes, else the refusal.</summary>
         public static Reply Busy()
@@ -188,17 +194,37 @@ namespace UnityGraph.Bridge
             return Answer.Lines(lines);
         }
 
-        public static Reply Play()
+        /// <summary>
+        /// Enters play mode, or resumes a pause. `paused=true` starts on the first frame (or keeps a pause);
+        /// `onerror=true` arms the error pause (SPEC-editor-ops, Play-mode debugging).
+        /// </summary>
+        public static Reply Play(Request request)
         {
+            bool paused = request.Get("paused") == "true";
+            bool onError = request.Get("onerror") == "true";
             if (EditorApplication.isPlaying)
             {
-                if (!EditorApplication.isPaused)
+                if (!EditorApplication.isPaused && paused)
+                {
+                    return Answer.Error("already playing: ug pause pauses here; ug stop first to start again on frame 1");
+                }
+
+                if (!EditorApplication.isPaused && !onError)
                 {
                     return Answer.Error("already playing");
                 }
 
-                EditorApplication.isPaused = false;
-                return Answer.Line("playing");
+                if (onError)
+                {
+                    ErrorPause.Current?.Arm();
+                }
+
+                if (!paused)
+                {
+                    EditorApplication.isPaused = false;
+                }
+
+                return Answer.Line(EditorApplication.isPaused ? "paused" : "playing");
             }
 
             if (EditorUtility.scriptCompilationFailed)
@@ -206,8 +232,65 @@ namespace UnityGraph.Bridge
                 return Answer.Error("scripts have compile errors: ug compile lists them");
             }
 
+            if (onError)
+            {
+                ErrorPause.Current?.Arm();
+            }
+
+            if (paused)
+            {
+                EditorApplication.isPaused = true;
+            }
+
+            if (paused || onError)
+            {
+                _starting = EditorApplication.timeSinceStartup;
+                _startingPaused = paused;
+            }
+
             EditorApplication.EnterPlaymode();
             return Answer.Lines(new[] { "playing" }, wait: "playing");
+        }
+
+        /// <summary>
+        /// `/play/state`: where play mode is (paused at the first error, paused or playing on a frame) and
+        /// what loaded, once the first frame has run (at most 5 s).
+        /// </summary>
+        public static Func<Reply> State(ConsoleBuffer console)
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                Reply refused = Answer.Error("not playing: ug play first");
+                return () => refused;
+            }
+
+            double asked = EditorApplication.timeSinceStartup;
+            return () =>
+            {
+                if (!EditorApplication.isPlaying)
+                {
+                    return Answer.Error("not playing: ug play first");
+                }
+
+                return Time.frameCount < 1 && EditorApplication.timeSinceStartup - asked < 5 ? null : Answer.Lines(StateLines(console));
+            };
+        }
+
+        /// <summary>On each editor update: a play start `ug play` asked for that never came takes back its pause and its arm.</summary>
+        public static void Tick()
+        {
+            if (_starting == 0 || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.timeSinceStartup - _starting < StartingSeconds)
+            {
+                return;
+            }
+
+            _starting = 0;
+            if (_startingPaused)
+            {
+                EditorApplication.isPaused = false;
+            }
+
+            ErrorPause.Current?.Disarm();
         }
 
         public static Reply Pause()
@@ -255,9 +338,73 @@ namespace UnityGraph.Bridge
         {
             if (change == PlayModeStateChange.ExitingEditMode)
             {
+                _starting = 0;
                 SessionState.SetString(PlayStartKey, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
                 SessionState.SetString(PlayConsoleKey, consoleId.ToString(CultureInfo.InvariantCulture));
             }
+        }
+
+        /// <summary>
+        /// `Boot (active, 3 roots, 41 objects), DontDestroyOnLoad (2 roots, 9 objects)`: the loaded scenes in
+        /// hierarchy order, then any other scene holding objects; objects hidden in the hierarchy left out.
+        /// </summary>
+        internal static string Loaded()
+        {
+            var counts = new Dictionary<int, int[]>();
+            var order = new List<Scene>();
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (!counts.ContainsKey(scene.handle))
+                {
+                    counts[scene.handle] = new int[2];
+                    order.Add(scene);
+                }
+            }
+
+            foreach (Transform t in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                Scene scene = t.gameObject.scene;
+                if (!scene.IsValid() || (t.gameObject.hideFlags & HideFlags.HideInHierarchy) != 0)
+                {
+                    continue;
+                }
+
+                if (!counts.TryGetValue(scene.handle, out int[] count))
+                {
+                    counts[scene.handle] = count = new int[2];
+                    order.Add(scene);
+                }
+
+                count[1]++;
+                if (t.parent == null)
+                {
+                    count[0]++;
+                }
+            }
+
+            Scene active = SceneManager.GetActiveScene();
+            return string.Join(", ", order.Select(s => (string.IsNullOrEmpty(s.name) ? "untitled scene" : s.name) + " (" + (s == active ? "active, " : "")
+                + Answer.Count(counts[s.handle][0], "root", "roots") + ", " + Answer.Count(counts[s.handle][1], "object", "objects") + ")"));
+        }
+
+        // The state lines: the error the pause caught, else the play state, what loaded and what play mode logged so far.
+        private static List<string> StateLines(ConsoleBuffer console)
+        {
+            ErrorPause errors = ErrorPause.Current;
+            if (errors != null && errors.Fired && EditorApplication.isPaused)
+            {
+                return errors.Lines();
+            }
+
+            string state = (EditorApplication.isPaused ? "paused" : "playing") + " on frame " + Time.frameCount.ToString(CultureInfo.InvariantCulture)
+                + (errors != null && errors.Armed ? "; pauses at the first error" : "");
+            long after = long.TryParse(SessionState.GetString(PlayConsoleKey, ""), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : 0;
+            var rows = new List<string>();
+            string logged = Digest.ConsolePart(console, after, null, rows);
+            var lines = new List<string> { state, "  loaded: " + Loaded() + (logged.Length > 0 ? "; " + logged : "") };
+            lines.AddRange(rows);
+            return lines;
         }
 
         /// <summary>`Assets/Scenes/Main.unity  active  modified  12 roots` per loaded scene, then the play state.</summary>

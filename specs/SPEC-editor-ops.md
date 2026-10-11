@@ -106,7 +106,7 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/scene` | Loaded scenes: path, active, modified, loaded, root count; play state. |
 | `/scene/open?path=&additive=` | Opens a scene. Refused while playing, and (without `additive`) while any loaded scene is modified: the answer names them. |
 | `/save?path=` | Saves modified loaded scenes (or the one given) and dirty assets. The only request that writes scene or asset files. |
-| `/play`, `/stop`, `/pause` | Sets `EditorApplication.isPlaying`/`isPaused`. `/play` is refused while compile errors exist. Answers at once; the client waits for the state (domain reloads handled as in the compile flow). `/stop` answers the play session's time and error/warning counts. |
+| `/play`, `/stop`, `/pause` | Sets `EditorApplication.isPlaying`/`isPaused`. `/play` is refused while compile errors exist. Answers at once; the client waits for the state (domain reloads handled as in the compile flow). `/stop` answers the play session's time and error/warning counts. Bridge 0.11.0 adds `/play?paused=&onerror=` and `/play/state`: Play-mode debugging. |
 | `/tree?object=&depth=` | Children of an object (or the roots of the loaded scenes) to `depth` (default 2): name, active, components, child count past the depth. At most 200 lines. |
 | `/inspect?object=&component=` | Components of an object, or one component's visible serialized fields: name, type, value (object references as addresses or asset paths; arrays with length and the first 10 items). At most 150 lines. Bridge 0.9.0 adds `field=` (one field whole) and `from=` (paging): Nothing out of reach. |
 | `/object/create?name=&parent=&prefab=&primitive=` | New empty object, primitive, or a prefab instance kept linked to its prefab. |
@@ -533,6 +533,86 @@ flags need bridge 0.9.0 and are refused by name on an older one (SPEC-editor-lin
   `ug perf memory --top` (500); 200 elements per `--field` page; the result file's walk (1,000
   items, two levels, 200 members); the play digest's object snapshot (20,000 objects:
   SPEC-play-input, Digest). Each says where it cut.
+
+## Play-mode debugging (I5, bridge 0.11.0)
+
+Requested by the user on 2026-10-11: stop the game where a problem starts, then read it with
+`ug inspect`, `ug tree`, `ug eval` and `ug play --step`. Play mode only, nothing saved, answers in
+the digest's shape. `ug play; ug pause` cannot do it: it lands a few frames late (purge-squad's
+Boot has already started loading GalaxyMap), and an error scrolls past while the game runs on.
+
+- **`ug play --paused`** enters play mode stopped on the first frame. The bridge sets
+  `EditorApplication.isPaused` before `EnterPlaymode`, as Unity's Pause button pressed in edit mode
+  does: Unity runs the first frame (`Awake`, `OnEnable`, `Start`, the first `Update`) and pauses
+  (purge-squad, 6000.3.14f1: `Time.frameCount` 1, `Time.time` 0, Boot loaded; `ug play --step 2`
+  then shows `scene +GalaxyMap` on frame 3). After the play wait the client asks `/play/state`:
+
+  ```
+  $ ug play --paused
+  paused on frame 1 (entered in 6.2 s)
+    loaded: Boot (active, 3 roots, 41 objects), DontDestroyOnLoad (2 roots, 9 objects); 1 error
+    error  NullReferenceException: Object reference not set to an instance of an object  Assets/Scripts/Boot.cs:12
+  ```
+
+  `loaded:` names the loaded scenes in hierarchy order, then any other scene holding objects
+  (DontDestroyOnLoad), each with its root and game object counts (objects hidden in the hierarchy
+  are left out, as in the digest). The console part counts the errors and warnings logged since
+  play mode started, with up to two error rows and `+N more errors: ug console --after <id>`, as
+  the digest does. `ug play --step`, `ug inspect`, `ug tree` and `ug eval` then work as on any
+  pause; `ug play` resumes, `ug stop` ends it (and Unity's pause goes off with it). While paused,
+  `ug play --paused` changes nothing and answers the same state lines (where it is paused, and
+  why); while playing it is refused: `already playing: ug pause pauses here; ug stop first to
+  start again on frame 1`. `--paused` with `--for` is a usage error.
+- **`ug play --pause-on-error`** arms an error pause: the bridge pauses the editor at the first
+  error, assert or exception logged in play mode after it (the console's `error` type), once. On
+  the main thread it pauses inside the log call, as Unity's Console Error Pause does, so the rest
+  of that frame runs and no further frame; an error logged from another thread pauses on the next
+  editor update. The arm survives the domain reload of entering play mode (SessionState), so an
+  error in `Awake` counts; it ends when it fires or play mode ends. Unity's Console Error Pause
+  setting is never read or changed, so there is nothing to restore; with it on, Unity also pauses
+  at every error, as before. From edit mode `--pause-on-error` enters play mode; with `--paused`
+  too it starts on frame 1 armed, so `ug play --step` stops at the first error. While playing it
+  arms and resumes a pause, as `ug play` resumes; with `--paused` too it arms and stays paused.
+  The answer is `/play/state`'s:
+
+  ```
+  $ ug play --pause-on-error
+  playing on frame 3; pauses at the first error (entered in 6.4 s)
+    loaded: Boot (active, 3 roots, 41 objects)
+
+  (when it has fired, here or for a later --paused or --for)
+  paused at the first error, frame 214, 3.5 s in
+    #4105 error  NullReferenceException: Object reference not set to an instance of an object  Assets/Scripts/Enemy.cs:42
+    more  whole: ug console --id 4105
+  ```
+
+  `frame` is `Time.frameCount` and `s in` is `Time.unscaledTime` when it fired; the row is the
+  entry's first line (160 characters, as the digest's rows) and its own frame. The id is the
+  entry's current one: a repeat folded into it later in that frame gives it a new id (then `x3`
+  shows), and `ug console --id` takes that one. The answer keeps the error until the editor
+  resumes.
+- **`ug play --for <s> --pause-on-error`** plays as `--for` does but polls `/status` every 250 ms
+  instead of sleeping. When the editor pauses (the error, or someone pausing it) it prints the
+  `/play/state` lines and leaves the game paused: no stop, no log digest. Otherwise at `s` it stops
+  and prints the `ug log` digest as before (`--whole` applies to that digest).
+- **Actions while armed.** An action running when the pause fires (`press`, `click`, `wait`) ends
+  there: it is released at once, and its digest's play part reads `paused at the first error
+  #4105 (frame 214)` after the console part that shows the error row. Any pause under a running
+  action now ends its hold the same way (play part `paused`): an action that waits for frames used
+  to wait out its client's timeout and keep the queue busy. `ug play --step <n>` stops at the frame
+  that paused: `stepped 3 frames of 10 (frame 217): the first error stopped it`.
+- **Nothing left behind.** `ug stop` ends the pause; leaving play mode drops the arm and the error
+  kept. A play start that Unity never begins (no play mode within 10 s) takes back the pause and the
+  arm `ug play` set, so the user's next Play is not paused or armed by `ug`.
+- **Requests.** `/play?paused=true&onerror=true` (either or both; without them `/play` is as
+  before). `/play/state` answers the state lines above; it waits for the first frame to have run
+  (at most 5 s) and is refused in edit mode with `not playing: ug play first`. The client asks
+  `/play/state` after `/play` (and its wait) whenever `--paused` or `--pause-on-error` is given,
+  and after `--for` sees a pause. An older bridge refuses the flags by name before any request:
+  `bridge 0.10.0 is too old for ug play --paused: run ug bridge install again`. `ug batch` takes
+  them as steps.
+- **Usage errors** (exit 1): `--paused and --for cannot be used together`, `--step cannot be used
+  with --paused or --pause-on-error` (`ug play --paused --pause-on-error`, then `--step`).
 
 ## Safety rules
 

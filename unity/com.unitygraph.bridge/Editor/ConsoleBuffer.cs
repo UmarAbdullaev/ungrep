@@ -69,7 +69,8 @@ namespace UnityGraph.Bridge
         public static string Bound(string text) =>
             text.Length > MaxText ? text.Substring(0, MaxText) + "... (cut at " + MaxText.ToString(CultureInfo.InvariantCulture) + " characters)" : text;
 
-        public void Add(string type, string text, string frame, string stack = null)
+        /// <summary>Adds an entry, or folds a repeat of the newest one into it; answers the entry's id.</summary>
+        public long Add(string type, string text, string frame, string stack = null)
         {
             text = Bound(text ?? "");
             stack = string.IsNullOrEmpty(stack) ? null : Bound(stack.TrimEnd());
@@ -80,7 +81,7 @@ namespace UnityGraph.Bridge
                 {
                     last.Count++;
                     last.Id = ++_lastId;
-                    return;
+                    return last.Id;
                 }
 
                 _entries.AddLast(new Entry { Id = ++_lastId, Type = type, Text = text, Frame = frame, Stack = stack, Count = 1 });
@@ -88,6 +89,8 @@ namespace UnityGraph.Bridge
                 {
                     _entries.RemoveFirst();
                 }
+
+                return _lastId;
             }
         }
 

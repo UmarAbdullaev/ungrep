@@ -143,11 +143,12 @@ namespace UnityGraph.Bridge
             }
 
             int frames = (int)count;
-            var action = new PlayAction("step") { Settle = false };
+            var action = new PlayAction("step") { Settle = false, RunsPaused = true };
             int done = 0;
             int atStep = 0;
             double sent = 0;
             bool pending = false;
+            int fires = ErrorPause.Current?.Fires ?? 0;
             action.Start = () => Answer.Line("stepped");
             action.Hold = (elapsed, passed) =>
             {
@@ -158,11 +159,12 @@ namespace UnityGraph.Bridge
                 }
 
                 bool resumed = !EditorApplication.isPaused;
-                if (done >= frames || resumed)
+                bool caught = (ErrorPause.Current?.Fires ?? 0) != fires;
+                if (done >= frames || resumed || (caught && !pending))
                 {
                     string text = done == 1 ? "1 frame" : done + " frames";
-                    action.Result = Answer.Line(resumed && done < frames
-                        ? "stepped " + text + " of " + frames + " (frame " + Time.frameCount + "): the editor was resumed"
+                    action.Result = Answer.Line(done < frames
+                        ? "stepped " + text + " of " + frames + " (frame " + Time.frameCount + "): " + (resumed ? "the editor was resumed" : "the first error stopped it")
                         : "stepped " + text + " (frame " + Time.frameCount + ")");
                     return true;
                 }

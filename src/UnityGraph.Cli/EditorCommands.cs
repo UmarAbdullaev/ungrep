@@ -220,6 +220,12 @@ internal static partial class EditorCommands
         /// <summary>A C1 escape (`ug console --whole`, `ug inspect --field`, `--all`, ...): needs bridge 0.9.0.</summary>
         public bool Full { get; init; }
 
+        /// <summary>Play-mode debugging (`ug play --paused`, `--pause-on-error`): needs bridge 0.11.0.</summary>
+        public bool PlayDebug { get; init; }
+
+        /// <summary>A request asked after the answer (and its wait), whose lines are printed instead: `/play/state`.</summary>
+        public string? Then { get; init; }
+
         /// <summary>The token budget for a docs page (`ug docs --budget`); null keeps the config's answer budget.</summary>
         public int? Budget { get; init; }
 
@@ -301,7 +307,7 @@ internal static partial class EditorCommands
         }
 
         if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras) || (request.UiToolkit && !client.HasUiToolkit)
-            || (request.Profiler && !client.HasProfiler) || (request.Full && !client.HasFull))
+            || (request.Profiler && !client.HasProfiler) || (request.Full && !client.HasFull) || (request.PlayDebug && !client.HasPlayDebug))
         {
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + (request.Option == null ? "" : " " + request.Option) + ": run ug bridge install again\n");
         }
@@ -337,7 +343,30 @@ internal static partial class EditorCommands
             {
                 return Failed(waited.Problem + "\n");
             }
+        }
 
+        if (request.Then != null)
+        {
+            OpAnswer then;
+            try
+            {
+                then = client.Op(request.Then, request.Timeout);
+            }
+            catch (BridgeUnavailableException e)
+            {
+                return Failed("no answer from Unity (" + e.Message + ")\n");
+            }
+
+            if (then.Error != null)
+            {
+                return Failed(then.Error + "\n");
+            }
+
+            lines = then.Lines!.ToList();
+        }
+
+        if (answer.Wait != null)
+        {
             if (answer.Wait == "playing" && lines.Count > 0)
             {
                 lines[0] += " (entered in " + clock.Elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s)";
@@ -382,8 +411,10 @@ internal static partial class EditorCommands
         var playFor = new Option<int?>("--for") { Description = "Stay in play mode this many seconds (1 to 600), then stop and print the ug log digest." };
         var playStep = new Option<int?>("--step") { Description = "While paused, advance this many frames (1 to 600, default 1) and print what changed.", Arity = ArgumentArity.ZeroOrOne };
         Option<bool> playWhole = Flag("--whole", "With --for: the log's rows with their ids, whole messages and stacks (bridge 0.9.0).");
-        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log; --step advances paused frames.", [playTimeout, playFor, playStep, playWhole], (root, config, r) =>
-            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor), r.GetResult(playStep) == null ? null : r.GetValue(playStep) ?? 1, r.GetValue(playWhole)));
+        Option<bool> playPaused = Flag("--paused", "Start stopped on the first frame and print the frame and what loaded; then --step, inspect, eval (bridge 0.11.0).");
+        Option<bool> playOnError = Flag("--pause-on-error", "Pause at the first error or exception and print it, its frame and console id; the game stays paused. Alone, with --paused, or with --for (bridge 0.11.0).");
+        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log; --step advances paused frames; --paused starts on frame 1; --pause-on-error stops at the first error.", [playTimeout, playFor, playStep, playWhole, playPaused, playOnError], (root, config, r) =>
+            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor), r.GetResult(playStep) == null ? null : r.GetValue(playStep) ?? 1, r.GetValue(playWhole), r.GetValue(playPaused), r.GetValue(playOnError)));
         Option<int> stopTimeout = Seconds();
         yield return Ops("stop", "stop", "Leave play mode; says how long it played and what it logged.", [stopTimeout], r =>
             new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(stopTimeout))) });

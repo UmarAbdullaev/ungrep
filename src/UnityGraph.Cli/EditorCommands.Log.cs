@@ -15,6 +15,8 @@ internal static partial class EditorCommands
 {
     private const int LogPage = 500;
 
+    private static readonly TimeSpan _pausePoll = TimeSpan.FromMilliseconds(250);
+
     /// <summary>Replaces the wait of `ug play --for`; tests only.</summary>
     internal static Action<TimeSpan> PlaySleep { get; set; } = Thread.Sleep;
 
@@ -120,7 +122,8 @@ internal static partial class EditorCommands
     }
 
     // `ug play`; with --for the editor plays that many seconds, stops, and the log digest follows; with --step a paused editor advances frames.
-    private static (int ExitCode, string Text) Play(string root, UnityGraphConfig config, int timeout, int? seconds, int? step = null, bool whole = false)
+    // --paused starts on frame 1 and --pause-on-error stops at the first error (SPEC-editor-ops, Play-mode debugging): both print /play/state.
+    private static (int ExitCode, string Text) Play(string root, UnityGraphConfig config, int timeout, int? seconds, int? step = null, bool whole = false, bool paused = false, bool onError = false)
     {
         if (whole && seconds == null)
         {
@@ -130,6 +133,16 @@ internal static partial class EditorCommands
         if (step != null && seconds != null)
         {
             return (1, "--step and --for cannot be used together\n");
+        }
+
+        if (paused && seconds != null)
+        {
+            return (1, "--paused and --for cannot be used together\n");
+        }
+
+        if (step != null && (paused || onError))
+        {
+            return (1, "--step cannot be used with --paused or --pause-on-error\n");
         }
 
         if (step is < 1 or > 600)
@@ -147,14 +160,75 @@ internal static partial class EditorCommands
             return (1, "--for must be 1 to 600 seconds\n");
         }
 
-        (int exitCode, string text) = Op(root, config, "play", new OpRequest("/play") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, timeout)) });
+        bool debug = paused || onError;
+        var play = new OpRequest(Query("/play", ("paused", paused ? "true" : null), ("onerror", onError ? "true" : null)))
+        {
+            WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, timeout)),
+            PlayDebug = debug,
+            Option = paused ? "--paused" : onError ? "--pause-on-error" : null,
+            Then = debug && seconds == null ? "/play/state" : null,
+        };
+        (int exitCode, string text) = Op(root, config, "play", play);
         if (seconds is not { } playFor || _opFailed)
         {
             return (exitCode, text);
         }
 
-        PlaySleep(TimeSpan.FromSeconds(playFor));
+        if (!onError)
+        {
+            PlaySleep(TimeSpan.FromSeconds(playFor));
+        }
+        else if (PausedWithin(root, playFor))
+        {
+            return Op(root, config, "play", new OpRequest("/play/state") { PlayDebug = true, Option = "--pause-on-error" });
+        }
+
         (_, string stopped) = Op(root, config, "stop", new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, timeout)) });
         return (0, (_opFailed ? stopped : "") + LogDigest(root, config, null, whole).Text);
+    }
+
+    // `ug play --for <s> --pause-on-error`: polls the status every 250 ms for up to that long; true when the editor paused.
+    private static bool PausedWithin(string root, int seconds)
+    {
+        BridgeClient? client = _session;
+        BridgeConnection? connection = null;
+        if (client == null)
+        {
+            connection = BridgeClient.Connect(root, ProcessCheck);
+            client = connection.Client;
+            if (client == null)
+            {
+                return false;
+            }
+        }
+
+        try
+        {
+            for (double waited = 0; waited < seconds; waited += _pausePoll.TotalSeconds)
+            {
+                string state = client.Status().State;
+                if (state == "paused")
+                {
+                    return true;
+                }
+
+                if (state == "idle")
+                {
+                    return false;
+                }
+
+                PlaySleep(_pausePoll);
+            }
+
+            return false;
+        }
+        catch (BridgeUnavailableException)
+        {
+            return false;
+        }
+        finally
+        {
+            connection?.Client?.Dispose();
+        }
     }
 }

@@ -483,6 +483,14 @@ a viewpoint or sheet whose source camera's culling mask is Nothing draws every l
 (SPEC-editor-ops, Viewpoints), and `ug inspect` on a prefab instance root counts its overrides
 as `ug prefab overrides` lists them (SPEC-editor-ops, C1). An older bridge keeps the old answers.
 
+## Bridge 0.11.0 (I5)
+
+Play-mode debugging (SPEC-editor-ops): `/play?paused=&onerror=`, the new `/play/state`, the error
+pause, and a pause ending a running action's hold. Package and `Bridge.Version` 0.11.0,
+`MinimumPlayDebugBridge` in the client. `ug play --paused` and `--pause-on-error` are refused by
+name on an older bridge, which would ignore the parameters and just play; plain `ug play` and
+every other command keep working on older bridges.
+
 ## Performance targets
 
 | Operation | Target |

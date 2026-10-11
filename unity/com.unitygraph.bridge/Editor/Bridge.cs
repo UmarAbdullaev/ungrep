@@ -27,14 +27,17 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal static class Bridge
     {
-        public const string Version = "0.10.0";
+        public const string Version = "0.11.0";
 
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";
         private const string ConsoleKey = "unitygraph.bridge.console";
+        private const string ErrorPauseKey = "unitygraph.bridge.errorpause";
         private const int DiscoveryAttempts = 40;
 
         private static readonly ConsoleBuffer _console = new ConsoleBuffer();
+        private static readonly ErrorPause _errors = new ErrorPause(_console);
+        private static int _mainThread;
         private static Server _server;
         private static readonly PlayLog _playLog = new PlayLog();
         private static CompileLog _compile;
@@ -74,6 +77,10 @@ namespace UnityGraph.Bridge
             _console.Restore(SessionState.GetString(ConsoleKey, ""));
             SessionState.EraseString(ConsoleKey);
             _playLog.Load();
+            _mainThread = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            _errors.Armed = SessionState.GetBool(ErrorPauseKey, false);
+            SessionState.EraseBool(ErrorPauseKey);
+            ErrorPause.Current = _errors;
             Application.logMessageReceivedThreaded += OnLog;
             _compile = new CompileLog(ProjectRoot, Folder);
             _compile.Attach();
@@ -112,6 +119,7 @@ namespace UnityGraph.Bridge
             _compile?.Detach();
             _server?.Stop();
             SessionState.SetString(ConsoleKey, _console.Save());
+            SessionState.SetBool(ErrorPauseKey, _errors.Armed);
         }
 
         private static void Quit()
@@ -132,6 +140,8 @@ namespace UnityGraph.Bridge
         private static void Update()
         {
             EvalGuard.Beat();
+            _errors.Tick();
+            SceneOps.Tick();
             RefreshStatus();
             CodeRun.Tick();
             _server.Pump(Handle);
@@ -142,6 +152,7 @@ namespace UnityGraph.Bridge
             SceneOps.OnPlayModeChanged(change, _console.LastId);
             _playLog.OnPlayModeChanged(change, DateTime.UtcNow, _console.LastId);
             _playLog.Persist();
+            _errors.OnPlayModeChanged(change);
             InputQueue.OnPlayModeChanged(change);
             CameraOps.OnPlayModeChanged();
         }
@@ -150,10 +161,19 @@ namespace UnityGraph.Bridge
         {
             _playLog.OnPause(state == PauseState.Paused, DateTime.UtcNow);
             _playLog.Persist();
+            _errors.OnPause(state == PauseState.Paused);
         }
 
-        private static void OnLog(string condition, string stackTrace, LogType type) =>
-            _console.Add(ConsoleBuffer.TypeName(type), condition, StackFrames.OwnFrame(stackTrace, ProjectRoot), stackTrace);
+        // Any thread. An error may pause the editor (`ug play --pause-on-error`): at once on the main thread.
+        private static void OnLog(string condition, string stackTrace, LogType type)
+        {
+            string kind = ConsoleBuffer.TypeName(type);
+            long id = _console.Add(kind, condition, StackFrames.OwnFrame(stackTrace, ProjectRoot), stackTrace);
+            if (kind == "error" && _errors.Armed)
+            {
+                _errors.OnLog(id, System.Threading.Thread.CurrentThread.ManagedThreadId == _mainThread);
+            }
+        }
 
         private static void RefreshStatus()
         {
