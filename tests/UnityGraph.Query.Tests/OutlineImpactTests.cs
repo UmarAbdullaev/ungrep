@@ -70,6 +70,7 @@ public sealed class OutlineImpactTests(QueryFixture fixture) : IClassFixture<Que
             "impact Turntable --json",
             "impact Turntable._speed --json",
             "impact Nothing --json",
+            "impact IOpenable",
         ];
 
         var transcript = new StringBuilder();

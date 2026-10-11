@@ -150,8 +150,10 @@ public sealed class GraphFreshnessTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => reader.UpdateStats(report.Touched));
     }
 
-    [Fact]
-    public void A_graph_from_before_whole_values_has_every_file_indexed_again_once()
+    [Theory]
+    [InlineData(null)] // before whole values (C1)
+    [InlineData("whole")] // before declaration lines (B1e)
+    public void A_graph_from_older_rules_has_every_file_indexed_again_once(string? rules)
     {
         WriteFile("Assets/a.cs", "class A {}");
         WriteFile("Assets/b.cs", "class B {}");
@@ -160,7 +162,9 @@ public sealed class GraphFreshnessTests : IDisposable
         {
             db.Open();
             using SqliteCommand command = db.CreateCommand();
-            command.CommandText = $"DELETE FROM meta WHERE key = '{GraphStore.ValuesKey}'";
+            command.CommandText = rules is null
+                ? $"DELETE FROM meta WHERE key = '{GraphStore.ValuesKey}'"
+                : $"UPDATE meta SET value = '{rules}' WHERE key = '{GraphStore.ValuesKey}'";
             command.ExecuteNonQuery();
         }
 

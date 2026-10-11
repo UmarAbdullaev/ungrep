@@ -53,6 +53,16 @@ public sealed partial class QueryEngine
     {
         string command = "ug find " + Names.Quote(text) + (kind is { } k ? " --kind " + KindNames.Of(k) : "") + AllFlag;
         Answer answer = Start(budget);
+
+        // No asset is named by its GUID: a GUID finds its asset by key.
+        string guid = text.Trim().ToLowerInvariant();
+        if (kind is null or NodeKind.Asset && guid.Length == 32 && guid.All(char.IsAsciiHexDigitLower) && Node(NodeKeys.Asset(guid)) is { } asset)
+        {
+            answer.AddRange(Answer.Table([FindRow(asset)]));
+            answer.Add("1 found");
+            return answer.Finish(command);
+        }
+
         Page<Node> page = _store.FindByName(text, kind is { } only ? NodeKindSet.Of(only) : _findKinds, All ? NoLimit : FindLimit);
         if (page.Items.Count == 0)
         {
@@ -79,34 +89,151 @@ public sealed partial class QueryEngine
             answer.Add(Header(node));
         }
 
-        var rows = new List<(int Order, string Label, string Source, int Line, string[] Row)>();
+        var rows = new List<RefRow>();
         bool more = false;
         foreach (Node node in nodes)
         {
+            string? target = nodes.Count > 1 ? "→ " + (Names.Prop(node, "sig") ?? node.Name) : null;
             foreach (Edge edge in Incoming(node, ref more))
             {
                 (int order, string label) = IncomingLabel(edge, node);
-                string source = Source(edge);
-                var row = new List<string> { label, source, Names.Location(edge) };
-                if (nodes.Count > 1)
-                {
-                    row.Add("→ " + (Names.Prop(node, "sig") ?? node.Name));
-                }
+                rows.Add(new RefRow(order, label, Source(edge), Label(edge.Src), edge, target, null));
+            }
 
-                if (edge.Confidence != Confidence.Exact)
-                {
-                    row.Add(Names.Confidence(edge.Confidence));
-                }
-
-                rows.Add((order, label, source, edge.Line, [.. row]));
+            foreach ((Edge edge, string via) in ImplementedVia(node))
+            {
+                rows.Add(new RefRow(4, "implemented by", Names.Qualified(edge.Src), Names.Qualified(edge.Src), edge, target, "via " + via));
             }
         }
 
-        rows.Sort((a, b) => (a.Order, a.Label, a.Source, a.Line, string.Join(' ', a.Row))
-            .CompareTo((b.Order, b.Label, b.Source, b.Line, string.Join(' ', b.Row))));
-        answer.AddRange(Answer.Table([.. rows.Select(r => r.Row)], "  "));
-        answer.Add(more ? $"{rows.Count}+ references: {command} --all" : rows.Count == 1 ? "1 reference" : $"{rows.Count} references");
+        rows.Sort((a, b) => (a.Order, a.Label, a.Source, a.Edge.Line, string.Join(' ', Cells(a)))
+            .CompareTo((b.Order, b.Label, b.Source, b.Edge.Line, string.Join(' ', Cells(b)))));
+        (List<string[]> lines, int folded, int into) = All ? (rows.Select(Cells).ToList(), 0, 0) : Fold(rows);
+        answer.AddRange(Answer.Table(lines, "  "));
+        string count = more ? $"{rows.Count}+ references" : rows.Count == 1 ? "1 reference" : $"{rows.Count} references";
+        answer.Add(count + (folded > 0 ? $", {folded} folded into {Count(into, "line")}" : "") + (more || folded > 0 ? $": {command} --all" : ""));
         return answer.Finish(command);
+    }
+
+    // A `refs` line: an edge in, or (B1c) a type implementing the interface through one extending it.
+    private sealed record RefRow(int Order, string Label, string Source, string Owner, Edge Edge, string? Target, string? Via);
+
+    private static string[] Cells(RefRow row)
+    {
+        var cells = new List<string> { row.Label, row.Source, Names.Location(row.Edge) };
+        if (row.Target is not null)
+        {
+            cells.Add(row.Target);
+        }
+
+        if (row.Via is not null)
+        {
+            cells.Add(row.Via);
+        }
+
+        if (row.Edge.Confidence != Confidence.Exact)
+        {
+            cells.Add(Names.Confidence(row.Edge.Confidence));
+        }
+
+        return [.. cells];
+    }
+
+    // Four or more asset lines of one label from one file fold into one where the first of them
+    // was (B1a: a prefab used 19 times in a data asset took 19 lines; which assets use it is the
+    // question): `referenced by  19 fields  Assets/Data/Nodes/C1_Central.asset:68-265`.
+    private static (List<string[]> Lines, int Folded, int Into) Fold(List<RefRow> rows)
+    {
+        var groups = rows.Where(r => FoldNoun(r.Label) is not null)
+            .GroupBy(r => (r.Label, r.Edge.File, r.Target))
+            .Where(g => g.Count() > 3)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var lines = new List<string[]>();
+        var done = new HashSet<(string, string, string?)>();
+        foreach (RefRow row in rows)
+        {
+            if (!groups.TryGetValue((row.Label, row.Edge.File, row.Target), out List<RefRow>? group))
+            {
+                lines.Add(Cells(row));
+                continue;
+            }
+
+            if (!done.Add((row.Label, row.Edge.File, row.Target)))
+            {
+                continue;
+            }
+
+            List<string> owners = [.. group.Select(r => r.Owner).Distinct()];
+            string counted = $"{group.Count} {FoldNoun(row.Label)}";
+            int first = group.Min(r => r.Edge.Line);
+            int last = group.Max(r => r.Edge.Line);
+            var cells = new List<string>
+            {
+                row.Label,
+                owners.Count == 1 && owners[0] != row.Edge.File ? owners[0] + ": " + counted : counted,
+                first == last ? $"{row.Edge.File}:{first}" : $"{row.Edge.File}:{first}-{last}",
+            };
+            if (row.Target is not null)
+            {
+                cells.Add(row.Target);
+            }
+
+            int heuristic = group.Count(r => r.Edge.Confidence != Confidence.Exact);
+            if (heuristic > 0)
+            {
+                cells.Add(heuristic == group.Count ? Names.Confidence(Confidence.Heuristic) : $"[{heuristic} heuristic]");
+            }
+
+            lines.Add([.. cells]);
+        }
+
+        return (lines, groups.Values.Sum(g => g.Count), groups.Count);
+    }
+
+    // What a folded line counts, by label; code lines (callers, users) do not fold.
+    private static string? FoldNoun(string label) => label switch
+    {
+        "on" => "components",
+        "unity event" => "events",
+        "prefab instance" => "instances",
+        "variant" => "variants",
+        "referenced by" => "fields",
+        "overridden in" => "overrides",
+        "addressable entry" => "entries",
+        _ => null,
+    };
+
+    // Types implementing an interface through interfaces that extend it, at any depth, with the
+    // extending interface (B1c: which classes implement IPartRule took one `refs` per interface).
+    // A type that also implements it directly is listed once, as the direct line.
+    private List<(Edge Edge, string Via)> ImplementedVia(Node type)
+    {
+        var found = new List<(Edge, string)>();
+        if (type.Kind != NodeKind.Type || Names.Prop(type, "subkind") != "interface")
+        {
+            return found;
+        }
+
+        var implementers = In(type.Key).Where(e => e.Kind == EdgeKind.Implements).Select(e => e.Src).ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal) { type.Key };
+        var queue = new Queue<string>([type.Key]);
+        while (queue.Count > 0)
+        {
+            foreach (Edge extends in In(queue.Dequeue()).Where(e => e.Kind == EdgeKind.Inherits))
+            {
+                if (!seen.Add(extends.Src))
+                {
+                    continue;
+                }
+
+                queue.Enqueue(extends.Src);
+                found.AddRange(In(extends.Src)
+                    .Where(e => e.Kind == EdgeKind.Implements && implementers.Add(e.Src))
+                    .Select(e => (e, Names.Qualified(extends.Src))));
+            }
+        }
+
+        return found;
     }
 
     public string Explain(string text, bool members, int budget)
@@ -186,7 +313,8 @@ public sealed partial class QueryEngine
         lines.Add(["used by", Join(Sources(incoming, EdgeKind.UsesType))]);
         bool isInterface = Names.Prop(type, "subkind") == "interface";
         AddIfAny(lines, isInterface ? "extended by" : "subclasses", Sources(incoming, EdgeKind.Inherits));
-        AddIfAny(lines, "implemented by", Sources(incoming, EdgeKind.Implements));
+        AddIfAny(lines, "implemented by", [.. Sources(incoming, EdgeKind.Implements)
+            .Concat(ImplementedVia(type).Select(v => $"{Names.Qualified(v.Edge.Src)} (via {v.Via})").Order(StringComparer.Ordinal))]);
         List<string> scripts = [.. incoming.Where(e => e.Kind == EdgeKind.ScriptDefines).Select(e => e.Src)];
         AddIfAny(lines, "on", On(scripts));
         List<string> placed = PlacedIn(scripts);
@@ -325,7 +453,9 @@ public sealed partial class QueryEngine
         bool instance = node.Kind == NodeKind.PrefabInstance;
         AddIfAny(lines, instance ? "instance of" : "script", [.. outgoing.Where(e => e.Kind == EdgeKind.InstanceOf).Select(e => instance ? Label(e.Dst) : ScriptName(e))]);
         AddIfAny(lines, "overrides", [.. outgoing.Where(e => e.Kind == EdgeKind.OverridesValue).Select(Override)]);
-        AddIfAny(lines, "references", [.. outgoing.Where(e => e.Kind == EdgeKind.References && !instance).Select(e => $"{Names.Prop(e, "field")} -> {Label(e.Dst)}")]);
+        // In the order the inspector shows the fields: the order they are saved in.
+        AddIfAny(lines, "references", [.. outgoing.Where(e => e.Kind == EdgeKind.References && !instance).OrderBy(e => e.Line)
+            .Select(e => $"{Names.Prop(e, "field")} -> {Label(e.Dst)}")]);
         AddIfAny(lines, "unity events", [.. outgoing.Where(e => e.Kind == EdgeKind.EventCalls)
             .Select(e => $"{Names.Prop(e, "event")} -> {Names.Qualified(e.Dst)}" + (e.Confidence == Confidence.Exact ? "" : " [heuristic]"))]);
         answer.AddRange(Answer.Table(lines, "  "));
@@ -449,6 +579,8 @@ public sealed partial class QueryEngine
                 return [Names.AssetPath(node), Names.Kind(node), "guid " + node.Key["a:".Length..]];
             case NodeKind.GameObject:
                 return [Label(node.Key), Names.Kind(node), Names.Location(node), Names.Prop(node, "active") == "false" ? "inactive" : ""];
+            case NodeKind.Component:
+                return [Label(node.Key), Names.Kind(node), Names.Location(node), ""];
             case NodeKind.PrefabInstance:
                 return [Label(node.Key), Names.Kind(node), Names.Location(node), Names.Prop(node, "source") is { } source ? "of " + Label(NodeKeys.Asset(source)) : ""];
         }

@@ -1,12 +1,12 @@
 ---
 name: unity
-description: Unity project questions and editor work. Use the ug CLI before grep or reading YAML.
+description: Unity project questions and editor work. For any question about this project's C# or assets (who calls, uses or implements X; where X is defined; what a scene, prefab or asset wires or references; what breaks if X changes), load this before Grep, Glob or Read: one ug call answers with file:line.
 ---
-Run `"${CLAUDE_PLUGIN_ROOT}/bin/ug" <cmd>` (`--project <dir>` elsewhere). Options: `ug <cmd> --help`, don't guess.
+Run `"${CLAUDE_PLUGIN_ROOT}/bin/ug" <cmd>` (`--project <dir>` elsewhere). `ug <cmd> --help`, don't guess.
 
 Graph (no Unity; beats grep; answers carry `file:line`, read only those):
 `explain <symbol>` what it is, users, scenes/prefabs holding it; `refs <symbol>` what points at it; `impact <symbol>` what a change breaks; `outline <file>` members/object tree, no bodies; `find <text>` types, members, assets, objects (`--kind`); `view <symbol>` HTML graph for people; `index`, `doctor`, `stats`.
-`<symbol>`: type, `Type.Member`, asset path/name/GUID, object name/path, `cs:`/`a:`/`o:` key. `[exact]` is compiler-true, `[heuristic]` is a string match: verify. `ambiguous:`/`not found:` list candidates; `more` if needed.
+`<symbol>`: type, `Type.Member`, asset path/name/GUID, object name/path, component `Run > RunDirector`, `cs:`/`a:`/`o:` key. `[heuristic]` is a string match: verify. `ambiguous:`/`not found:` list candidates; `more` if needed.
 
 Open editor (bridge; "Unity not reachable" answers are from Editor.log: check age):
 - `status`, `compile` (after each script edit, not Editor.log), `bridge`

@@ -14,14 +14,15 @@ Game.Lab.LabStage._turntable  field  Assets/Scripts/Lab/LabStage.cs:12  Turntabl
 1 found
 
 $ ug find Open
+Game.Core.Door.Open                method       Assets/Scripts/Core/Stage.cs:36       Open(int)
 Game.Core.IOpenable.Open           method       Assets/Scripts/Core/Stage.cs:9        Open(int)
 Game.Core.Stage.Open               method       Assets/Scripts/Core/Stage.cs:14       Open(int)
 Game.Lab.LabStage.Open             method       Assets/Scripts/Lab/LabStage.cs:24-36  Open(int)
 Game.Lab.LabStage._opened          field        Assets/Scripts/Lab/LabStage.cs:16     int
 Canvas/Open Button                 game_object  Assets/Scenes/Lab.unity:38-50
-Game.EditorTools.LabTools.OpenLab  method       Assets/Editor/LabTools.cs:9-13        OpenLab()
-Game.Lab.LabStage.OpenFirst        method       Assets/Scripts/Lab/LabStage.cs:55-56  OpenFirst()
-7 found
+Game.EditorTools.LabTools.OpenLab  method       Assets/Editor/LabTools.cs:10-13       OpenLab()
+Game.Lab.LabStage.OpenFirst        method       Assets/Scripts/Lab/LabStage.cs:56     OpenFirst()
+8 found
 
 $ ug find Nothing
 nothing found: Nothing
@@ -46,10 +47,10 @@ Game.Core.Stage  class  Assets/Scripts/Core/Stage.cs:12-17  [exact]
 1 reference
 
 $ ug refs LabStage
-Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:8-57  [exact]
   used by       Game.EditorTools.LabStageEditor    Assets/Editor/LabTools.cs:16
   used by       Game.EditorTools.LabTools.OpenLab  Assets/Editor/LabTools.cs:12
-  script asset  Assets/Scripts/Lab/LabStage.cs     Assets/Scripts/Lab/LabStage.cs:7
+  script asset  Assets/Scripts/Lab/LabStage.cs     Assets/Scripts/Lab/LabStage.cs:8
   on            Turntable > LabStage               Assets/Prefabs/Turntable.prefab:56
 4 references
 
@@ -80,7 +81,7 @@ Game.Lab.Turntable.OnOpened()  method  Assets/Scripts/Lab/Turntable.cs:25  [exac
 1 reference
 
 $ ug explain LabStage
-Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.cs:8-57  [exact]
   also in       Assets/Scripts/Lab/LabStage.Debug.cs
   unity         MonoBehaviour, script guid 5a1b2c3d4e5f60718293a4b5c6d7e8f9
   engine calls  Awake
@@ -93,7 +94,7 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
   more  ug explain LabStage --members | ug refs LabStage
 
 $ ug explain LabStage --members
-Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.cs:8-57  [exact]
   also in       Assets/Scripts/Lab/LabStage.Debug.cs
   unity         MonoBehaviour, script guid 5a1b2c3d4e5f60718293a4b5c6d7e8f9
   engine calls  Awake
@@ -115,7 +116,7 @@ Game.Lab.LabStage  class : Game.Core.Stage, Game.Lab.ILabDebug  Assets/Scripts/L
     ResetStage   method  38  ResetStage()
     Spin         method  40  Spin()
     OnClosed     method  46  OnClosed()  protected  override
-    OpenFirst    method  55  OpenFirst()  [ContextMenu]
+    OpenFirst    method  56  OpenFirst()  [ContextMenu]
   more  ug refs LabStage
 
 $ ug explain Game.Lab.ILabDebug
@@ -144,7 +145,7 @@ Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21 
   more  ug refs 'Turntable.Rotate(float)'
 
 $ ug explain Turntable._speed
-Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:9-11  [exact]
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:11  [exact]
   in          Game.Lab.Turntable
   type        float
   serialized  yes, formerly _rpm, rpm
@@ -177,10 +178,10 @@ $ ug explain Nope.Missing
 not found: Nope.Missing
 
 $ ug refs cs:T:Game.Lab.LabStage
-Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:8-57  [exact]
   used by       Game.EditorTools.LabStageEditor    Assets/Editor/LabTools.cs:16
   used by       Game.EditorTools.LabTools.OpenLab  Assets/Editor/LabTools.cs:12
-  script asset  Assets/Scripts/Lab/LabStage.cs     Assets/Scripts/Lab/LabStage.cs:7
+  script asset  Assets/Scripts/Lab/LabStage.cs     Assets/Scripts/Lab/LabStage.cs:8
   on            Turntable > LabStage               Assets/Prefabs/Turntable.prefab:56
 4 references
 
@@ -335,7 +336,7 @@ Extra  sub_asset  Assets/Data/LabSettings.asset:3-22  [exact]
   more  ug refs o:f6000000000000000000000000000006:-5
 
 $ ug explain LabStage.OpenFirst
-Game.Lab.LabStage.OpenFirst()  method  Assets/Scripts/Lab/LabStage.cs:55-56  [exact]
+Game.Lab.LabStage.OpenFirst()  method  Assets/Scripts/Lab/LabStage.cs:56  [exact]
   in            Game.Lab.LabStage
   called from   (none)
   unity events  Lab.unity > Canvas/Open Button > Button: m_OnClick
@@ -353,4 +354,59 @@ Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
   script asset  Assets/Scripts/Lab/Turntable.cs  Assets/Scripts/Lab/Turntable.cs:7
   on            Turntable > Turntable            Assets/Prefabs/Turntable.prefab:42
 7 references
+
+$ ug find b1000000000000000000000000000001
+Assets/Prefabs/Turntable.prefab  prefab  guid b1000000000000000000000000000001
+1 found
+
+$ ug find B1000000000000000000000000000001 --kind asset
+Assets/Prefabs/Turntable.prefab  prefab  guid b1000000000000000000000000000001
+1 found
+
+$ ug find b1000000000000000000000000000001 --kind field
+nothing found: b1000000000000000000000000000001
+
+$ ug refs IOpenable
+Game.Core.IOpenable  interface  Assets/Scripts/Core/Stage.cs:7-10  [exact]
+  extended by     Game.Core.ILockable  Assets/Scripts/Core/Stage.cs:27
+  implemented by  Game.Core.Door       Assets/Scripts/Core/Stage.cs:32  via Game.Core.ILockable
+  implemented by  Game.Core.Stage      Assets/Scripts/Core/Stage.cs:12
+3 references
+
+$ ug explain IOpenable
+Game.Core.IOpenable  interface  Assets/Scripts/Core/Stage.cs:7-10  [exact]
+  members         1 method
+  used by         (none)
+  extended by     Game.Core.ILockable
+  implemented by  Game.Core.Stage, Game.Core.Door (via Game.Core.ILockable)
+  more  ug explain IOpenable --members | ug refs IOpenable
+
+$ ug explain Turntable > Turntable
+Turntable > Turntable  component  Assets/Prefabs/Turntable.prefab:33-46  [exact]
+  in      Assets/Prefabs/Turntable.prefab
+  on      Turntable
+  script  Game.Lab.Turntable
+  more  ug refs 'Turntable > Turntable'
+
+$ ug explain Turntable.prefab > Turntable > LabStage
+Turntable > LabStage  component  Assets/Prefabs/Turntable.prefab:47-64  [exact]
+  in          Assets/Prefabs/Turntable.prefab
+  on          Turntable
+  script      Game.Lab.LabStage
+  references  _turntable -> Turntable > Turntable
+  more  ug refs 'Turntable.prefab > Turntable > LabStage'
+
+$ ug explain Lab.unity > Turntable > LabStage
+not found: Lab.unity > Turntable > LabStage
+
+$ ug explain Turntable > Nope
+not found: Turntable > Nope
+
+$ ug explain StageData
+Game.Core.StageData  class  Assets/Scripts/Core/Stage.cs:20-25  [exact]
+  unity       [Serializable]
+  serialized  level: int, points: List<Vector3>
+  members     3 fields
+  used by     Game.Lab.LabStage._data
+  more  ug explain StageData --members | ug refs StageData
 

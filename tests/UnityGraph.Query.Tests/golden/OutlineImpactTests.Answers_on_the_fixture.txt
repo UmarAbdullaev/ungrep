@@ -1,7 +1,7 @@
 $ ug outline Turntable.cs
 Assets/Scripts/Lab/Turntable.cs  script  1 type, 6 members  [exact]
   Game.Lab.Turntable  class     7-26   : UnityEngine.MonoBehaviour  public MonoBehaviour
-    _speed            field     9-11   float  serialized
+    _speed            field     11     float  serialized
     Tint              property  13     Color  public  serialized
     Rotated           event     15     Action<float>  public
     Rotate            method    17-21  Rotate(float)  public
@@ -10,7 +10,7 @@ Assets/Scripts/Lab/Turntable.cs  script  1 type, 6 members  [exact]
 
 $ ug outline Assets/Scripts/Lab/LabStage.cs
 Assets/Scripts/Lab/LabStage.cs  script  1 type, 12 members  [exact]
-  Game.Lab.LabStage  class   7-57   : Game.Core.Stage, Game.Lab.ILabDebug  public MonoBehaviour  partial, also in Assets/Scripts/Lab/LabStage.Debug.cs
+  Game.Lab.LabStage  class   8-57   : Game.Core.Stage, Game.Lab.ILabDebug  public MonoBehaviour  partial, also in Assets/Scripts/Lab/LabStage.Debug.cs
     ResetMethod      field   10     string  const
     _turntable       field   12     Turntable  serialized
     _data            field   13     StageData  serialized
@@ -22,11 +22,11 @@ Assets/Scripts/Lab/LabStage.cs  script  1 type, 12 members  [exact]
     ResetStage       method  38     ResetStage()
     Spin             method  40-44  Spin()
     OnClosed         method  46-53  OnClosed()  protected  override
-    OpenFirst        method  55-56  OpenFirst()  [ContextMenu]
+    OpenFirst        method  56     OpenFirst()  [ContextMenu]
 
 $ ug outline LabStage.Debug.cs
 Assets/Scripts/Lab/LabStage.Debug.cs  script  2 types, 2 members  [exact]
-  Game.Lab.LabStage   class      7      part of Assets/Scripts/Lab/LabStage.cs:7-57
+  Game.Lab.LabStage   class      7      part of Assets/Scripts/Lab/LabStage.cs:8-57
     Trace             method     7      Trace(int)  public
   Game.Lab.ILabDebug  interface  10-13  public
     Trace             method     12     Trace(int)  public
@@ -46,16 +46,21 @@ Assets/Scripts/Core/Pool.cs  script  3 types, 8 members  [exact]
     op_Addition    method    32     op_Addition(Money, Money)  public  static
 
 $ ug outline Assets/Scripts/Core/Stage.cs
-Assets/Scripts/Core/Stage.cs  script  3 types, 6 members  [exact]
+Assets/Scripts/Core/Stage.cs  script  5 types, 9 members  [exact]
   Game.Core.IOpenable  interface  7-10   public
     Open               method     9      Open(int)  public
   Game.Core.Stage      class      12-17  : UnityEngine.MonoBehaviour, Game.Core.IOpenable  public abstract MonoBehaviour
     Open               method     14     Open(int)  public  abstract
     OnClosed           method     16     OnClosed()  protected  virtual
-  Game.Core.StageData  class      19-25  public [Serializable]
+  Game.Core.StageData  class      20-25  public [Serializable]
     level              field      22     int  public  serialized
     points             field      23     List<Vector3>  public  serialized
     _lookup            field      24     Dictionary<string, int>
+  Game.Core.ILockable  interface  27-30  : Game.Core.IOpenable  public
+    Locked             property   29     bool  public
+  Game.Core.Door       class      32-37  : Game.Core.ILockable  public
+    Locked             property   34     bool  public
+    Open               method     36     Open(int)  public
 
 $ ug outline Assets/Scripts/Broken.cs
 Assets/Scripts/Broken.cs  script  1 type, 1 member  [exact]
@@ -132,7 +137,7 @@ Game.Lab.Turntable.OnOpened()  method  Assets/Scripts/Lab/Turntable.cs:25  [exac
     Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:31  [heuristic]
 
 $ ug impact Turntable._speed
-Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:9-11  serialized  [exact]
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:11  serialized  [exact]
   affects        1 asset may hold data (1 prefab); 2 overrides
   serialized     1 component of Game.Lab.Turntable in 1 asset  [heuristic]
     1 Turntable  Assets/Prefabs/Turntable.prefab:33
@@ -154,7 +159,7 @@ Game.Lab.Turntable.Rotated  event  Assets/Scripts/Lab/Turntable.cs:15  [exact]
     Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
 
 $ ug impact LabStage
-Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:7-57  [exact]
+Game.Lab.LabStage  class  Assets/Scripts/Lab/LabStage.cs:8-57  [exact]
   affects     2 places in 1 file: 2 type uses; 1 asset hold data (1 prefab)
   type uses   2
     Game.EditorTools.LabStageEditor    Assets/Editor/LabTools.cs:16
@@ -180,7 +185,7 @@ Game.Lab.LabStage.Spin()  method  Assets/Scripts/Lab/LabStage.cs:40-44  [exact]
     Game.Lab.LabStage.Open  Assets/Scripts/Lab/LabStage.cs:30
 
 $ ug impact StageData
-Game.Core.StageData  class  Assets/Scripts/Core/Stage.cs:19-25  [exact]
+Game.Core.StageData  class  Assets/Scripts/Core/Stage.cs:20-25  [exact]
   affects                           1 place in 1 file: 1 type use; 1 asset hold data (1 prefab)
   type uses                         1
     Game.Lab.LabStage._data  Assets/Scripts/Lab/LabStage.cs:13
@@ -258,14 +263,23 @@ $ ug impact cs:T:Game.Lab.Gone
 not found: cs:T:Game.Lab.Gone
 
 $ ug outline Turntable.cs --json
-{"file":"Assets/Scripts/Lab/Turntable.cs","kind":"script","counts":"1 type, 6 members","rows":[{"depth":0,"kind":"class","name":"Game.Lab.Turntable","lines":[7,26],"detail":": UnityEngine.MonoBehaviour  public MonoBehaviour"},{"depth":1,"kind":"field","name":"_speed","lines":[9,11],"detail":"float  serialized"},{"depth":1,"kind":"property","name":"Tint","lines":[13,13],"detail":"Color  public  serialized"},{"depth":1,"kind":"event","name":"Rotated","lines":[15,15],"detail":"Action<float>  public"},{"depth":1,"kind":"method","name":"Rotate","lines":[17,21],"detail":"Rotate(float)  public"},{"depth":1,"kind":"method","name":"Stop","lines":[23,23],"detail":"Stop()  public"},{"depth":1,"kind":"method","name":"OnOpened","lines":[25,25],"detail":"OnOpened()"}],"cut":false}
+{"file":"Assets/Scripts/Lab/Turntable.cs","kind":"script","counts":"1 type, 6 members","rows":[{"depth":0,"kind":"class","name":"Game.Lab.Turntable","lines":[7,26],"detail":": UnityEngine.MonoBehaviour  public MonoBehaviour"},{"depth":1,"kind":"field","name":"_speed","lines":[11,11],"detail":"float  serialized"},{"depth":1,"kind":"property","name":"Tint","lines":[13,13],"detail":"Color  public  serialized"},{"depth":1,"kind":"event","name":"Rotated","lines":[15,15],"detail":"Action<float>  public"},{"depth":1,"kind":"method","name":"Rotate","lines":[17,21],"detail":"Rotate(float)  public"},{"depth":1,"kind":"method","name":"Stop","lines":[23,23],"detail":"Stop()  public"},{"depth":1,"kind":"method","name":"OnOpened","lines":[25,25],"detail":"OnOpened()"}],"cut":false}
 
 $ ug impact Turntable --json
 {"symbol":[{"key":"cs:T:Game.Lab.Turntable","kind":"class","location":"Assets/Scripts/Lab/Turntable.cs:7-26"}],"affects":"5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)","groups":[{"label":"type uses","count":5,"summary":"5","confidence":"exact","rows":[{"name":"Game.Broken.Run","file":"Assets/Scripts/Broken.cs","line":8,"confidence":"exact"},{"name":"Game.Lab.LabStage","file":"Assets/Scripts/Lab/LabStage.cs","line":7,"confidence":"exact"},{"name":"Game.Lab.LabStage.Awake","file":"Assets/Scripts/Lab/LabStage.cs","line":20,"confidence":"exact"},{"name":"Game.Lab.LabStage.OnClosed","file":"Assets/Scripts/Lab/LabStage.cs","line":49,"confidence":"exact"},{"name":"Game.Lab.LabStage._turntable","file":"Assets/Scripts/Lab/LabStage.cs","line":12,"confidence":"exact"}],"more":0},{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"exact","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"held via Game.Lab.LabStage._turntable","count":1,"summary":"1 component in 1 asset","confidence":"exact","rows":[{"name":"1 LabStage","file":"Assets/Prefabs/Turntable.prefab","line":47,"confidence":"exact"}],"more":0}],"cut":false}
 
 $ ug impact Turntable._speed --json
-{"symbol":[{"key":"cs:F:Game.Lab.Turntable._speed","kind":"field","location":"Assets/Scripts/Lab/Turntable.cs:9-11"}],"affects":"1 asset may hold data (1 prefab); 2 overrides","groups":[{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"heuristic","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"overridden in","count":2,"summary":"2","confidence":"exact","rows":[{"name":"Lab Turntable: _speed = 3","file":"Assets/Scenes/Lab.unity","line":133,"confidence":"exact"},{"name":"Turntable Variant: _speed = 5","file":"Assets/Prefabs/Turntable Variant.prefab","line":19,"confidence":"exact"}],"more":0}],"note":"field reads and writes are not in the graph: grep _speed for code uses","cut":false}
+{"symbol":[{"key":"cs:F:Game.Lab.Turntable._speed","kind":"field","location":"Assets/Scripts/Lab/Turntable.cs:11"}],"affects":"1 asset may hold data (1 prefab); 2 overrides","groups":[{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"heuristic","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"overridden in","count":2,"summary":"2","confidence":"exact","rows":[{"name":"Lab Turntable: _speed = 3","file":"Assets/Scenes/Lab.unity","line":133,"confidence":"exact"},{"name":"Turntable Variant: _speed = 5","file":"Assets/Prefabs/Turntable Variant.prefab","line":19,"confidence":"exact"}],"more":0}],"note":"field reads and writes are not in the graph: grep _speed for code uses","cut":false}
 
 $ ug impact Nothing --json
 {"error":"not found: Nothing","lines":[]}
+
+$ ug impact IOpenable
+Game.Core.IOpenable  interface  Assets/Scripts/Core/Stage.cs:7-10  [exact]
+  affects         3 places in 1 file: 2 implementations, 1 extension
+  implemented by  2
+    Game.Core.Door (via Game.Core.ILockable)  Assets/Scripts/Core/Stage.cs:32
+    Game.Core.Stage                           Assets/Scripts/Core/Stage.cs:12
+  extended by     1
+    Game.Core.ILockable  Assets/Scripts/Core/Stage.cs:27
 

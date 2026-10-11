@@ -58,7 +58,7 @@
       "key": {
         "items": ["RunDirector\\.cs\\D{1,12}2[34]\\b|RunDirector\\.cs[^\\n]{0,200}(:|\\bline |\\bL)2[34]\\b", "\\bAwake\\b", "\\bOnEnable\\b", "\\bOnDisable\\b", "\\bStart\\b"],
         "not": ["\\bUpdate\\b", "\\bOnDestroy\\b"],
-        "checked": "2026-10-11, RunDirector.cs read whole: attribute at 23 (ug explain starts there), class at 24; Awake 90, OnEnable 101, OnDisable 108, Start 117; no other Unity message"
+        "checked": "2026-10-11, RunDirector.cs read whole: attribute at 23 (ug explain gave 23 before B1e, 24 since), class at 24; Awake 90, OnEnable 101, OnDisable 108, Start 117; no other Unity message"
       },
       "steps": {
         "codegraph": [
@@ -164,10 +164,7 @@
           { "run": "grep -rnE \"(class|struct)\\s+\\w+[^{]*:[^{]*\\b(IPartRule|IPayload|IEmitter|ITrigger)\\b\" Assets --include=*.cs" }
         ],
         "unitygraph": [
-          { "run": "ug refs IPartRule" },
-          { "run": "ug refs IPayload" },
-          { "run": "ug refs IEmitter" },
-          { "run": "ug refs ITrigger" }
+          { "run": "ug refs IPartRule" }
         ]
       }
     },
@@ -287,10 +284,7 @@
         ],
         "unitygraph": [
           { "run": "ug explain RunDirector" },
-          { "run": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity" },
-          { "run": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject" },
-          { "run": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta" },
-          { "run": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity" }
+          { "run": "ug explain 'Arena_Greybox.unity > Run > RunDirector'" }
         ]
       }
     },
@@ -313,9 +307,7 @@
           { "run": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity" }
         ],
         "unitygraph": [
-          { "run": "ug refs Assets/Prefabs/Enemies/Enemy_Shooter.prefab" },
-          { "run": "ug refs 'Assets/Prefabs/Enemies/Enemy_Shooter.prefab' --budget 2400", "redo": "the first answer was cut at the budget" },
-          { "run": "ug refs 'Assets/Prefabs/Enemies/Enemy_Shooter.prefab' --budget 4800", "redo": "the second answer was cut at the budget" }
+          { "run": "ug refs Assets/Prefabs/Enemies/Enemy_Shooter.prefab" }
         ]
       }
     },

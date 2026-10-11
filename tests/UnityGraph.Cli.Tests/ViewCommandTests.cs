@@ -62,7 +62,7 @@ public sealed partial class ViewCommandTests : IDisposable
     {
         var (_, output) = Run("view", "LabStage", "--kind", "type,method");
 
-        Assert.Equal("indexed 28 files in <t> s\nLibrary/unitygraph/view.html  29 nodes (26 drawn), 28 edges  generated <time> from graph <revision>\n", output);
+        Assert.Equal("indexed 28 files in <t> s\nLibrary/unitygraph/view.html  30 nodes (26 drawn), 29 edges  generated <time> from graph <revision>\n", output);
         string page = File.ReadAllText(Page);
         Assert.Contains("\"depth\":2,\"baked\":3,\"layout\":\"dagre\",", page, StringComparison.Ordinal);
         Assert.Contains("\"kinds\":[\"method\",\"type\"]", page, StringComparison.Ordinal);
@@ -97,7 +97,7 @@ public sealed partial class ViewCommandTests : IDisposable
         var (exitCode, ambiguous) = Run("view", "Open");
         Assert.Equal(0, exitCode);
         Assert.StartsWith("ambiguous: Open\n", ambiguous, StringComparison.Ordinal);
-        Assert.EndsWith("  more  ug view Game.Core.IOpenable.Open\n", ambiguous, StringComparison.Ordinal);
+        Assert.EndsWith("  more  ug view Game.Core.Door.Open\n", ambiguous, StringComparison.Ordinal);
         Assert.False(File.Exists(Page));
     }
 

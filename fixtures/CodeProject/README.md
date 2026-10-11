@@ -15,3 +15,5 @@ The Unity YAML under `Assets/Prefabs`, `Assets/Scenes`, `Assets/Materials`, `Ass
 instances, overrides and UnityEvent calls, a material, ScriptableObjects and an Addressables
 group. GUIDs are readable patterns (`b1000…01`). `Data/Baked.asset` is binary on purpose,
 `Scenes/New.unity` has no `.meta` on purpose, and `Textures/Grid.png` is a text placeholder.
+`ILockable` extends `IOpenable` and `Door` implements it, so `IOpenable` has an implementer
+through an extending interface (B1c).
