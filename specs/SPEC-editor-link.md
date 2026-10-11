@@ -524,6 +524,10 @@ In play mode the loaded scenes include DontDestroyOnLoad while it holds objects:
 (SPEC-editor-ops, DontDestroyOnLoad). No new request or flag, so `ug` gates nothing on it; an older
 bridge keeps answering "not found" for kept objects, and `ug status` naming 0.15.0 tells the two apart.
 
+Also in 0.15.0: a returned or awaited value that is `IEnumerable` as well as `IEnumerator` (a LINQ
+query, an iterator method declared `IEnumerable`) is enumerated once and printed, not stepped as a
+coroutine (X1 and R1, Calling code).
+
 ## Performance targets
 
 | Operation | Target |
