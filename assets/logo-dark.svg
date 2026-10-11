@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="unitygraph: a cube drawn as a graph, with a node at its centre">
+  <title>unitygraph</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#bef264"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#efe8dc" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M100 28 L162 64 L162 136 L100 172 L38 136 L38 64 Z"/>
+    <path d="M100 100 L38 64 M100 100 L162 64 M100 100 L100 172"/>
+  </g>
+  <circle cx="100" cy="100" r="24" fill="url(#g)"/>
+</svg>

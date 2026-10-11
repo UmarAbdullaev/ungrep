@@ -26,7 +26,8 @@ Windows, macOS or Linux, with nothing to build:
 ## Payload (`build/package.sh`)
 
 From `HEAD` by `git archive`, so an uncommitted edit can't slip in:
-`.claude-plugin/plugin.json`, `bin/`, `hooks/`, `skills/`, `unity/` (the bridge package),
+`.claude-plugin/plugin.json`, `assets/` (the README images; their sources and `render.sh` are in
+`build/readme-art/`), `bin/`, `hooks/`, `skills/`, `unity/` (the bridge package),
 `README.md`, `CHANGELOG.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md`. Added by the script:
 
 - `dist/ug/`: `dotnet publish src/UnityGraph.Cli -c Release`, framework-dependent (.NET 8 runtime

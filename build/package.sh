@@ -37,7 +37,7 @@ rm -rf "$out"
 mkdir -p "$out"
 
 # The plugin files as committed, so a local edit can't slip into a release.
-git archive HEAD .claude-plugin/plugin.json bin hooks skills unity README.md CHANGELOG.md LICENSE THIRD_PARTY_NOTICES.md \
+git archive HEAD .claude-plugin/plugin.json assets bin hooks skills unity README.md CHANGELOG.md LICENSE THIRD_PARTY_NOTICES.md \
     | tar -x -C "$out"
 
 mkdir -p "$out/licenses"
