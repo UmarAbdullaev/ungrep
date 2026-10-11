@@ -227,6 +227,31 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void Undo_and_redo_name_the_group_not_the_records_Unity_named()
+        {
+            // SerializedObject, Undo.AddComponent and Undo.DestroyObjectImmediate name their own records
+            // ("Modified Speed in Player", "Add BoxCollider", "Destroy Object").
+            Ask("/set", "object", "Level/Player", "field", "speed", "value", "7.5");
+            Ask("/component/add", "object", "Level/Player", "type", "BoxCollider");
+            Ask("/object/delete", "object", "Level/Enemy#2");
+
+            Assert.AreEqual(Lines("undid ug object delete"), Ask("/undo"));
+            Assert.AreEqual(Lines("undid ug component add"), Ask("/undo"));
+            Assert.AreEqual(Lines("undid ug set"), Ask("/undo"));
+            Assert.AreEqual(5f, Find("Level/Player").GetComponent<UgProbe>().speed);
+
+            // Redo takes the nearest undone group, not the last one undone first.
+            Assert.AreEqual(Lines("redid ug set"), Ask("/redo"));
+            Assert.AreEqual(Lines("redid ug component add"), Ask("/redo"));
+            Assert.AreEqual(Lines("redid ug object delete"), Ask("/redo"));
+            Assert.AreEqual(Lines("nothing to redo"), Ask("/redo"));
+            Assert.IsNotNull(Find("Level/Player").GetComponent<BoxCollider>());
+
+            Undo.ClearAll();
+            Assert.AreEqual(Lines("nothing to undo"), Ask("/undo"));
+        }
+
+        [Test]
         public void Past_20_selected_select_names_all_which_lists_every_one()
         {
             GameObject level = Find("Level");

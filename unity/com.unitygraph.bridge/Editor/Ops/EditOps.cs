@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -416,14 +417,14 @@ namespace UnityGraph.Bridge
 
         public static Reply UndoLast(bool redo)
         {
-            bool known = Answer.UndoRecords(out List<string> undos, out List<string> redos);
-            List<string> records = redo ? redos : undos;
-            if (known && records.Count == 0)
+            bool known = Groups(out List<string> groups, out int cursor);
+            int next = redo ? cursor + 1 : cursor;
+            if (known && (next < 0 || next >= groups.Count))
             {
                 return Answer.Line(redo ? "nothing to redo" : "nothing to undo");
             }
 
-            string name = known ? records[records.Count - 1] : null;
+            string name = known ? groups[next] : null;
             if (redo)
             {
                 Undo.PerformRedo();
@@ -951,5 +952,39 @@ namespace UnityGraph.Bridge
         }
 
         private static string Bool(bool value) => value ? "true" : "false";
+
+        // Unity keeps one name per undo group, the one Edit > Undo shows, oldest first, and a cursor on
+        // the group Ctrl+Z reverts (-1 when none); the groups after it are the redos, nearest first.
+        // GetRecords would list each group's records too, under names Unity gives them itself
+        // ("Add BoxCollider"). Read the groups by reflection (Unity 6 adds a `serialized` flag: false
+        // lists the editor's groups, true listed none), and fall back to nameless answers when that
+        // method is gone.
+        private static bool Groups(out List<string> groups, out int cursor)
+        {
+            groups = new List<string>();
+            cursor = -1;
+            const BindingFlags all = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            Type[] unity6 = { typeof(List<string>), typeof(int).MakeByRefType(), typeof(bool) };
+            Type[] unity2022 = { typeof(List<string>), typeof(int).MakeByRefType() };
+            MethodInfo method = typeof(Undo).GetMethod("GetUndoList", all, null, unity6, null)
+                ?? typeof(Undo).GetMethod("GetUndoList", all, null, unity2022, null);
+            if (method == null)
+            {
+                return false;
+            }
+
+            object[] arguments = method.GetParameters().Length == 3 ? new object[] { groups, -1, false } : new object[] { groups, -1 };
+            try
+            {
+                method.Invoke(null, arguments);
+            }
+            catch (TargetInvocationException)
+            {
+                return false;
+            }
+
+            cursor = (int)arguments[1];
+            return true;
+        }
     }
 }
