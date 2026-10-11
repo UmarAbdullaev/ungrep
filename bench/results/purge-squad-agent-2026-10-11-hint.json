@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "suite": "purge-squad",
+  "mode": "agent",
+  "date": "2026-10-11",
+  "commit": "9ce9995",
+  "head": "9ce9995",
+  "arms": [
+    "unitygraph"
+  ],
+  "questions": [
+    {
+      "id": "N3",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 0,
+          "of": 0,
+          "runs": [
+            {
+              "sessionId": "95b3a86a-11d8-4453-acd2-b9d9a28eba14",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 171245,
+              "subagentTokens": 0,
+              "usd": 0.0972,
+              "seconds": 20.3,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "2fa30836-627b-44c6-8120-02f704f19f0e",
+              "turns": 4,
+              "toolCalls": 3,
+              "contextTokens": 229215,
+              "subagentTokens": 0,
+              "usd": 0.1119,
+              "seconds": 24.8,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "fdbe5a55-9e8b-4ece-9efd-16ed35d31936",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 171276,
+              "subagentTokens": 0,
+              "usd": 0.0948,
+              "seconds": 22.7,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N4",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 0,
+          "of": 0,
+          "runs": [
+            {
+              "sessionId": "5b38c29e-9e66-44ec-859d-3eed716fdfd9",
+              "turns": 4,
+              "toolCalls": 3,
+              "contextTokens": 228810,
+              "subagentTokens": 0,
+              "usd": 0.3185,
+              "seconds": 22.9,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "58c9983f-6632-4638-b5ad-1ba281c931ef",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 171026,
+              "subagentTokens": 0,
+              "usd": 0.0922,
+              "seconds": 17.7,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "7ca102b3-fc69-4eda-b54d-332f46a2636e",
+              "turns": 2,
+              "toolCalls": 1,
+              "contextTokens": 113877,
+              "subagentTokens": 0,
+              "usd": 0.0806,
+              "seconds": 15.6,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N5",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 0,
+          "of": 0,
+          "runs": [
+            {
+              "sessionId": "9016f655-77b4-4b5f-bc36-98d04fb48627",
+              "turns": 5,
+              "toolCalls": 4,
+              "contextTokens": 290681,
+              "subagentTokens": 0,
+              "usd": 0.1366,
+              "seconds": 23.2,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": true,
+              "leaked": false
+            },
+            {
+              "sessionId": "db010f98-dd8c-478c-9639-eeb3a5255aa2",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 172814,
+              "subagentTokens": 0,
+              "usd": 0.1007,
+              "seconds": 14.9,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "90bf18a3-74d1-41aa-a790-ff90cecc22c6",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 171530,
+              "subagentTokens": 0,
+              "usd": 0.098,
+              "seconds": 15.8,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": true,
+              "leaked": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "idle": [],
+  "budgets": [
+    {
+      "name": "skill description",
+      "ok": true,
+      "detail": "80/300"
+    },
+    {
+      "name": "skill body",
+      "ok": true,
+      "detail": "598/600"
+    },
+    {
+      "name": "compile gate",
+      "ok": true,
+      "detail": "0 bytes clean, 20/20 error lines"
+    }
+  ],
+  "model": "claude-opus-5-5"
+}

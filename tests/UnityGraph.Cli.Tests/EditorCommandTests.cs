@@ -208,9 +208,11 @@ public sealed partial class EditorCommandTests : IDisposable
         Assert.Equal("""
             The bridge is a Unity package in the plugin: <package>/package.json
             Add it one of two ways; both write into the project:
-              1. In Unity: Window > Package Manager > + > Install package from disk..., and pick that file.
-                 Unity records it in Packages/manifest.json; ug never edits that file.
-              2. ug bridge install --copy: copies it to Assets/Plugins/UnityGraphBridge/ (vendored, so not indexed).
+              1. ug bridge install --copy (recommended): copies it to Assets/Plugins/UnityGraphBridge/ (vendored, so not indexed).
+                 Run it again after a unitygraph update; ug doctor says when the copy is behind.
+              2. In Unity: Window > Package Manager > + > Install package from disk..., and pick that file.
+                 Unity records it in Packages/manifest.json; ug never edits that file. The link points into
+                 this unitygraph version's folder, which a plugin update removes.
             Once Unity has compiled it, ug status shows the editor.
 
             """.ReplaceLineEndings("\n"), output);
@@ -243,14 +245,14 @@ public sealed partial class EditorCommandTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "Packages", "manifest.json"), "{\"dependencies\":{\"com.unitygraph.bridge\":\"file:../bridge\"}}");
 
         Assert.Equal(
-            "the bridge is linked through Package Manager (Packages/manifest.json: file:../bridge); Unity loads it from that folder, so it is already current and there is nothing to copy\n",
+            "the bridge is already added through Package Manager (Packages/manifest.json: file:../bridge); a copy would clash with it. To switch to a copy, remove it in Window > Package Manager, then run this again\n",
             Run("bridge", "install", "--copy").Output);
         Assert.False(Directory.Exists(Path.Combine(_root, "Assets", "Plugins")));
         Assert.Equal("the bridge was added through Package Manager: remove it there (Window > Package Manager)\n", Run("bridge", "remove").Output);
 
         File.WriteAllText(Path.Combine(_root, "Packages", "manifest.json"), "{\"dependencies\":{\"com.unitygraph.bridge\":\"0.9.0\"}}");
         Assert.Equal(
-            "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it\n",
+            "the bridge is already added through Package Manager (Packages/manifest.json); a copy would clash with it. To switch to a copy, remove it in Window > Package Manager, then run this again\n",
             Run("bridge", "install", "--copy").Output);
         Assert.False(Directory.Exists(Path.Combine(_root, "Assets", "Plugins")));
     }

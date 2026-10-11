@@ -29,7 +29,7 @@ In:
 
 Out: the compile gate hook, compact `ug console`, `ug test` and `ug log` (all `unity-loop`,
 which uses this client); entering or leaving play mode and scene or asset edits (added later
-as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, Decisions #3); Linux.
+as `editor-ops`, `SPEC-editor-ops.md`); Unity's official CLI adapter (after v1, Decisions #3).
 
 ## The bridge
 
@@ -126,7 +126,8 @@ poll during a domain reload.
 ### `Editor.log` fallback
 
 When no bridge answers, `ug compile` reads `Editor.log` (Windows
-`%LOCALAPPDATA%\Unity\Editor\Editor.log`, macOS `~/Library/Logs/Unity/Editor.log`):
+`%LOCALAPPDATA%\Unity\Editor\Editor.log`, macOS `~/Library/Logs/Unity/Editor.log`, Linux
+`~/.config/unity3d/Editor.log`):
 
 - It belongs to this project when its command line (`-projectpath`) names the project root;
   otherwise the answer says the log is another project's and gives no errors.
@@ -172,13 +173,18 @@ ran Game.EditorTools.LabTools.OpenLab in 12 ms
   assemblies once. `--all` lists every line (C1); with `--warnings` every warning too. The Editor.log
   fallback takes `--all` the same way. The compile gate's reason keeps the 20-line cap and its
   last line names `ug compile --all`.
-- `ug bridge install` prints the two ways to add the package: Unity's Package Manager "Add
-  package from disk" on `unity/com.unitygraph.bridge/package.json` in the plugin folder (Unity
-  edits its own manifest; we never touch `Packages/`), or `ug bridge install --copy`, which
-  copies the package into `Assets/Plugins/UnityGraphBridge/` (a vendored folder, so the graph
-  ignores it). When the manifest already has the package, `--copy` copies nothing: a `file:` link
-  loads the plugin folder itself, so it is always current; any other entry would clash. `ug bridge
-  remove` deletes the copied folder only. The `unity` skill tells Claude to
+- `ug bridge install` prints the two ways to add the package: `ug bridge install --copy`
+  (recommended), which copies the package into `Assets/Plugins/UnityGraphBridge/` (a vendored
+  folder, so the graph ignores it), or Unity's Package Manager "Add package from disk" on
+  `unity/com.unitygraph.bridge/package.json` in the plugin folder (Unity edits its own manifest;
+  we never touch `Packages/`). The copy comes first since 0.9.0: an installed plugin lives in a
+  versioned cache folder that an update deletes, so a `file:` link into it breaks
+  (`specs/SPEC-release.md`). When the manifest already has the package, `--copy` copies nothing,
+  as the copy would clash with it, and says to remove it in Package Manager first. `ug bridge
+  remove` deletes the copied folder only.
+- `ug doctor` has a `bridge` line: `file:` link to a missing folder fails; a link into
+  `/plugins/cache/` warns; a copy whose `package.json` version differs from the plugin's bundled
+  bridge warns (rerun `--copy`); not installed is ok (the bridge is optional). The `unity` skill tells Claude to
   ask the user before either, as both write into the project (SPEC Boundaries).
 
 ## Running code (R1, X1; bridge 0.5.0)

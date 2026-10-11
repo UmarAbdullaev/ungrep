@@ -3,4 +3,5 @@ FAIL  unity    <root>: Unity 2021.3.45f1 is not supported; needs 2022.3 or newer
 ok    assets   Force Text serialization
 FAIL  config   .claude/unitygraph.json: unknown module 'graph' (known: asset-index, code-index, editor-link, guards, play-input, project-map, query, unity-loop, viewer)
 warn  graph    not built yet (Library/unitygraph/graph.db)
+ok    bridge   not installed (optional; ug bridge install --copy adds it)
 doctor: 2 failures, 1 warning

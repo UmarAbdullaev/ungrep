@@ -211,7 +211,8 @@ Standing assumptions:
 - Local only: no telemetry, no network calls. Transcripts are read on the user's machine. One
   exception (user, 2026-09-30): `ug api`/`ug docs` fall back to docs.unity3d.com when the local
   answers run out, sending only a type, member or page name (SPEC-editor-ops rule 11).
-- Windows and macOS first; Linux after v1.
+- Windows, macOS and Linux (changed 2026-10-11, user: Linux was after v1). Development and the Unity
+  tests run on Windows; CI runs the .NET test suite and the launcher on all three (`specs/SPEC-release.md`).
 - Development dogfoods on purge-squad; each module is measured there before it's called done.
 
 ## Capability map
@@ -283,7 +284,8 @@ Bench         ug bench run bench/suites/purge-squad.json --arm unitygraph
 
 `<Unity>` is the installed editor's executable.
 
-`dist/ug` is framework-dependent and portable (no `-r`), so one build serves Windows and macOS.
+`dist/ug` is framework-dependent and portable (no `-r`), so one build serves Windows, macOS and Linux
+(SQLite natives for x64 and arm64 of each).
 `bin/ug` (POSIX sh, used by hooks) and `bin/ug.cmd` (cmd/PowerShell) run `dist/ug/ug.dll` on the
 first `dotnet` root holding `Microsoft.NETCore.App` 8.0 or newer, skipping Unity's bundled 6.0.
 
@@ -325,7 +327,8 @@ Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 
   arrives as JSON on stdin (`session_id`, `transcript_path`, `cwd`, `hook_event_name`, ...);
   `CLAUDE_PROJECT_DIR` is set. `bin/` is not on `PATH` inside hooks.
 - Wired events (T5, 2026-09-29): PreToolUse on `Bash|PowerShell|Edit|MultiEdit|Write|NotebookEdit`
-  (guards), PostToolUse on the edit tools (reindex on edit, edit tracking), Stop (compile gate).
+  (guards), PostToolUse on the edit tools (reindex on edit, edit tracking), Stop (compile gate);
+  SessionStart (query's session hint, B1f, 2026-10-11).
   Grep and Read are not matched: interception was dropped (Decisions #4), and every matched
   call pays the `ug` start. `ug hook` bypasses the command parser, reads and writes UTF-8, and
   exits 0 with no output outside a Unity project, on any exception, and past 2 s (Stop: 40 s, the compile gate waits for Unity); failures go

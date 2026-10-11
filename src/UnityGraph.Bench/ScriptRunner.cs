@@ -178,9 +178,10 @@ public sealed class ScriptRunner
     }
 
     /// <summary>
-    /// What each arm puts in context besides its calls: always, the skills' listing lines and the
-    /// deferred names of every tool of each MCP server it used; on use, the skill bodies and the
-    /// schemas of the MCP tools it called (O10's idle-cost rule).
+    /// What each arm puts in context besides its calls: always, the skills' listing lines, the
+    /// plugin's session hint when the arm loads the plugin, and the deferred names of every tool
+    /// of each MCP server it used; on use, the skill bodies and the schemas of the MCP tools it
+    /// called (O10's idle-cost rule).
     /// </summary>
     private static IReadOnlyList<IdleRow> Idle(IReadOnlyList<Arm> arms, Dictionary<string, HashSet<(string Server, string Tool)>> used, StepExecutor executor, RunOptions options)
     {
@@ -203,6 +204,12 @@ public sealed class ScriptRunner
                 {
                     detail.Add($"skill {skillPath} unreadable: {e.Message}");
                 }
+            }
+
+            if (arm.Agent.PluginDir)
+            {
+                always += Encoding.UTF8.GetByteCount(UnityGraph.Hooks.SessionHintHandler.Hint);
+                detail.Add("session hint");
             }
 
             if (used.TryGetValue(arm.Name, out var tools))

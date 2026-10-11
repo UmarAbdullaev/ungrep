@@ -543,3 +543,25 @@ On the user's yes (6 runs, about $1 quoted): N3 and N5 on the unitygraph arm, 3 
 - The N3 run without `ug` grepped `.Dieds*[+-]=` twice and answered as well.
 - Against the B1f check (N3 1 of 3 picked, the one `ug` run grepped after it): 5 of 6 picked,
   0 redo. Two questions, three repeats: a direction, not a rate.
+
+### Agent mode with the session hint, 2026-10-11
+
+On the user's yes ("b1f before release", 9 runs, about $1.20 quoted): N3, N4 and N5 on the
+unitygraph arm, 3 repeats, `claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, `ug` 0.9.0 with
+the SessionStart hint (SPEC-query, Session hint). 9 runs, $1.13, no subagents.
+`bench/results/purge-squad-agent-2026-10-11-hint.json`.
+
+| Question | Picked `ug` | Calls | Main context | Right |
+|---|---|---|---|---|
+| N3 | 0 of 3 | 2.3 | 190,579 | 3/3 |
+| N4 | 0 of 3 | 2 | 171,238 | 3/3 |
+| N5 | 3 of 3 | 2.7 | 211,675 | 3/3, redo 2 |
+
+- The hint was in every run's context; it did not change the pick. N3 and N4 went to Grep
+  first in all six runs (`\.Died\s*[+-]=`, `IPartRule` then the extending interfaces) and
+  answered right in one to three calls, as cheap as the skill plus one `ug` call.
+- N5 picked `ug impact ProgressBar._value` in all three: twice through the skill, once as a bare
+  `ug` (the plugin's `bin/` is on the Bash PATH). Two runs read or grepped the lines after it.
+- With B1g (no hint) N3 was picked 2 of 3; here 0 of 3. Three repeats are noise, but the hint
+  buys nothing measurable: Claude takes `ug` where grep is hard (impact, serialized data) and
+  Grep where one pattern answers.

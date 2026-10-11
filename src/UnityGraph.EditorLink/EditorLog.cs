@@ -30,6 +30,11 @@ public static partial class EditorLog
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Logs", "Unity", "Editor.log");
         }
 
+        if (OperatingSystem.IsLinux())
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "unity3d", "Editor.log");
+        }
+
         return null;
     }
 

@@ -14,7 +14,7 @@ public sealed class VersionTests
         int exitCode = CliApp.Run(["--version"], output, error);
 
         Assert.Equal(0, exitCode);
-        Assert.Equal("0.1.0" + Environment.NewLine, output.ToString());
+        Assert.Equal("0.9.0" + Environment.NewLine, output.ToString());
         Assert.Equal("", error.ToString());
     }
 
