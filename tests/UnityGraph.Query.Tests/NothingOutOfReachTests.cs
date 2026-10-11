@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using UnityGraph.Assets;
 using UnityGraph.Code;
 using UnityGraph.Core;
 using UnityGraph.Core.Graph;
@@ -146,6 +147,65 @@ public sealed partial class NothingOutOfReachTests(QueryFixture fixture) : IClas
 
         string json = new QueryEngine(store) { From = 2 }.Impact("LabStage", true, 8000);
         Assert.StartsWith("{\"symbol\":", json, StringComparison.Ordinal);
+    }
+
+    // A data asset holding the Turntable prefab four times, written into the fixture while the test runs.
+    private const string Waves = """
+        %YAML 1.1
+        %TAG !u! tag:unity3d.com,2011:
+        --- !u!114 &11400000
+        MonoBehaviour:
+          m_ObjectHideFlags: 0
+          m_Script: {fileID: 11500000, guid: a7000000000000000000000000000007, type: 3}
+          m_Name: Waves
+          m_EditorClassIdentifier: Assembly-CSharp::Game.Data.Waves
+          waves:
+          - prefab: {fileID: 100, guid: b1000000000000000000000000000001, type: 3}
+            count: 3
+          - prefab: {fileID: 100, guid: b1000000000000000000000000000001, type: 3}
+            count: 5
+          - prefab: {fileID: 100, guid: b1000000000000000000000000000001, type: 3}
+            count: 8
+          - prefab: {fileID: 100, guid: b1000000000000000000000000000001, type: 3}
+            count: 13
+
+        """;
+
+    [Fact]
+    public void Refs_folds_four_asset_lines_from_one_file_and_all_lists_each()
+    {
+        string path = Path.Combine(fixture.Root, "Assets", "Data", "Waves.asset");
+        File.WriteAllText(path, Waves);
+        File.WriteAllText(path + ".meta", "fileFormatVersion: 2\nguid: f7000000000000000000000000000007\nNativeFormatImporter:\n  mainObjectFileID: 11400000\n");
+        try
+        {
+            using (GraphStore writer = GraphStore.Open(fixture.Root, StoreMode.ReadWrite))
+            {
+                AssetIndex.Update(AssetWorkspace.Scan(fixture.Root, VendoredFolders.Default), writer, []);
+            }
+
+            Folds();
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".meta");
+            using GraphStore store = GraphStore.Open(fixture.Root, StoreMode.ReadWrite);
+            AssetIndex.Update(AssetWorkspace.Scan(fixture.Root, VendoredFolders.Default), store, []);
+        }
+    }
+
+    private void Folds()
+    {
+        using GraphStore store = fixture.Open();
+
+        string folded = new QueryEngine(store).Refs("Assets/Prefabs/Turntable.prefab", 8000);
+        Assert.Matches(@"\n  referenced by +4 fields +Assets/Data/Waves\.asset:10-16\n", folded);
+        Assert.EndsWith(", 4 folded into 1 line: ug refs 'Assets/Prefabs/Turntable.prefab' --all\n", folded, StringComparison.Ordinal);
+
+        string all = new QueryEngine(store) { All = true }.Refs("Assets/Prefabs/Turntable.prefab", 8000);
+        Assert.Equal(4, all.Split('\n').Count(l => l.Contains("Assets/Data/Waves.asset: waves[", StringComparison.Ordinal)));
+        Assert.DoesNotContain("folded", all, StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"\n(\d+) found\n$")]

@@ -102,6 +102,11 @@ public sealed partial class QueryEngine
             }
         }
 
+        foreach ((Edge edge, string via) in ImplementedVia(symbol))
+        {
+            Group(groups, "implemented by").Rows.Add(new ImpactRow(Named($"{Names.Qualified(edge.Src)} (via {via})"), edge.File, edge.Line, false));
+        }
+
         foreach (Edge edge in Out(symbol.Key).Where(e => e.Kind == EdgeKind.Overrides))
         {
             Node? baseMember = Node(edge.Dst);

@@ -1,6 +1,6 @@
 $ ug view LabStage --depth 1
   45 nodes (20 first open), 32 edges, 3 unresolved, layout dagre
-  n0  type/class  LabStage  [d0 root drawn refs 3]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:7-57  ug explain Game.Lab.LabStage
+  n0  type/class  LabStage  [d0 root drawn refs 3]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:8-57  ug explain Game.Lab.LabStage
   n1  member/field  Count  [d1 drawn in n0]  Game.Lab.LabStage.Count  Assets/Scripts/Lab/LabStage.cs:15  ug explain Game.Lab.LabStage.Count
   n2  member/field  ResetMethod  [d1 drawn in n0]  Game.Lab.LabStage.ResetMethod  Assets/Scripts/Lab/LabStage.cs:10  ug explain Game.Lab.LabStage.ResetMethod
   n3  member/field  _data  [d1 drawn in n0]  Game.Lab.LabStage._data  Assets/Scripts/Lab/LabStage.cs:13  ug explain Game.Lab.LabStage._data
@@ -10,17 +10,17 @@ $ ug view LabStage --depth 1
   n7  method/method  Awake()  [d1 drawn in n0]  Game.Lab.LabStage.Awake()  Assets/Scripts/Lab/LabStage.cs:18-22  ug explain 'Game.Lab.LabStage.Awake()'
   n8  method/method  OnClosed()  [d1 drawn in n0]  Game.Lab.LabStage.OnClosed()  Assets/Scripts/Lab/LabStage.cs:46-53  ug explain 'Game.Lab.LabStage.OnClosed()'
   n9  method/method  Open(int)  [d1 drawn in n0 refs 3]  Game.Lab.LabStage.Open(int)  Assets/Scripts/Lab/LabStage.cs:24-36  ug explain 'Game.Lab.LabStage.Open(int)'
-  n10  method/method  OpenFirst()  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:55-56  ug explain 'Game.Lab.LabStage.OpenFirst()'
+  n10  method/method  OpenFirst()  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:56  ug explain 'Game.Lab.LabStage.OpenFirst()'
   n11  method/method  ResetStage()  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.ResetStage()  Assets/Scripts/Lab/LabStage.cs:38  ug explain 'Game.Lab.LabStage.ResetStage()'
   n12  method/method  Spin()  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.Spin()  Assets/Scripts/Lab/LabStage.cs:40-44  ug explain 'Game.Lab.LabStage.Spin()'
   n13  method/method  Trace(int)  [d1 in n0 refs 1]  Game.Lab.LabStage.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:7  ug explain 'Game.Lab.LabStage.Trace(int)'
   n14  type/class  Stage  [d1 drawn refs 1]  Game.Core.Stage  Assets/Scripts/Core/Stage.cs:12-17  ug explain Game.Core.Stage
   n15  type/interface  ILabDebug  [d1 drawn refs 1]  Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  ug explain Game.Lab.ILabDebug
   n16  type/class  Turntable  [d1 drawn refs 6]  Game.Lab.Turntable  Assets/Scripts/Lab/Turntable.cs:7-26  ug explain Game.Lab.Turntable
-  n17  method/method  OpenLab()  [d1 drawn in n38 refs 1]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:9-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
-  n18  type/class  LabStageEditor  [d1 drawn]  Game.EditorTools.LabStageEditor  Assets/Editor/LabTools.cs:16-20  ug explain Game.EditorTools.LabStageEditor
+  n17  method/method  OpenLab()  [d1 drawn in n38 refs 1]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:10-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
+  n18  type/class  LabStageEditor  [d1 drawn]  Game.EditorTools.LabStageEditor  Assets/Editor/LabTools.cs:17-20  ug explain Game.EditorTools.LabStageEditor
   n19  script/script  LabStage.cs  [d1 drawn refs 1]  Assets/Scripts/Lab/LabStage.cs  Assets/Scripts/Lab/LabStage.cs  ug explain 'Assets/Scripts/Lab/LabStage.cs'
-  n20  type/class  StageData  [d2 drawn refs 1]  Game.Core.StageData  Assets/Scripts/Core/Stage.cs:19-25  ug explain Game.Core.StageData
+  n20  type/class  StageData  [d2 drawn refs 1]  Game.Core.StageData  Assets/Scripts/Core/Stage.cs:20-25  ug explain Game.Core.StageData
   n21  method/method  OnClosed()  [d2 drawn in n14 refs 2]  Game.Core.Stage.OnClosed()  Assets/Scripts/Core/Stage.cs:16  ug explain 'Game.Core.Stage.OnClosed()'
   n22  method/method  Release(T)  [d2 drawn in n24 refs 1]  Game.Core.Pool.Release(T)  Assets/Scripts/Core/Pool.cs:18  ug explain 'Game.Core.Pool.Release(T)'
   n23  method/method  Stop()  [d2 drawn in n16 refs 1]  Game.Lab.Turntable.Stop()  Assets/Scripts/Lab/Turntable.cs:23  ug explain 'Game.Lab.Turntable.Stop()'
@@ -32,13 +32,13 @@ $ ug view LabStage --depth 1
   n29  method/method  Trace(int)  [d2 drawn in n15 refs 1]  Game.Lab.ILabDebug.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:12  ug explain 'Game.Lab.ILabDebug.Trace(int)'
   n30  type/interface  IOpenable  [d2 drawn refs 1]  Game.Core.IOpenable  Assets/Scripts/Core/Stage.cs:7-10  ug explain Game.Core.IOpenable
   n31  member/event  Rotated  [d2 drawn in n16]  Game.Lab.Turntable.Rotated  Assets/Scripts/Lab/Turntable.cs:15  ug explain Game.Lab.Turntable.Rotated
-  n32  member/field  _speed  [d2 drawn in n16]  Game.Lab.Turntable._speed  Assets/Scripts/Lab/Turntable.cs:9-11  ug explain Game.Lab.Turntable._speed
+  n32  member/field  _speed  [d2 drawn in n16]  Game.Lab.Turntable._speed  Assets/Scripts/Lab/Turntable.cs:11  ug explain Game.Lab.Turntable._speed
   n33  member/property  Tint  [d2 drawn in n16]  Game.Lab.Turntable.Tint  Assets/Scripts/Lab/Turntable.cs:13  ug explain Game.Lab.Turntable.Tint
   n34  method/method  Run(Turntable)  [d2 drawn in n40]  Game.Broken.Run(Turntable)  Assets/Scripts/Broken.cs:8-12  ug explain 'Game.Broken.Run(Turntable)'
   n35  script/script  Turntable.cs  [d2 drawn]  Assets/Scripts/Lab/Turntable.cs  Assets/Scripts/Lab/Turntable.cs  ug explain 'Assets/Scripts/Lab/Turntable.cs'
   n36  method/method  OnInspectorGUI()  [d2 drawn in n18]  Game.EditorTools.LabStageEditor.OnInspectorGUI()  Assets/Editor/LabTools.cs:19  ug explain 'Game.EditorTools.LabStageEditor.OnInspectorGUI()'
   n37  component/component  LabStage  [d2 drawn in n41]  Turntable > LabStage  Assets/Prefabs/Turntable.prefab:47-64  ug explain o:b1000000000000000000000000000001:111
-  n38  type/class  LabTools  [d1 container]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:6-14  ug explain Game.EditorTools.LabTools
+  n38  type/class  LabTools  [d1 container]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:7-14  ug explain Game.EditorTools.LabTools
   n39  object/game_object  Open Button  [d2 container in n42]  Canvas/Open Button  Assets/Scenes/Lab.unity:38-50  ug explain o:c3000000000000000000000000000003:510
   n40  type/class  Broken  [d2 container]  Game.Broken  Assets/Scripts/Broken.cs:6-13  ug explain Game.Broken
   n41  object/game_object  Turntable  [d2 container in n43]  Turntable  Assets/Prefabs/Turntable.prefab:3-16  ug explain o:b1000000000000000000000000000001:100
@@ -50,7 +50,7 @@ $ ug view LabStage --depth 1
   n0 -uses_type-> n16  references  Assets/Scripts/Lab/LabStage.cs:7
   n17 -uses_type-> n0  references  Assets/Editor/LabTools.cs:12
   n18 -uses_type-> n0  references  Assets/Editor/LabTools.cs:16
-  n19 -script_defines-> n0  instances  Assets/Scripts/Lab/LabStage.cs:7
+  n19 -script_defines-> n0  instances  Assets/Scripts/Lab/LabStage.cs:8
   n3 -uses_type-> n20  references  Assets/Scripts/Lab/LabStage.cs:13
   n5 -uses_type-> n16  references  Assets/Scripts/Lab/LabStage.cs:12
   n7 -uses_type-> n16  references  Assets/Scripts/Lab/LabStage.cs:20
@@ -90,19 +90,19 @@ $ ug view 'Turntable.Rotate(float)' --depth 2
   n6  method/method  Trace(int)  [d2 drawn in n14 refs 1]  Game.Lab.LabStage.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:7  ug explain 'Game.Lab.LabStage.Trace(int)'
   n7  method/method  ResetStage()  [d2 drawn in n14 refs 1]  Game.Lab.LabStage.ResetStage()  Assets/Scripts/Lab/LabStage.cs:38  ug explain 'Game.Lab.LabStage.ResetStage()'
   n8  method/method  OnOpened()  [d2 drawn in n15 refs 1]  Game.Lab.Turntable.OnOpened()  Assets/Scripts/Lab/Turntable.cs:25  ug explain 'Game.Lab.Turntable.OnOpened()'
-  n9  method/method  OpenLab()  [d2 drawn in n18 refs 1]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:9-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
-  n10  method/method  OpenFirst()  [d2 drawn in n14 refs 1]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:55-56  ug explain 'Game.Lab.LabStage.OpenFirst()'
+  n9  method/method  OpenLab()  [d2 drawn in n18 refs 1]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:10-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
+  n10  method/method  OpenFirst()  [d2 drawn in n14 refs 1]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:56  ug explain 'Game.Lab.LabStage.OpenFirst()'
   n11  method/method  Open(int)  [d3 drawn in n19 refs 1]  Game.Core.IOpenable.Open(int)  Assets/Scripts/Core/Stage.cs:9  ug explain 'Game.Core.IOpenable.Open(int)'
   n12  method/method  Trace(int)  [d3 drawn in n20 refs 1]  Game.Lab.ILabDebug.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:12  ug explain 'Game.Lab.ILabDebug.Trace(int)'
   n13  method/method  OnInspectorGUI()  [d3 drawn in n21]  Game.EditorTools.LabStageEditor.OnInspectorGUI()  Assets/Editor/LabTools.cs:19  ug explain 'Game.EditorTools.LabStageEditor.OnInspectorGUI()'
-  n14  type/class  LabStage  [d3 drawn refs 1]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:7-57  ug explain Game.Lab.LabStage
+  n14  type/class  LabStage  [d3 drawn refs 1]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:8-57  ug explain Game.Lab.LabStage
   n15  type/class  Turntable  [d0 container]  Game.Lab.Turntable  Assets/Scripts/Lab/Turntable.cs:7-26  ug explain Game.Lab.Turntable
   n16  object/game_object  Open Button  [d1 container in n22]  Canvas/Open Button  Assets/Scenes/Lab.unity:38-50  ug explain o:c3000000000000000000000000000003:510
   n17  type/class  Stage  [d2 container]  Game.Core.Stage  Assets/Scripts/Core/Stage.cs:12-17  ug explain Game.Core.Stage
-  n18  type/class  LabTools  [d2 container]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:6-14  ug explain Game.EditorTools.LabTools
+  n18  type/class  LabTools  [d2 container]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:7-14  ug explain Game.EditorTools.LabTools
   n19  type/interface  IOpenable  [d3 container]  Game.Core.IOpenable  Assets/Scripts/Core/Stage.cs:7-10  ug explain Game.Core.IOpenable
   n20  type/interface  ILabDebug  [d3 container]  Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  ug explain Game.Lab.ILabDebug
-  n21  type/class  LabStageEditor  [d3 container]  Game.EditorTools.LabStageEditor  Assets/Editor/LabTools.cs:16-20  ug explain Game.EditorTools.LabStageEditor
+  n21  type/class  LabStageEditor  [d3 container]  Game.EditorTools.LabStageEditor  Assets/Editor/LabTools.cs:17-20  ug explain Game.EditorTools.LabStageEditor
   n22  object/game_object  Canvas  [d1 container in n23]  Canvas  Assets/Scenes/Lab.unity:12-23  ug explain o:c3000000000000000000000000000003:500
   n23  scene/scene  Lab.unity  [d1 container]  Assets/Scenes/Lab.unity  Assets/Scenes/Lab.unity  ug explain 'Assets/Scenes/Lab.unity'
   n0 -calls-> n1  calls  Assets/Scripts/Lab/Turntable.cs:20
@@ -161,19 +161,19 @@ $ ug view o:c3000000000000000000000000000003:512 --depth 1
   17 nodes (7 first open), 10 edges, 2 unresolved, layout dagre
   n0  component/component  Button  [d0 root drawn in n10]  Canvas/Open Button > Button  Assets/Scenes/Lab.unity:60-116  ug explain o:c3000000000000000000000000000003:512
   n1  method/method  Open(int)  [d1 drawn in n11 refs 3]  Game.Lab.LabStage.Open(int)  Assets/Scripts/Lab/LabStage.cs:24-36  ug explain 'Game.Lab.LabStage.Open(int)'
-  n2  method/method  OpenFirst()  [d1 drawn in n11 refs 1]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:55-56  ug explain 'Game.Lab.LabStage.OpenFirst()'
+  n2  method/method  OpenFirst()  [d1 drawn in n11 refs 1]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:56  ug explain 'Game.Lab.LabStage.OpenFirst()'
   n3  method/method  Open(int)  [d2 drawn in n12 refs 1]  Game.Core.Stage.Open(int)  Assets/Scripts/Core/Stage.cs:14  ug explain 'Game.Core.Stage.Open(int)'
   n4  method/method  Trace(int)  [d2 drawn in n11 refs 1]  Game.Lab.LabStage.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:7  ug explain 'Game.Lab.LabStage.Trace(int)'
   n5  method/method  Rotate(float)  [d2 drawn in n13 refs 1]  Game.Lab.Turntable.Rotate(float)  Assets/Scripts/Lab/Turntable.cs:17-21  ug explain 'Game.Lab.Turntable.Rotate(float)'
   n6  method/method  ResetStage()  [d2 drawn in n11 refs 1]  Game.Lab.LabStage.ResetStage()  Assets/Scripts/Lab/LabStage.cs:38  ug explain 'Game.Lab.LabStage.ResetStage()'
   n7  method/method  Spin()  [d2 drawn in n11 refs 1]  Game.Lab.LabStage.Spin()  Assets/Scripts/Lab/LabStage.cs:40-44  ug explain 'Game.Lab.LabStage.Spin()'
   n8  method/method  OnOpened()  [d2 drawn in n13 refs 1]  Game.Lab.Turntable.OnOpened()  Assets/Scripts/Lab/Turntable.cs:25  ug explain 'Game.Lab.Turntable.OnOpened()'
-  n9  method/method  OpenLab()  [d2 drawn in n14]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:9-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
+  n9  method/method  OpenLab()  [d2 drawn in n14]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:10-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
   n10  object/game_object  Open Button  [d0 container in n15]  Canvas/Open Button  Assets/Scenes/Lab.unity:38-50  ug explain o:c3000000000000000000000000000003:510
-  n11  type/class  LabStage  [d1 container]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:7-57  ug explain Game.Lab.LabStage
+  n11  type/class  LabStage  [d1 container]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:8-57  ug explain Game.Lab.LabStage
   n12  type/class  Stage  [d2 container]  Game.Core.Stage  Assets/Scripts/Core/Stage.cs:12-17  ug explain Game.Core.Stage
   n13  type/class  Turntable  [d2 container]  Game.Lab.Turntable  Assets/Scripts/Lab/Turntable.cs:7-26  ug explain Game.Lab.Turntable
-  n14  type/class  LabTools  [d2 container]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:6-14  ug explain Game.EditorTools.LabTools
+  n14  type/class  LabTools  [d2 container]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:7-14  ug explain Game.EditorTools.LabTools
   n15  object/game_object  Canvas  [d0 container in n16]  Canvas  Assets/Scenes/Lab.unity:12-23  ug explain o:c3000000000000000000000000000003:500
   n16  scene/scene  Lab.unity  [d0 container]  Assets/Scenes/Lab.unity  Assets/Scenes/Lab.unity  ug explain 'Assets/Scenes/Lab.unity'
   n0 -event_calls-> n1  calls m_OnClick  Assets/Scenes/Lab.unity:78
@@ -221,20 +221,20 @@ $ ug view Lab.unity --depth 1
   n12 -addressable-> n5  assembly Prefabs/Turntable  Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset:18
 
 $ ug view LabStage --depth 2 --kind type,method
-  29 nodes (26 first open), 28 edges, 4 unresolved, layout dagre
-  n0  type/class  LabStage  [d0 root drawn refs 2]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:7-57  ug explain Game.Lab.LabStage
+  30 nodes (26 first open), 29 edges, 4 unresolved, layout dagre
+  n0  type/class  LabStage  [d0 root drawn refs 2]  Game.Lab.LabStage  Assets/Scripts/Lab/LabStage.cs:8-57  ug explain Game.Lab.LabStage
   n1  method/method  Awake()  [d1 drawn in n0]  Game.Lab.LabStage.Awake()  Assets/Scripts/Lab/LabStage.cs:18-22  ug explain 'Game.Lab.LabStage.Awake()'
   n2  method/method  OnClosed()  [d1 drawn in n0]  Game.Lab.LabStage.OnClosed()  Assets/Scripts/Lab/LabStage.cs:46-53  ug explain 'Game.Lab.LabStage.OnClosed()'
   n3  method/method  Open(int)  [d1 drawn in n0 refs 2]  Game.Lab.LabStage.Open(int)  Assets/Scripts/Lab/LabStage.cs:24-36  ug explain 'Game.Lab.LabStage.Open(int)'
-  n4  method/method  OpenFirst()  [d1 drawn in n0]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:55-56  ug explain 'Game.Lab.LabStage.OpenFirst()'
+  n4  method/method  OpenFirst()  [d1 drawn in n0]  Game.Lab.LabStage.OpenFirst()  Assets/Scripts/Lab/LabStage.cs:56  ug explain 'Game.Lab.LabStage.OpenFirst()'
   n5  method/method  ResetStage()  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.ResetStage()  Assets/Scripts/Lab/LabStage.cs:38  ug explain 'Game.Lab.LabStage.ResetStage()'
   n6  method/method  Spin()  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.Spin()  Assets/Scripts/Lab/LabStage.cs:40-44  ug explain 'Game.Lab.LabStage.Spin()'
   n7  method/method  Trace(int)  [d1 drawn in n0 refs 1]  Game.Lab.LabStage.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:7  ug explain 'Game.Lab.LabStage.Trace(int)'
   n8  type/class  Stage  [d1 drawn refs 1]  Game.Core.Stage  Assets/Scripts/Core/Stage.cs:12-17  ug explain Game.Core.Stage
   n9  type/interface  ILabDebug  [d1 drawn refs 1]  Game.Lab.ILabDebug  Assets/Scripts/Lab/LabStage.Debug.cs:10-13  ug explain Game.Lab.ILabDebug
   n10  type/class  Turntable  [d1 drawn refs 4]  Game.Lab.Turntable  Assets/Scripts/Lab/Turntable.cs:7-26  ug explain Game.Lab.Turntable
-  n11  method/method  OpenLab()  [d1 drawn in n27 refs 1]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:9-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
-  n12  type/class  LabStageEditor  [d1 drawn]  Game.EditorTools.LabStageEditor  Assets/Editor/LabTools.cs:16-20  ug explain Game.EditorTools.LabStageEditor
+  n11  method/method  OpenLab()  [d1 drawn in n28 refs 1]  Game.EditorTools.LabTools.OpenLab()  Assets/Editor/LabTools.cs:10-13  ug explain 'Game.EditorTools.LabTools.OpenLab()'
+  n12  type/class  LabStageEditor  [d1 drawn]  Game.EditorTools.LabStageEditor  Assets/Editor/LabTools.cs:17-20  ug explain Game.EditorTools.LabStageEditor
   n13  method/method  OnClosed()  [d2 drawn in n8 refs 2]  Game.Core.Stage.OnClosed()  Assets/Scripts/Core/Stage.cs:16  ug explain 'Game.Core.Stage.OnClosed()'
   n14  method/method  Release(T)  [d2 drawn in n16 refs 1]  Game.Core.Pool.Release(T)  Assets/Scripts/Core/Pool.cs:18  ug explain 'Game.Core.Pool.Release(T)'
   n15  method/method  Stop()  [d2 drawn in n10 refs 2]  Game.Lab.Turntable.Stop()  Assets/Scripts/Lab/Turntable.cs:23  ug explain 'Game.Lab.Turntable.Stop()'
@@ -243,14 +243,15 @@ $ ug view LabStage --depth 2 --kind type,method
   n18  method/method  Rotate(float)  [d2 drawn in n10 refs 2]  Game.Lab.Turntable.Rotate(float)  Assets/Scripts/Lab/Turntable.cs:17-21  ug explain 'Game.Lab.Turntable.Rotate(float)'
   n19  method/method  OnOpened()  [d2 drawn in n10 refs 1]  Game.Lab.Turntable.OnOpened()  Assets/Scripts/Lab/Turntable.cs:25  ug explain 'Game.Lab.Turntable.OnOpened()'
   n20  method/method  Trace(int)  [d2 drawn in n9 refs 1]  Game.Lab.ILabDebug.Trace(int)  Assets/Scripts/Lab/LabStage.Debug.cs:12  ug explain 'Game.Lab.ILabDebug.Trace(int)'
-  n21  type/interface  IOpenable  [d2 drawn refs 1]  Game.Core.IOpenable  Assets/Scripts/Core/Stage.cs:7-10  ug explain Game.Core.IOpenable
-  n22  method/method  Run(Turntable)  [d2 drawn in n28]  Game.Broken.Run(Turntable)  Assets/Scripts/Broken.cs:8-12  ug explain 'Game.Broken.Run(Turntable)'
+  n21  type/interface  IOpenable  [d2 drawn refs 2]  Game.Core.IOpenable  Assets/Scripts/Core/Stage.cs:7-10  ug explain Game.Core.IOpenable
+  n22  method/method  Run(Turntable)  [d2 drawn in n29]  Game.Broken.Run(Turntable)  Assets/Scripts/Broken.cs:8-12  ug explain 'Game.Broken.Run(Turntable)'
   n23  method/method  OnInspectorGUI()  [d2 drawn in n12]  Game.EditorTools.LabStageEditor.OnInspectorGUI()  Assets/Editor/LabTools.cs:19  ug explain 'Game.EditorTools.LabStageEditor.OnInspectorGUI()'
   n24  method/method  Get(Func<T>)  [d3 drawn in n16]  Game.Core.Pool.Get(Func<T>)  Assets/Scripts/Core/Pool.cs:12-16  ug explain 'Game.Core.Pool.Get(Func<T>)'
   n25  type/class  Handle  [d3 drawn in n16]  Game.Core.Pool.Handle  Assets/Scripts/Core/Pool.cs:20-23  ug explain Game.Core.Pool.Handle
   n26  method/method  Open(int)  [d3 drawn in n21 refs 1]  Game.Core.IOpenable.Open(int)  Assets/Scripts/Core/Stage.cs:9  ug explain 'Game.Core.IOpenable.Open(int)'
-  n27  type/class  LabTools  [d3 drawn refs 1]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:6-14  ug explain Game.EditorTools.LabTools
-  n28  type/class  Broken  [d2 container]  Game.Broken  Assets/Scripts/Broken.cs:6-13  ug explain Game.Broken
+  n27  type/interface  ILockable  [d3 drawn]  Game.Core.ILockable  Assets/Scripts/Core/Stage.cs:27-30  ug explain Game.Core.ILockable
+  n28  type/class  LabTools  [d3 drawn refs 1]  Game.EditorTools.LabTools  Assets/Editor/LabTools.cs:7-14  ug explain Game.EditorTools.LabTools
+  n29  type/class  Broken  [d2 container]  Game.Broken  Assets/Scripts/Broken.cs:6-13  ug explain Game.Broken
   n0 -inherits-> n8  hierarchy  Assets/Scripts/Lab/LabStage.cs:8
   n0 -implements-> n9  hierarchy  Assets/Scripts/Lab/LabStage.Debug.cs:5
   n0 -uses_type-> n10  references  Assets/Scripts/Lab/LabStage.cs:7
@@ -278,7 +279,8 @@ $ ug view LabStage --depth 2 --kind type,method
   n23 -calls-> n11  calls  Assets/Editor/LabTools.cs:19
   n22 -calls-> n15  calls  Assets/Scripts/Broken.cs:10
   n17 -overrides-> n26  hierarchy  Assets/Scripts/Core/Stage.cs:14
-  n23 -uses_type-> n27  references  Assets/Editor/LabTools.cs:19
+  n27 -inherits-> n21  hierarchy  Assets/Scripts/Core/Stage.cs:27
+  n23 -uses_type-> n28  references  Assets/Editor/LabTools.cs:19
 
 $ ug view Turntable.Stop --depth 1 --kind method,asset
   5 nodes (3 first open), 5 edges, 0 unresolved, layout dagre

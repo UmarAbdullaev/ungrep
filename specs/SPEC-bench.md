@@ -427,6 +427,30 @@ questions are grep's steps and their chores Pipeline's (Arms).
   asset; scene and prefab field values offline; implementers through derived interfaces in one
   call; `ug find <guid>` (found nothing); `ug explain`'s line at the attribute, not the class.
 
+### Script mode after the B1 fixes, unitygraph, 2026-10-11
+
+purge-squad 9ce9995, `ug` with B1a-B1e, navigation and asset questions only (the chores need the
+editor and the fixes touch none of them: their 19 / 1,188 stands). `--baseline` the four-arm run
+above: no regression. The baseline file is kept: it is the four-arm record, and its unitygraph
+numbers are the floor these beat.
+
+| Question | Before | After | Change |
+|---|---|---|---|
+| N4 | 4 / 688 | 1 / 201 | `ug refs IPartRule` lists the implementers through `IEmitter`, `IPayload`, `ITrigger` (B1c) |
+| A4 | 5 / 624 | 2 / 352 | `ug explain 'Arena_Greybox.unity > Run > RunDirector'` gives the wired fields (B1b) |
+| A5 | 3 / 8,139, redo 2 | 1 / 249 | 139 field rows folded into 11 lines, one per node asset (B1a) |
+| N1-N3, N5, A1-A3 | 8 / 2,210 | 8 / 2,206 | N2 four tokens shorter: line numbers moved (B1e) |
+
+- unitygraph navigation 6 / 1,077 against grep's 12 / 2,293; asset 6 / 1,931 against grep's
+  15 / 1,346. With the chores, 31 calls / 4,195 tokens against grep's 71 / 7,394: calls −56%,
+  tokens −43% (before: −45%, +74%).
+- `ug explain RunDirector` gives 24, the class line; the key took 23 or 24 and still does.
+- Idle went from 27 + 599 to 80 + 598: the skill description names the questions to load it for
+  (B1f), 53 tokens on every session. Whether Claude now picks `ug` is an agent-mode question, not
+  run here (paid runs, the user's yes first).
+- The first `ug` call after the upgrade took 61 s: older index rules reindex every file once
+  (SPEC-graph-core).
+
 ### Agent mode pilot, N3 on four arms, 2026-10-11
 
 On the user's yes (4 runs, about $1-2 quoted): `claude-opus-5-5`, `--max-usd 0.5`, the desktop

@@ -91,7 +91,7 @@ is a config error that `ug doctor` names.
 
 | Symbol | Kind | `name` | Lines | `props` |
 | --- | --- | --- | --- | --- |
-| class, struct, interface, enum, delegate, record | `type` | metadata name without arity (`List`) | declaration incl. attributes | `subkind`, `access`, `static`/`abstract`/`sealed` when true, `generic` arity when > 0, `unity` (see below) |
+| class, struct, interface, enum, delegate, record | `type` | metadata name without arity (`List`) | declaration | `subkind`, `access`, `static`/`abstract`/`sealed` when true, `generic` arity when > 0, `unity` (see below) |
 | method, operator, conversion, destructor | `method` | symbol name | declaration | `sig` (e.g. `Open(int, bool)`, whole), `access`, `static`/`virtual`/`abstract`/`override`/`async` when true, `message` / `entry` (see below) |
 | constructor | `method` | the type's name | declaration | as method, plus `subkind: constructor` |
 | field, enum member | `field` | field name | declarator | `type` (display string, whole), `access`, `static`/`const`/`readonly` when true, `serialized`, `serialize_reference`, `former` (list) |
@@ -109,9 +109,10 @@ is a config error that `ug doctor` names.
 - Explicit interface implementations are named by the member name (`Dispose`, not
   `System.IDisposable.Dispose`); the key keeps the full doc ID.
 - Nested types: `contains` from the outer type.
-- Lines are 1-based, from the declaration's full span (attributes included, leading trivia
-  excluded). A field or event field spans its whole declaration statement, so `int a, b;` gives
-  both the same lines.
+- Lines are 1-based, from the declaration's span without its attribute lists and leading trivia:
+  the line that declares it (B1e, 2026-10-11: `[Serializable]` above a class put the class on the
+  attribute's line). A field or event field spans its whole declaration statement, so `int a, b;`
+  gives both the same lines.
 - `unity` on a type: `mono_behaviour`, `scriptable_object`, `editor`, `editor_window`,
   `property_drawer` or `object` (another `UnityEngine.Object`), from the base type chain;
   `serializable` for `[Serializable]` classes and structs. Absent otherwise.

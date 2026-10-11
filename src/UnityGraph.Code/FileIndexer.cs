@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using UnityGraph.Core.Graph;
 
 namespace UnityGraph.Code;
@@ -569,9 +570,14 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
         }
     }
 
+    // A declaration starts after its attribute lists, on the line that declares it (B1e:
+    // `[Serializable]` above a class put the class on the attribute's line).
     private (int Start, int End) Lines(SyntaxNode node)
     {
-        FileLinePositionSpan span = _tree.GetLineSpan(node.Span);
+        int start = node is MemberDeclarationSyntax { AttributeLists: { Count: > 0 } lists }
+            ? lists.Last().GetLastToken().GetNextToken().SpanStart
+            : node.SpanStart;
+        FileLinePositionSpan span = _tree.GetLineSpan(TextSpan.FromBounds(start, node.Span.End));
         return (span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1);
     }
 

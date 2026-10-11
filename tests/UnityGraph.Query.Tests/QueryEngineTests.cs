@@ -78,6 +78,16 @@ public sealed class QueryEngineTests(QueryFixture fixture) : IClassFixture<Query
             "explain o:f6000000000000000000000000000006:-5",
             "explain LabStage.OpenFirst",
             "refs Turntable",
+            "find b1000000000000000000000000000001",
+            "find B1000000000000000000000000000001 --kind asset",
+            "find b1000000000000000000000000000001 --kind field",
+            "refs IOpenable",
+            "explain IOpenable",
+            "explain Turntable > Turntable",
+            "explain Turntable.prefab > Turntable > LabStage",
+            "explain Lab.unity > Turntable > LabStage",
+            "explain Turntable > Nope",
+            "explain StageData",
         ];
 
         var transcript = new StringBuilder();

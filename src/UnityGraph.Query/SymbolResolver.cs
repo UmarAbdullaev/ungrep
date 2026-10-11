@@ -10,7 +10,7 @@ public sealed record Resolution(IReadOnlyList<Node> Nodes, bool Ambiguous)
 
 /// <summary>
 /// Turns `&lt;symbol&gt;` text into nodes (SPEC-query, Resolving): a `cs:`, `a:` or `o:` key, a GUID,
-/// an asset path or file name, or a dotted name that a node's qualified name ends with,
+/// a component as answers show it (`Run &gt; RunDirector`), an asset path or file name, or a dotted name that a node's qualified name ends with,
 /// optionally with a parameter list matched against `sig`; failing those, a game object or prefab
 /// instance by name or hierarchy path (`Level/Spawn`).
 /// Overloads of one method named without parameters are one symbol.
@@ -31,6 +31,11 @@ public static class SymbolResolver
         if (text.Length == 32 && text.All(char.IsAsciiHexDigitLower))
         {
             return One(store.GetNode(NodeKeys.Asset(text)));
+        }
+
+        if (text.Contains(" > ", StringComparison.Ordinal) && Components(store, text, all) is { Nodes.Count: > 0 } components)
+        {
+            return components;
         }
 
         if (text.Contains('/', StringComparison.Ordinal))
@@ -104,6 +109,39 @@ public static class SymbolResolver
                 .OrderBy(n => n.File, StringComparer.Ordinal)
                 .ThenBy(n => n.Key, StringComparer.Ordinal)
                 .ToList();
+            if (matches.Count > 0)
+            {
+                return new Resolution(matches, matches.Count > 1);
+            }
+        }
+
+        return new Resolution([], false);
+    }
+
+    // A component as answers show it: `Run > RunDirector`, or as `explain` lists where a script is
+    // on, after its file: `Arena_Greybox.unity > Run > RunDirector`.
+    private static Resolution Components(GraphStore store, string text, bool all)
+    {
+        string[] parts = text.Split(" > ", StringSplitOptions.TrimEntries);
+        if (parts.Length > 3 || parts.Any(p => p.Length == 0))
+        {
+            return new Resolution([], false);
+        }
+
+        string? file = parts.Length == 3 ? parts[0] : null;
+        List<Node> objects = [.. Objects(store, parts[^2].Trim('/'), all).Nodes
+            .Where(o => file is null || o.File == file || Path.GetFileName(o.File) == file)];
+        List<Node> components = [.. objects
+            .SelectMany(o => store.EdgesFrom(o.Key, EdgeKindSet.Of(EdgeKind.Contains), all ? int.MaxValue - 1 : Candidates).Items)
+            .Select(h => store.GetNode(h.Edge.Dst))
+            .OfType<Node>()
+            .Where(n => n.Kind == NodeKind.Component)];
+        foreach (StringComparison comparison in (StringComparison[])[StringComparison.Ordinal, StringComparison.OrdinalIgnoreCase])
+        {
+            List<Node> matches = [.. components
+                .Where(n => string.Equals(n.Name, parts[^1], comparison))
+                .OrderBy(n => n.File, StringComparer.Ordinal)
+                .ThenBy(n => n.Key, StringComparer.Ordinal)];
             if (matches.Count > 0)
             {
                 return new Resolution(matches, matches.Count > 1);

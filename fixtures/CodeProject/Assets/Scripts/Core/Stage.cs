@@ -23,4 +23,16 @@ namespace Game.Core
         public List<Vector3> points;
         private Dictionary<string, int> _lookup;
     }
+
+    public interface ILockable : IOpenable
+    {
+        bool Locked { get; }
+    }
+
+    public class Door : ILockable
+    {
+        public bool Locked => false;
+
+        public void Open(int level) { }
+    }
 }

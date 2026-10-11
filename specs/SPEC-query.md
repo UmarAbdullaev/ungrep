@@ -67,6 +67,10 @@ Lab Turntable  prefab_instance  Assets/Scenes/Lab.unity:117-145  of Assets/Prefa
 Columns are padded to the widest entry in the answer. At most 50 results; beyond that the last
 line is `50+ found, narrow the text or add --kind`. Nothing: `nothing found: <text>`.
 
+A GUID (32 hex characters, either case) finds its asset, under no `--kind` or `--kind asset`
+(B1d, 2026-10-11: no asset is named by its GUID, so the name search found nothing):
+`Assets/Prefabs/Turntable.prefab  prefab  guid b1000000000000000000000000000001`, `1 found`.
+
 ### `ug refs <symbol>`
 
 Every edge arriving at the symbol, grouped by label in this order, each group sorted by source
@@ -105,6 +109,36 @@ Game.Lab.Turntable.Stop()  method  Assets/Scripts/Lab/Turntable.cs:23  [exact]
 ```
 
 A line whose source has no node (a file that failed to read) shows the raw key.
+
+**Implementers through extending interfaces** (B1c, 2026-10-11: "which classes implement
+`IPartRule`" took one `refs` per extending interface). For an interface, a type that implements
+an interface extending it, at any depth, is an `implemented by` line too, ending with the
+interface it goes through; a type that also implements it directly is listed once, as the direct
+line. `explain` (`Game.Core.Door (via Game.Core.ILockable)`) and `impact` list them the same way.
+Subclasses of an implementer are not walked: they are one `refs` away.
+
+```
+$ ug refs IOpenable
+Game.Core.IOpenable  interface  Assets/Scripts/Core/Stage.cs:7-10  [exact]
+  extended by     Game.Core.ILockable  Assets/Scripts/Core/Stage.cs:27
+  implemented by  Game.Core.Door       Assets/Scripts/Core/Stage.cs:32  via Game.Core.ILockable
+  implemented by  Game.Core.Stage      Assets/Scripts/Core/Stage.cs:12
+3 references
+```
+
+**Folded asset lines** (B1a, 2026-10-11: a prefab placed 135 times in 11 wave assets took 135
+lines and two cuts, 8,139 tokens, where grep's GUID search listed the 11 files). Four or more
+lines with one asset label (`on`, `unity event`, `prefab instance`, `variant`, `referenced by`,
+`overridden in`, `addressable entry`) from one file fold into one line where the first of them
+was: the count (`19 fields`, `5 instances`, `4 overrides`, ...; after the owner and `: ` when
+they all have one owner other than the file) and the file with the first and last line. It ends
+`[heuristic]` when every folded edge is, `[N heuristic]` when some are. Code lines never fold.
+The count line says what was folded and `--all` lists every line:
+
+```
+  referenced by    4 fields  Assets/Data/Waves.asset:10-16
+14 references, 4 folded into 1 line: ug refs 'Assets/Prefabs/Turntable.prefab' --all
+```
 
 ### `ug explain <symbol> [--members]`
 
@@ -180,7 +214,8 @@ Asset lines: `defines` (a script's types); `objects` (counts by kind, not for sc
 (methods its UnityEvents call); `used by` (always); `addressable`; `on` (a script's components
 elsewhere).
 
-For a game object, component, sub-asset or prefab instance (an `o:` key from an answer):
+For a game object, component, sub-asset or prefab instance (an `o:` key from an answer; a
+component also as answers show it, `Run > RunDirector` or `Arena_Greybox.unity > Run > RunDirector`):
 
 ```
 $ ug explain o:c3000000000000000000000000000003:600
@@ -193,7 +228,8 @@ Lab Turntable  prefab_instance  Assets/Scenes/Lab.unity:117-145  [exact]
 ```
 
 Object lines: `in`, `parent`, `on`, `components`, `children`, `script` or `instance of`,
-`overrides`, `references` (serialized object fields, not for prefab instances), `unity events`
+`overrides`, `references` (serialized object fields in the order they are saved, which is the
+inspector's; not for prefab instances), `unity events`
 (`field -> Method`). Separators are ASCII (` > `, `->`) so every console shows them.
 
 ### `ug outline <file> [--json]`
@@ -282,7 +318,7 @@ ends `[heuristic]` when the edge is; a holder row is `<count> <type>  <file>:<li
 | `overridden by` / `implemented by` | virtual, abstract and interface members | `overrides` edges in |
 | `overrides` | a member that overrides or implements one | the base members: changing the signature breaks that contract |
 | `subclasses` / `extended by` | type | `inherits` edges in |
-| `implemented by` | interface | `implements` edges in |
+| `implemented by` | interface | `implements` edges in, and into the interfaces extending it (`X (via ILockable)`) |
 | `type uses` | type | `uses_type` edges in: members and types naming it |
 | `unity events` | method | `event_calls` in, with the owning object path; param-less dynamic calls are `[heuristic]` |
 | `serialized` | Unity types, serialized fields | assets holding components, below |
@@ -327,21 +363,27 @@ writes (the graph has none), a "what to change" plan.
 
 1. `cs:<doc id>`, `a:<guid>`, `o:<guid>:<fileID>`: that key.
 2. 32 lowercase hex characters: that GUID's asset.
-3. Text with a `/`: the asset at that project path (`Assets/Prefabs/Turntable.prefab`); no
-   such asset: step 6.
-4. Text with a `.` and no `(` is first tried as an asset file name (`Turntable.prefab`),
-   case-sensitive first; several assets with that name are ambiguous. No asset: step 5.
-5. Otherwise the text is a dotted name, optionally with a parameter list (`Rotate(float)` is
+3. Text with ` > `: a component as answers show it, `<object> > <component>` (`Run >
+   RunDirector`, `Canvas/RoomFade > ScreenFade`), or after its scene or prefab file name as
+   `explain` lists where a script is on (`Arena_Greybox.unity > Run > RunDirector`). The object
+   resolves as in step 7; its components named like the last part match, case-sensitive first
+   (B1b, 2026-10-11: the `on` row named the component but no command took that name). No match:
+   step 4.
+4. Text with a `/`: the asset at that project path (`Assets/Prefabs/Turntable.prefab`); no
+   such asset: step 7.
+5. Text with a `.` and no `(` is first tried as an asset file name (`Turntable.prefab`),
+   case-sensitive first; several assets with that name are ambiguous. No asset: step 6.
+6. Otherwise the text is a dotted name, optionally with a parameter list (`Rotate(float)` is
    matched against `sig`). Candidates are nodes named like its last segment; a candidate matches
    when its qualified name (the doc ID without prefix, parameters and generic arity marks) ends
    with the text on a `.` boundary. Case-sensitive matches win; if none, case-insensitive. No
-   match (and no parameter list): step 6.
-6. Scene objects: game objects and prefab instances named like the text's last `/` segment
+   match (and no parameter list): step 7.
+7. Scene objects: game objects and prefab instances named like the text's last `/` segment
    whose hierarchy path is the text or ends with it on a `/` (`Spawn`, `Level/Spawn`, `Lab
    Turntable/Marker`; a leading `/` is ignored). A prefab instance's path is its parent's plus its
    name. Case-sensitive matches win; if none, case-insensitive. Code symbols come first, so
    `Turntable` stays the class when a game object shares the name.
-7. One match, or only overloads of one method: answer. Several: list them like `find` (at most
+8. One match, or only overloads of one method: answer. Several: list them like `find` (at most
    20) under `ambiguous: <text>` with a `more` line repeating the command for the first by its
    qualified name (a scene object by its `o:` key), exit 0. None: `not found: <text>` followed by up to 5 `find` results for the
    last segment.
@@ -381,7 +423,7 @@ Defaults keep their size. Every query command gains two flags:
     all: ug find <text> --all`);
   - `ug refs`: every edge, past the 2,000 read per query (`1999+ references: ug refs <symbol>
     --all`; the count is the rows the 2,000 edges gave). A default `refs` cut at the largest
-    budget pages to that line;
+    budget pages to that line; folded asset lines are listed one by one;
   - `ug explain`: every list item, not 8 (`(+N)`); a cut list's answer ends
     `  more  ug explain <symbol> --all | ug refs <symbol>`. `ug refs` lists incoming edges only;
     the outgoing lists (`calls`, `overrides`, `uses`, `scripts`, `components`, `references`, ...)
@@ -434,6 +476,10 @@ the graph and prints. The engine never writes.
   and the 10-row group cap, JSON for both (parsed back, within budget), determinism.
 - Performance: env-gated purge-squad run (`UG_PURGE_SQUAD`) records p95 in Measured, Q2 commands
   included (`PurgeSquadQueryTests` for `outline` and `impact`, in process, warm).
+- B1 fixes (2026-10-11): golden answers for `find` by GUID (either case, and under another `--kind`),
+  a component by `object > component` and with its file (and one in no such file), `refs`,
+  `explain` and `impact` of an interface with an implementer through an extending interface;
+  `refs` folding four asset lines from one file and `--all` listing them.
 - Coverage ≥ 80% lines on Query.
 
 ## Boundaries
