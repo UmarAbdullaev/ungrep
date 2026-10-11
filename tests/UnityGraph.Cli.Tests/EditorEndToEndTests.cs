@@ -63,7 +63,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.7.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.8.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -311,7 +311,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.7.0  local", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.8.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
@@ -413,6 +413,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         }
 
         UiToolkitCommands(log);
+        ProfilerCommands(log);
 
         string ug = Path.Combine(repo, "artifacts", "bin", "UnityGraph.Cli", "release", OperatingSystem.IsWindows() ? "ug.exe" : "ug");
         if (File.Exists(ug))

@@ -56,7 +56,8 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
 | `manage_camera` (every other action: `ensure_brain`, `get_brain_status`, `create_camera`, `set_target`, `set_priority`, `set_lens`, `set_body`, `set_aim`, `set_noise`, `add_extension`, `remove_extension`, `list_cameras`, `set_blend`, `force_camera`, `release_override`, `ping`) | `ug camera [list]|create|priority|body|aim|noise|blend|force|release|brain` (O13); action by action, with lens and extensions through `ug set` and `ug component`, in `SPEC-camera.md`, Unity MCP parity |
 | `manage_scene` `screenshot` (every mode) and `scene_view_frame`; `manage_camera` `screenshot`, `screenshot_multiview` | `ug shot` viewpoints (O11, see Viewpoints): `camera` is `ug shot <camera>` (or `--camera` for a temporary camera's settings); `capture_source` `game_view`/`scene_view` is `ug shot game`/`scene`; `view_target` is `--look` (game), `--frame` (scene) or the target of `--angles`/`--orbit`; `view_position` is `--from`; `view_rotation` is `--rotation` (MCP lets it override `view_target`; `ug` refuses the pair, since one of them would be ignored); an instance ID for `camera` or `view_target` is an address (`ug` names objects by path, Addressing objects; `ug find --live` gives the path); `batch: "surround"` and `screenshot_multiview` are `--angles`; `batch: "orbit"` with `orbit_angles`, `orbit_elevations`, `orbit_distance`, `orbit_fov` is `--orbit N --elevations --distance --fov`; `max_resolution` is `--width`/`--height` (one tile of a sheet, as MCP's cap is per tile); `include_image` is Claude reading the PNG (the answer gives its path, never base64); `scene_view_frame` (`scene_view_target`) is `ug shot scene --frame <object> --keep` |
-| `manage_graphics`, `manage_physics`, `manage_profiler` | `ug perf` (render, memory, profiler counters; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
+| `manage_graphics`, `manage_physics` | `ug perf` (render, memory; `ug stats` is the token stats); settings through `ug set` on `ProjectSettings/*.asset` |
+| `manage_profiler` (every action: `ping`, `profiler_start` (`log_file`, `enable_callstacks`), `profiler_stop`, `profiler_status`, `profiler_set_areas` (`areas`), `get_frame_timing`, `get_counters` (`category`, `counters`), `get_object_memory` (`object_path`), `memory_take_snapshot` (`snapshot_path`), `memory_list_snapshots` (`search_path`), `memory_compare_snapshots` (`snapshot_a`, `snapshot_b`), `frame_debugger_enable`, `frame_debugger_get_events` (`page_size`, `cursor`), `frame_debugger_disable`) | O12 (bridge 0.8.0, see Profiler): `ping` is `ug status` (the bridge answers) and `ug perf profiler` (the profiler's state); `profiler_start` is `ug perf profiler start [--file [<path>.raw]] [--callstacks]`; `profiler_stop`, `profiler_status` are `ug perf profiler stop`, `ug perf profiler [status]`; `profiler_set_areas` is `ug perf profiler areas CPU=on GPU=off ...`; `get_frame_timing` is `ug perf timing`; `get_counters` is `ug perf counters [<name>...] [--category <c>] [--markers]`; `get_object_memory` is `ug perf memory --object <x>`; `memory_take_snapshot` is `ug perf snapshot take [<path>]`; `memory_list_snapshots` is `ug perf snapshot list [--folder <dir>]`; `memory_compare_snapshots` is `ug perf snapshot compare <a> <b>` (native objects by type and name, not MCP's file sizes; no package needed, Unity may be closed); `frame_debugger_*` is `ug perf frame-debugger enable|events [--from <cursor>] [--top <page_size>]|disable`. Beyond it: `ug perf --record <s>` and `--frames` (top markers by self time, GC allocations, spikes), `ug perf memory` (top objects), one frame debugger event's detail |
 | `manage_ui` (every action: `ping`, `create`, `read`, `update`, `delete`, `attach_ui_document`, `detach_ui_document`, `create_panel_settings`, `update_panel_settings`, `get_visual_tree`, `render_ui`, `link_stylesheet`, `list`, `modify_visual_element`) | U2 (bridge 0.7.0): `ug ui`, `ug click`, `ug nav`, `ug tree --ui`, element addresses in `ug inspect`/`ug set`, `ug shot <UIDocument object>` and `ug shot <x.uxml> --panel`, `ug asset create` for `.uxml`/`.uss`/`.tss` and PanelSettings, `ug component add|remove UIDocument`; action by action in `SPEC-play-input.md`, UI Toolkit, Unity MCP `manage_ui` parity |
 | `unity_reflect`, `unity_docs` | `ug api <Type[.Member]>`, `ug docs <page>`: reflection, then the offline Scripting Reference, then docs.unity3d.com (trimmed, cached) |
 | `batch_execute` | `ug batch` with editor commands, one process and one connection |
@@ -137,7 +138,7 @@ Added for parity (O6–O9; same rules, same answer shape):
 | `/shot?view=game\|scene\|<camera address>&width=&height=` (bridge 0.6.0 adds `from`, `look`, `rotation`, `fov`, `frame`, `keep`, `angles`, `orbit`, `elevations`, `distance`, `camera`: Viewpoints) | Renders to `Library/unitygraph/shots/game.png`, `scene.png` or `camera-<name>.png` (overwritten each time) and answers `path  WxH  N KB  (Game view, 1 camera)`. Default 960x540, `width` and `height` 64 to 2048. `game` renders every enabled Game camera in depth order into a temporary render texture (each camera's own target is put back; root Screen Space - Overlay canvases are pointed at the last camera for the render, since no camera draws them, and put back after, without an Undo entry or a dirty flag; UI Toolkit screen panels are drawn over the cameras from bridge 0.7.0 by pointing their PanelSettings at the shot's texture for the render, and the answer counts them, `(Game view, 1 camera, 2 UI Toolkit documents)`; before 0.7.0 the answer ended `, N UI Toolkit documents not drawn`; an object with a UIDocument and a `.uxml` path with `panel=` draw UI Toolkit alone: SPEC-play-input, UI Toolkit); `scene` renders the Scene view's camera; an address renders that one camera. Refused with `cannot take a screenshot: this Unity runs without a graphics device` when the editor runs with `-nographics` (a blank PNG would mislead). Read-only. |
 | `/api?type=&member=` | Types, members and signatures by reflection over the loaded assemblies: `Transform`, `UnityEngine.Transform`, `Physics.Raycast` (split at the last dot when no type has that name); short names match case-sensitively first, Unity's namespaces win over System's, an ambiguous name lists its candidates. The type view is under 300 tokens for the common types (kind, base, assembly, constructors, then property, method, static and event names, longest lists cut with `+N more`); `member` lists overloads with parameter names, `out`/`ref`/`params` and default values. Members inherited from a base say `(from Object)`; obsolete ones are left out. When reflection finds nothing the answer is `{"error":..., "online":[page addresses]}`, or `{"local":"<file>"}` when the Hub's Documentation module has the page. |
 | `/api?page=Manual/<page>\|ScriptReference/<page>\|<package>[@version]/<path>` | Names a documentation page (same answer shape: `local` file, else `error` and `online`); `ug docs` uses it. Bare `<page>` means `Manual/<page>`. The package version is the installed one's major.minor. The bridge never opens a connection: fetching, trimming and caching are the client's (rule 11). |
-| `/stats` (`ug perf`) | Lines: play state; `render` (draw calls, batches, triangles, set-pass calls, render ms from `UnityStats`, which only counts in play mode, else `only counted in play mode (ug play, then ug perf)`); memory (allocated, reserved, scripts heap, graphics driver, MB); objects (game objects, active, components in the loaded scenes); assets (files under `Assets/` with the main kinds counted). Read-only. |
+| `/stats` (`ug perf`) | Lines: play state; `render` (draw calls, batches, triangles, set-pass calls, render ms from `UnityStats`, which only counts in play mode, else `only counted in play mode (ug play, then ug perf)`); memory (allocated, reserved, scripts heap, graphics driver, MB); objects (game objects, active, components in the loaded scenes); assets (files under `Assets/` with the main kinds counted). Read-only. Bridge 0.8.0 adds the `/perf/...` requests: Profiler. |
 
 `field` is the serialized name (`speed`, `m_LocalPosition`, `waves[2].count`); display names
 (`Speed`) also match. `value` by the field's type: numbers (invariant culture), `true`/`false`,
@@ -251,6 +252,213 @@ with the source's post-processing off, SMAA, dithering on and volume mask 32, th
 `UniversalAdditionalCameraData` had the same, render type Base, and was HideAndDontSave. The scene
 stayed unmodified after every shot, the editor's undo records stayed at 0, and the viewpoint and
 sheet pictures leave out the overlay HUD that `ug shot` (game) draws.
+
+## Profiler (O12, bridge 0.8.0)
+
+`ug perf` keeps its one-screen summary (`/stats`) and gains the profiler: recorded frames read
+back as top markers, the profiler session and its `.raw` file, counters, frame timing, object
+memory, memory snapshots and the Frame Debugger. Unity's own APIs, no package; edit and play mode.
+
+```
+ug perf --record <s> [--max-frames N] [--top N]   ug perf --frames <a-b|all> [--top N]
+ug perf profiler [status]                 ug perf profiler start [--file [<path>]] [--callstacks] [--editor]
+ug perf profiler stop                     ug perf profiler areas [<Area>=on|off ...]
+ug perf counters [<name>...] [--category <c>] [--markers] [--all]
+ug perf timing
+ug perf memory [--top N] [--type <T>]     ug perf memory --object <x>
+ug perf snapshot take [<path>]            ug perf snapshot list [--folder <dir>] [--all]
+ug perf snapshot compare <a> <b> [--top N]
+ug perf frame-debugger enable|disable     ug perf frame-debugger events [<n>] [--from N] [--top N]
+```
+
+Requests: `/perf/record?seconds=&max-frames=&frames=&top=`, `/perf/profiler?do=&file=&callstacks=&editor=&areas=`,
+`/perf/counters?names=&category=&markers=&all=`, `/perf/timing`, `/perf/memory?top=&type=&object=`,
+`/perf/snapshot?path=`, `/perf/frame-debugger?do=&event=&from=&top=`. `snapshot list` and `compare`
+run in the client and need no Unity. Every list is capped and ends with a `more` line naming the
+command that shows the rest.
+
+- **`--record <s>`** (0.1 to 60 s) records the editor's frames for that long and analyses them. When
+  the profiler is off it sets `ProfilerDriver.profileEditor` (on in edit mode, off in play mode, as the
+  Profiler window's target) and `ProfilerDriver.enabled`, and puts both back after; when it is already
+  recording (the Profiler window, `ug perf profiler start`) it is left alone and the frames recorded
+  meanwhile are read. Frames are never cleared. The analysis runs after the recording, so it does not
+  slow the frames it measures, a slice of about 50 ms per editor update so the editor stays usable.
+  Per frame, main thread: `ProfilerDriver.GetHierarchyFrameDataView(frame, 0, MergeSamplesWithTheSameName
+  | InvertHierarchy, ...)`, whose top items are the markers with their self time and calls; the
+  children of its `GC.Alloc` item are the callers with the bytes they allocated; `frameTimeMs` is the
+  frame. The profiler keeps the last 2000 frames (Preferences > Analysis > Frame count): older ones are
+  gone, and the answer says how many it analysed (`analysed the last 2000 of 2712 frames`). A
+  batch-mode editor hands frames over late, so the request waits until the last frame index stops
+  moving (at most 2 s). If a domain reload ends the request (a compile, play mode entered), the next
+  bridge start turns the profiler back off when `--record` had turned it on (a `SessionState` flag).
+- **Frame cap.** `--record` stops at `--max-frames` frames (10 to 2000; default 300, the Profiler
+  window's default history) when that comes before the time asked, and the header says so (`300
+  frames in 0.0 s (the 300-frame cap: --max-frames, up to 2,000)`). Frames are counted as editor
+  updates, since the request is polled once an update and a batch-mode editor hands its frames over
+  late. The reason is memory: the profiler's pool (Unity's `ProfilerEditor` label) grows with the
+  frames it holds and is not given back while the editor runs (`ProfilerDriver.ClearAllFrames`
+  empties the frames, not the pool; later recordings reuse it). Measured in BridgeHost's batch-mode
+  editor, which updates about 21,000 times a second: one 0.3 s recording held 2000 frames, the
+  profiler's memory peaked at 3.1–3.5 GB and settled at 1.3 GB. Three such recordings in the
+  EditMode suite, on a machine with 2 GB of commit left, made Unity abort (`Could not allocate
+  memory ... ProfilerEditor`). With the cap the suite passes. The cap binds in an interactive
+  editor too: purge-squad's window updated about 2,000 times a second while `ug` waited, so 300
+  frames took 0.2–0.3 s and `--max-frames 2000` about 1 s; a longer window needs `ug perf profiler
+  start` or the Profiler window. `profiler start` has no cap: a session the user starts and stops
+  is the Profiler window's behaviour, and its answer gives the frames held.
+- **`--frames a-b|all`** analyses frames the profiler holds, from any recording (the Profiler window's
+  too). Refused outside what it holds (`the profiler holds frames 3100-5099`) or with none.
+- **Answer** of both, `--top` 1 to 200 (default 10 markers, 5 callers, 3 spikes):
+
+  ```
+  $ ug perf --record 5 --max-frames 2000
+  play mode, 1312 frames in 5.0 s, main thread: median 3.6 ms (277 fps), p99 6.1 ms, max 14.2 ms; GC 1.2 KB a frame
+  self ms a frame, share, calls a frame:
+    EditorLoop  1.51  41%  1  (editor, not in a build)
+    Gfx.WaitForPresentOnGfxThread  0.62  17%  1
+    ...
+    ... 412 more: ug perf --frames 2201-3512 --top 30
+  GC allocated a frame, by caller:
+    PlayerController.Update()  0.8 KB  (in 1312 frames)
+  spikes over 7.2 ms (2x median): 4 frames; slowest:
+    frame 3011  14.2 ms  GC.Collect 8.1, BehaviourUpdate 2.0, Physics.Simulate 1.1
+  ```
+
+  In edit mode the frames are the editor's own (`edit mode (the editor's frames)`); in play mode
+  `EditorLoop`'s self time is the editor drawing itself, labelled as not in a build. The `more`
+  line is `--frames` over the same frames, so it reads them again instead of recording again.
+- **`profiler`** reports and drives the session. `status` (the default):
+
+  ```
+  profiler  recording play mode frames since frame 1200 (holds 1200-3199)
+  file  Library/unitygraph/profiler/20261011-101500.raw  26.9 MB
+  allocation callstacks  off
+  areas on  CPU, Rendering, Memory, Audio, Video, Physics, Physics2D, NetworkMessages, NetworkOperations, UI, UIDetails, GlobalIllumination, VirtualTexturing
+  areas off  GPU
+  ```
+
+  `start` sets `ProfilerDriver.enabled` (and `profileEditor` as `--record` does; `--editor` profiles
+  the editor in play mode too, the window's Edit Mode target). `--file` writes Unity's binary log
+  (`Profiler.logFile`, `enableBinaryLog`), which the Profiler window loads: a path relative to the
+  project or absolute, `.raw` added when there is no extension; without a path
+  `Library/unitygraph/profiler/<yyyyMMdd-HHmmss>.raw`. `--callstacks` sets
+  `Profiler.enableAllocationCallstacks` (GC.Alloc samples carry call stacks; slower). Already
+  recording: `start --file` adds the file, a plain `start` is refused. `stop` ends the log, turns
+  callstacks and recording off, puts `profileEditor` back, and answers the time, the frame range
+  with the `--frames` command that reads it, and the file and its size. Frames arrive late (batch
+  mode most), so the answer waits until the last frame index holds still for 0.1 s (at most 2 s
+  after stopping) and the range is the one the profiler holds then. `areas` lists the
+  `ProfilerArea`s, or sets them (`Profiler.SetAreaEnabled`, which the Profiler window shares):
+  names case-insensitive, `on|off|true|false`; an unknown name is refused with the list.
+- **`counters`** reads `ProfilerRecorder`s. Without names or `--category`: the categories, with
+  how many counters (`MarkerFlags.Counter`) and markers each has. `--category Render`: every counter
+  of it with its value; `--markers`: the category's markers (time in the last frame) instead,
+  slowest first, the idle ones counted. Names are counter names in any category (`Draw Calls Count`,
+  `Total Used Memory`), case-insensitive; an unknown or partial name lists the near ones. The
+  recorders run for 3 frames (play mode, or the editor's updates queued in edit mode; at most 2 s) and
+  the value is the last sample. Units by `ProfilerRecorderDescription.UnitType`: bytes as KB/MB/GB,
+  nanoseconds as ms, counts, percent, Hz. Lists cap at 40 (`... N more: ug perf counters --category
+  Render --all`). Render counters are 0 in edit mode unless something draws.
+- **`timing`**: `FrameTimingManager` over 5 frames (the first reading after an idle editor is the
+  idle gap), the last frame's 12 fields: CPU frame, main thread, present wait, render thread and GPU
+  ms; first submit, present called and frame complete as ms after the frame start; the frame start
+  timestamp with the timer frequency; width and height scale; sync interval. A GPU time of 0 says
+  `not measured`. Refused when `FrameTimingManager.IsFeatureEnabled()` is false, naming the player
+  setting (`Frame Timing Stats`).
+- **`memory`**: every loaded object (`Resources.FindObjectsOfTypeAll<Object>()`) sized by
+  `Profiler.GetRuntimeMemorySizeLong`: the total, the 8 largest types (size and count), and the top
+  objects with type and where they live: an asset path, a scene address, `hidden` (HideFlags: the
+  editor's or the engine's own) or `not saved` (made by code). `--type` keeps one type and its
+  subclasses (`Texture` takes `Texture2D` and `RenderTexture`). `--top` 1 to 500, default 10.
+  `--object <x>` sizes one object: a game object with its components each, its children's total, and
+  the assets it uses (`EditorUtility.CollectDependencies`, persistent ones, largest 5); an asset path
+  with its sub-assets (largest 20). Sizes are native memory; managed memory is in the snapshot.
+- **`snapshot take`**: `Unity.Profiling.Memory.MemoryProfiler.TakeSnapshot(path, callback,
+  ManagedObjects | NativeObjects | NativeAllocations)` (the Memory Profiler package's default
+  capture, without the package), waiting for the callback (at most 60 s). Default
+  `Library/unitygraph/snapshots/<yyyyMMdd-HHmmss>.snap`; `.snap` added when there is no extension.
+  Answers path, size and time. Unity can call back before the file is flushed, so the answer also
+  waits for the file's end signature (`0xABCDCDAE`, below; at most 20 s past the callback, else
+  refused with the size so far). Snapshots are big: 183 MB in 0.6 s for BridgeHost in batch mode,
+  1.81 GB in 10–17.5 s for purge-squad with its window open.
+- **`snapshot list`** (client): `Library/unitygraph/snapshots/` and `MemoryCaptures/` (the package's
+  folder), or `--folder` (MCP's default, `Application.temporaryCachePath/MemoryCaptures`, is reached
+  this way), newest first, at most 20 (`--all`): path, size, capture time, product, Unity version,
+  platform, total used memory and native object count, read from the file. A file ug cannot read
+  says why.
+- **`snapshot compare <a> <b>`** (client): ug's own reader of the `.snap` format (below), so no
+  `com.unity.memoryprofiler` in the project and no Unity running. Answers both files' metadata;
+  memory totals with changes (total used, graphics, GC heap used and reserved, audio, profiler);
+  native objects count and size; types by size change; objects new in `b`, gone from `a` and grown,
+  largest first. Two snapshots of the same editor session (equal session GUID) match objects by
+  instance ID; otherwise by type and name, in order. `--top` 1 to 200, default 10. Managed objects
+  are counted in the GC heap only: crawling the managed heap is the Memory Profiler package's work.
+- **`frame-debugger`** drives Unity's internal Frame Debugger by reflection
+  (`UnityEditorInternal.FrameDebuggerInternal.FrameDebuggerUtility`: `locallySupported`, `count`,
+  `limit`, `SetEnabled(bool, int)`, `GetFrameEvents`, `GetFrameEventInfoName`, `GetFrameEventData`,
+  `GetBatchBreakCauseStrings`; `UnityEditor.FrameDebuggerWindow`). The names are Unity 6000.3's and
+  are checked on each request: a missing one refuses (`the Frame Debugger's internals are not the
+  ones ug knows (no FrameDebuggerUtility.count in this Unity)`). `enable` is refused where Unity
+  cannot debug frames locally (`locallySupported` false: an editor rendering single-threaded, as
+  `-batchmode` and `-automated` start it; the refusal says to start Unity with `-force-gfx-mt`).
+  When the Frame Debugger window is open its own enable, disable and event limit are used (calling
+  the utility under an open window makes it throw), else the utility, and no window is opened. Unity
+  pauses play mode while debugging, as from the window; the answer says so and gives the event count
+  once it settles (at most 5 s). Unity captures the next frame the Game or Scene view draws, and an
+  editor in the background draws none (measured: a windowed editor behind another application held
+  0 events until its window was clicked, then 4), so `enable` with no events yet says to click the
+  editor's window, and `events` with none is refused with the same hint. `events`: index, event
+  type, Unity's event name and the object (an address or asset path), from `--from` (default 0),
+  `--top` (default 50, at most 500), `... N more: ug perf frame-debugger events --from 50`.
+  `events <n>`: sets the limit to that event (the Game view shows the frame up to it, as clicking it
+  in the window) and answers its detail: shader (real and original when they differ), pass and
+  light mode, keywords, mesh, vertex, index, instance and draw call counts, render target name, size
+  (not twice when Unity's name carries it: `TempBuffer 14 613x428`), format and count, compute
+  shader and kernel, and the batch break cause. `disable` ends it; play mode stays paused. `events`
+  and `disable` are refused while it is off.
+- **Files.** ug creates `Library/unitygraph/profiler/` and `Library/unitygraph/snapshots/` (Library
+  is never in version control) and never deletes what it writes there; answers give sizes. A path
+  given is refused under the project's `Assets/` or `Packages/` (Unity would import a growing file),
+  when the file exists, and when its folder does not.
+- **State, not data.** Profiler recording, areas and the Frame Debugger are editor state: not on the
+  Undo stack, nothing saved or marked dirty; the commands that change them say how to put them back.
+- **Older bridge.** Before 0.8.0 the `/perf/...` requests are unknown: `bridge 0.7.0 is too old for
+  ug perf --record: run ug bridge install again`. Plain `ug perf` works with any.
+
+**The `.snap` format** (read by `UnityGraph.EditorLink`, written by Unity 2022.2 to 6000.3; checked
+against the Memory Profiler package 1.1.12 sources): a file starts with `0xAEABCDCD` and ends with
+`0xABCDCDAE` after a `long` directory offset. The directory (`0xCDCDAEAB`, version `0x20170724`, the
+block section offset) lists one offset per entry type; the block section (`0x20170724`, block count,
+offsets) gives each block's chunk size, total bytes and chunk offsets, and a block offset maps to the
+chunk holding it. An entry's header (format, block, entries meta, header meta; 18 bytes packed) makes
+it one value, an array of fixed-size elements, or of sized elements (strings: UTF-8). ug reads:
+`Metadata_Version`, `Metadata_RecordDate`, `NativeTypes_Name`, `NativeObjects_NativeTypeArrayIndex`,
+`_Flags`, `_InstanceId` (8 bytes from format 18), `_Name`, `_Size`, `ManagedHeapSections_Bytes`,
+`ProfileTarget_Info` (session GUID, platform, Unity version, product) and `ProfileTarget_MemoryStats`.
+A file without the signatures, or a format version above the newest ug knows, is refused by name.
+
+Measured on purge-squad (2026-10-11, Unity 6000.3.14f1 open with its window, URP 17.3.0, bridge
+0.8.0 copied in; fresh `ug` process, wall clock, answer bytes): `--record 1` 2.1–4.4 s, 1.9–2.1 KB
+(about 500 tokens), 299 frames in 0.2–0.3 s ended by the cap, median 0.46–0.64 ms (1,550–2,170
+fps); `--record 1 --max-frames 2000` 7.4 s, 2.1 KB, 1,151 frames in 1.0 s; the time past the
+recording is the analysis, sliced across editor updates. The profiler's own memory (`Profiler Used
+Memory`) was 2.10 GB before and 2.10–2.11 GB after three recordings. `profiler start --file` 208
+ms; `stop` 2.3 s after 1 s of recording (`.raw` 26.4 and 35.4 MB) and 9.7 s after 3 s (11,000
+frames): Unity drains the frames it queued on the main thread, and the ranges answered were the
+ones it held afterwards. `profiler` (status) 217 ms, 261 B. Counters: categories 211 ms, 1.3 KB;
+four Memory counters 198–258 ms, 204 B; the Render category 219 ms, 1.3 KB. `timing` 201 ms, 364
+B. `memory` 239 ms, 1.1 KB (12,521 objects, 391.1 MB; RenderTexture 230.2 MB in 22); `--type
+Texture2D` 192 ms, 604 B; `--object Boot` 314 ms, 768 B. `snapshot take` 1.81 GB in 17.5 and 10.0
+s; `snapshot list` 206 ms, 312 B; `compare` of the two 246 ms, 958 B (240 tokens), the object made
+between them found new. `frame-debugger enable` refused in 179 ms, 153 B: the Hub starts
+purge-squad with `-automated`, which renders single-threaded. The Frame Debugger live, BridgeHost
+with its window and `-force-gfx-mt`: `enable` 473 ms (4 events), `events` 202 ms, 359 B, event 1
+(`Skybox/Procedural`, 5,040 vertices) 203 ms, 272 B, event 3 (`Hidden/BlitCopy` to a `TempBuffer`)
+192 ms, 264 B, `disable` 185 ms; in play mode `enable` 507 ms paused the game, `disable` 193 ms
+left it paused, and `ug stop` found 0 errors. In the `UG_UNITY` end to end (batch mode, in
+process): `--record 1` 416 ms, about 390 tokens; `--frames` over a stopped session 1.13 s; two
+counters 13 ms; `memory --top 5` 11 ms, about 157 tokens; `snapshot take` 645 ms (183 MB);
+`compare` 24 ms, about 223 tokens; a 0.3 s `.raw` log 54.5 MB.
 
 ## Safety rules
 
@@ -427,11 +635,27 @@ a fresh process's time is .NET start-up.
   URP's camera data copy is checked live in purge-squad only (BridgeHost is built-in; no package is
   added for it). CLI tests: each option's request and the old-bridge refusal; the `UG_UNITY` end to
   end adds two refusals and a sheet refused for want of a device.
+  Profiler (O12): EditMode tests in the batch editor, kept short because a batch editor makes
+  thousands of frames a second: `--record 0.3` (frames, header, the 300-frame cap, the profiler
+  put back off), a 30 s recording ended by `--max-frames 20` and its refusals, `--frames` over them
+  and out of range, `profiler start --file`/`status`/`stop` (the `.raw` written, the stop's range
+  ending at the last frame the profiler holds, callstacks and areas set and put back), the path
+  refusals, counters by name, category and markers, timing, memory list, `--type` and `--object`
+  (game object and asset), a snapshot taken and read back, and the Frame Debugger's refusal on the
+  single-threaded batch editor (its reflection names checked there too). Client tests: the `.snap`
+  reader on a file written by the test (chunks across block boundaries, both instance ID widths, a
+  bad signature, a newer version), list and compare answers, each command's request, and the 0.7.0
+  refusal. The `UG_UNITY` end to end records in edit and play mode, starts and stops a `.raw` log
+  and reads its frames back, takes two snapshots and compares them, and checks the play-mode log
+  holds no error but the batch editor's missing graphics device. The Frame Debugger's events are
+  checked live in BridgeHost started with its window and `-force-gfx-mt` (MultiThreaded Direct3D12),
+  in edit and play mode (below).
 
 ## Boundaries
 
 - Writes scene and asset files only on `ug save`, for prefab-content edits (rule 3), and for
-  explicit `ug prefab`, `ug asset` and `ug package` commands.
+  explicit `ug prefab`, `ug asset` and `ug package` commands. Profiler logs and memory snapshots go
+  to `Library/unitygraph/` or a path the user gives outside `Assets/` and `Packages/` (O12).
 - Never from a hook; never edits package contents or vendored folders; never discards unsaved
   work.
 - The only network access is rule 11's docs fallback, to docs.unity3d.com only, and the

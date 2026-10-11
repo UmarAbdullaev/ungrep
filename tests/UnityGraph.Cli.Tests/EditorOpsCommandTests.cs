@@ -482,6 +482,78 @@ public sealed class EditorOpsCommandTests : IDisposable
         Assert.Contains(error, errors.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("/perf/record?seconds=2", "perf", "--record", "2")]
+    [InlineData("/perf/record?seconds=0.5&top=20", "perf", "--record", "0.5", "--top", "20")]
+    [InlineData("/perf/record?seconds=30&max-frames=2000", "perf", "--record", "30", "--max-frames", "2000")]
+    [InlineData("/perf/record?frames=100-200", "perf", "--frames", "100-200")]
+    [InlineData("/perf/record?frames=all&top=3", "perf", "--frames", "all", "--top", "3")]
+    [InlineData("/perf/profiler?do=status", "perf", "profiler")]
+    [InlineData("/perf/profiler?do=status", "perf", "profiler", "status")]
+    [InlineData("/perf/profiler?do=start", "perf", "profiler", "start")]
+    [InlineData("/perf/profiler?do=start&file=", "perf", "profiler", "start", "--file")]
+    [InlineData("/perf/profiler?do=start&file=Library%2Frun.raw&callstacks=true&editor=true", "perf", "profiler", "start", "--file", "Library/run.raw", "--callstacks", "--editor")]
+    [InlineData("/perf/profiler?do=stop", "perf", "profiler", "stop")]
+    [InlineData("/perf/profiler?do=areas", "perf", "profiler", "areas")]
+    [InlineData("/perf/profiler?do=areas&areas=CPU%3Don%2CAudio%3Doff", "perf", "profiler", "areas", "CPU=on", "Audio=off")]
+    [InlineData("/perf/counters", "perf", "counters")]
+    [InlineData("/perf/counters?names=Draw%20Calls%20Count%7CTotal%20Used%20Memory", "perf", "counters", "Draw Calls Count", "Total Used Memory")]
+    [InlineData("/perf/counters?category=Scripts&markers=true&all=true", "perf", "counters", "--category", "Scripts", "--markers", "--all")]
+    [InlineData("/perf/timing", "perf", "timing")]
+    [InlineData("/perf/memory", "perf", "memory")]
+    [InlineData("/perf/memory?top=30&type=Texture2D", "perf", "memory", "--top", "30", "--type", "Texture2D")]
+    [InlineData("/perf/memory?object=Main%3APlayer%2FGun", "perf", "memory", "--object", "Main:Player/Gun")]
+    [InlineData("/perf/snapshot", "perf", "snapshot", "take")]
+    [InlineData("/perf/snapshot?path=Library%2Fbefore.snap", "perf", "snapshot", "take", "Library/before.snap")]
+    [InlineData("/perf/frame-debugger?do=enable", "perf", "frame-debugger", "enable")]
+    [InlineData("/perf/frame-debugger?do=events", "perf", "frame-debugger", "events")]
+    [InlineData("/perf/frame-debugger?do=events&event=12", "perf", "frame-debugger", "events", "12")]
+    [InlineData("/perf/frame-debugger?do=events&from=50&top=100", "perf", "frame-debugger", "events", "--from", "50", "--top", "100")]
+    [InlineData("/perf/frame-debugger?do=disable", "perf", "frame-debugger", "disable")]
+    public void Perf_requests_carry_their_options(string request, params string[] args)
+    {
+        _bridge.Publish(_root, bridge: "0.8.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"profiler  off, holds no frames\"]}");
+
+        var (exitCode, output) = Run(args);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("profiler  off, holds no frames\n", output);
+        Assert.Equal(["/status", request], _bridge.Requests);
+    }
+
+    [Fact]
+    public void A_bridge_before_the_profiler_refuses_the_perf_additions_and_keeps_plain_perf()
+    {
+        _bridge.Publish(_root, bridge: "0.7.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"edit mode\"]}");
+
+        Assert.Equal("bridge 0.7.0 is too old for ug perf --record: run ug bridge install again\n", Run("perf", "--record", "1").Output);
+        Assert.Equal("bridge 0.7.0 is too old for ug perf --frames: run ug bridge install again\n", Run("perf", "--frames", "all").Output);
+        Assert.Equal("bridge 0.7.0 is too old for ug perf profiler start: run ug bridge install again\n", Run("perf", "profiler", "start").Output);
+        Assert.Equal("bridge 0.7.0 is too old for ug perf counters: run ug bridge install again\n", Run("perf", "counters").Output);
+        Assert.Equal("bridge 0.7.0 is too old for ug perf snapshot take: run ug bridge install again\n", Run("perf", "snapshot", "take").Output);
+        Assert.Equal("bridge 0.7.0 is too old for ug perf frame-debugger enable: run ug bridge install again\n", Run("perf", "frame-debugger", "enable").Output);
+        Assert.Equal("edit mode\n", Run("perf").Output);
+        Assert.Equal("/stats", _bridge.Requests.Last());
+    }
+
+    [Fact]
+    public void Snapshot_list_and_compare_run_here_without_the_bridge()
+    {
+        Assert.Equal("no snapshots in Library/unitygraph/snapshots/ or MemoryCaptures/: ug perf snapshot take\n", Run("perf", "snapshot", "list").Output);
+        Assert.Equal("no folder Captures\n", Run("perf", "snapshot", "list", "--folder", "Captures").Output);
+        Assert.Equal("no snapshot before (ug perf snapshot list)\n", Run("perf", "snapshot", "compare", "before", "after").Output);
+        Assert.Equal("--top is 1 to 200\n", Run("perf", "snapshot", "compare", "before", "after", "--top", "0").Output);
+
+        Directory.CreateDirectory(Path.Combine(_root, "Library", "unitygraph", "snapshots"));
+        File.WriteAllText(Path.Combine(_root, "Library", "unitygraph", "snapshots", "before.snap"), "not one");
+        File.WriteAllText(Path.Combine(_root, "Library", "unitygraph", "snapshots", "after.snap"), "not two");
+
+        Assert.Equal("cannot read the snapshots: not a memory snapshot (no snapshot signature at the start)\n", Run("perf", "snapshot", "compare", "before", "after").Output);
+        Assert.Empty(_bridge.Requests);
+    }
+
     [Fact]
     public void The_commands_obey_the_module_switch()
     {

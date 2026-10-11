@@ -77,6 +77,15 @@ namespace UnityGraph.Bridge
                 { "/api", (r, c) => Checked(() => ApiOps.Api(r)) },
                 { "/stats", (r, c) => Checked(StatsOps.Stats) },
 
+                // Profiler, counters, memory and the Frame Debugger (SPEC-editor-ops, Profiler).
+                { "/perf/record", (r, c) => Deferred(() => PerfOps.Record(r)) },
+                { "/perf/profiler", (r, c) => Deferred(() => PerfOps.Profiler(r)) },
+                { "/perf/counters", (r, c) => Deferred(() => PerfOps.Counters(r)) },
+                { "/perf/timing", (r, c) => Deferred(() => PerfOps.Timing(r)) },
+                { "/perf/memory", (r, c) => Checked(() => PerfOps.Memory(r)) },
+                { "/perf/snapshot", (r, c) => Deferred(() => PerfOps.Snapshot(r)) },
+                { "/perf/frame-debugger", (r, c) => Deferred(() => FrameDebuggerOps.Handle(r)) },
+
                 // Cameras and Cinemachine (specs/SPEC-camera.md): edits answer after the brain has run.
                 { "/camera", (r, c) => Checked(() => CameraOps.List(r)) },
                 { "/camera/create", (r, c) => Deferred(() => CameraOps.Create(r)) },

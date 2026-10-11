@@ -205,6 +205,9 @@ internal static partial class EditorCommands
         /// <summary>A UI Toolkit request (`ug nav`, `ug tree --ui`, a UXML shot): needs bridge 0.7.0.</summary>
         public bool UiToolkit { get; init; }
 
+        /// <summary>A profiler request (`ug perf --record`, `ug perf profiler`, ...): needs bridge 0.8.0.</summary>
+        public bool Profiler { get; init; }
+
         /// <summary>The option that needs the newer bridge, named in the refusal: `ug shot --angles`.</summary>
         public string? Option { get; init; }
 
@@ -279,7 +282,8 @@ internal static partial class EditorCommands
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
 
-        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras) || (request.UiToolkit && !client.HasUiToolkit))
+        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras) || (request.UiToolkit && !client.HasUiToolkit)
+            || (request.Profiler && !client.HasProfiler))
         {
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + (request.Option == null ? "" : " " + request.Option) + ": run ug bridge install again\n");
         }
@@ -546,7 +550,7 @@ internal static partial class EditorCommands
         yield return Ops("docs", "docs", "A Unity documentation page as trimmed text: local copy, then the cache, then docs.unity3d.com (docs.online in .claude/unitygraph.json).", [docsPage], r =>
             new OpRequest(Query("/api", ("page", r.GetValue(docsPage)))) { Timeout = TimeSpan.FromSeconds(20) });
 
-        yield return Ops("perf", "perf", "Play state, frame render stats (play mode), memory, object and asset counts.", [], _ => new OpRequest("/stats"));
+        yield return PerfCommand();
 
         yield return Ops("undo", "undo", "Undo the editor's last change, like Ctrl+Z.", [], _ => new OpRequest("/undo"));
         yield return Ops("redo", "redo", "Redo the last undone change.", [], _ => new OpRequest("/redo"));

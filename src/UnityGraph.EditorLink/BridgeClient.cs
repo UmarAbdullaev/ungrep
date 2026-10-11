@@ -35,6 +35,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge that knows UI Toolkit: `ug nav`, `ug tree --ui`, UXML shots (SPEC-play-input, UI Toolkit).</summary>
     public const string MinimumUiBridge = "0.7.0";
 
+    /// <summary>The oldest bridge with the profiler requests: `/perf/...` (SPEC-editor-ops, Profiler).</summary>
+    public const string MinimumProfilerBridge = "0.8.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -76,6 +79,9 @@ public sealed class BridgeClient : IDisposable
 
     /// <summary>Whether the bridge lists, clicks, navigates, shows and draws UI Toolkit documents.</summary>
     public bool HasUiToolkit => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumUiBridge);
+
+    /// <summary>Whether the bridge records and reads profiler frames, counters, memory and the Frame Debugger.</summary>
+    public bool HasProfiler => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumProfilerBridge);
 
     /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
