@@ -135,7 +135,10 @@ public sealed class McpClientTests : IDisposable
         CallAnswer answer = _client.Call("ask", "{}", TimeSpan.FromSeconds(5));
 
         Assert.Equal("ask\n[image]\n", answer.Text);
-        Assert.Contains(Received(), l => l.Contains("\"id\":\"s1\"", StringComparison.Ordinal) && l.Contains("-32601", StringComparison.Ordinal));
+        // The refusal goes out without waiting, so the fake server may read it after the call returns.
+        Assert.True(SpinWait.SpinUntil(
+            () => Received().Exists(l => l.Contains("\"id\":\"s1\"", StringComparison.Ordinal) && l.Contains("-32601", StringComparison.Ordinal)),
+            TimeSpan.FromSeconds(5)), "the server never got the refusal of its own request");
     }
 
     [Fact]
