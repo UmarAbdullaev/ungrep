@@ -13,6 +13,7 @@ public sealed class AssetWorkspace
     private readonly VendoredFolders _vendored;
     private readonly HashSet<string> _tracked;
     private readonly List<string> _problems;
+    private readonly Lazy<Dictionary<string, List<string>>> _resources;
 
     private AssetWorkspace(string root, VendoredFolders vendored, List<FileStat> files, List<string> problems)
     {
@@ -22,6 +23,7 @@ public sealed class AssetWorkspace
         TrackedFiles = files;
         _tracked = files.Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
         _problems = problems;
+        _resources = new Lazy<Dictionary<string, List<string>>>(ResourceIndex);
     }
 
     public string ProjectRoot => _root;
@@ -81,7 +83,7 @@ public sealed class AssetWorkspace
             problems[i] = [];
             results[i] = files[i].EndsWith(".meta", StringComparison.Ordinal)
                 ? AssetFileIndexer.Meta(_root, files[i], problems[i])
-                : AssetFileIndexer.Content(_root, files[i], problems[i]);
+                : AssetFileIndexer.Content(_root, files[i], problems[i], Resources);
         });
 
         lock (_problems)
@@ -90,6 +92,33 @@ public sealed class AssetWorkspace
         }
 
         return results;
+    }
+
+    /// <summary>The assets `Resources.Load(name)` could load: under a `Resources/` folder at <paramref name="name"/>, without extension.</summary>
+    public IReadOnlyList<string> Resources(string name) => _resources.Value.TryGetValue(name, out List<string>? found) ? found : [];
+
+    private Dictionary<string, List<string>> ResourceIndex()
+    {
+        const string Folder = "/Resources/";
+        var index = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (FileStat file in TrackedFiles.Where(f => f.Path.EndsWith(".meta", StringComparison.Ordinal)))
+        {
+            string asset = file.Path[..^".meta".Length];
+            for (int at = asset.IndexOf(Folder, StringComparison.Ordinal); at >= 0; at = asset.IndexOf(Folder, at + 1, StringComparison.Ordinal))
+            {
+                string below = asset[(at + Folder.Length)..];
+                string dot = Path.GetExtension(below);
+                string name = below[..^dot.Length];
+                if (!index.TryGetValue(name, out List<string>? paths))
+                {
+                    index[name] = paths = [];
+                }
+
+                paths.Add(asset);
+            }
+        }
+
+        return index;
     }
 
     private sealed class Walk(string root, VendoredFolders vendored, List<FileStat> files, List<string> problems)

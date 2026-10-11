@@ -20,6 +20,12 @@ namespace UnityGraph.Bridge
 
         public static Reply Tree(Request request)
         {
+            string ui = request.Get("ui");
+            if (!string.IsNullOrWhiteSpace(ui))
+            {
+                return UiToolkit.Tree(ui.Trim(), request.Get("depth"));
+            }
+
             int depth = int.TryParse(request.Get("depth"), NumberStyles.None, CultureInfo.InvariantCulture, out int d) ? Math.Min(d, 50) : 2;
             string address = request.Get("object");
             var lines = new List<string>();
@@ -77,7 +83,8 @@ namespace UnityGraph.Bridge
             UnityEngine.Object target = Addresses.FindObject(request.Get("object"), out string error);
             if (target == null)
             {
-                return Answer.Error(error);
+                UiToolkit.Target element = UiToolkit.Find(request.Get("object"), out string elementError);
+                return element != null ? UiToolkit.Inspect(element) : Answer.Error(elementError ?? error);
             }
 
             string component = request.Get("component");

@@ -92,6 +92,7 @@ namespace UnityGraph.Bridge
                 // Play input: uGUI elements and clicks, device actions (SPEC-play-input).
                 { "/ui", (r, c) => Checked(() => PlayInput.UiList(r)) },
                 { "/ui/click", (r, c) => Deferred(() => PlayInput.UiClick(r)) },
+                { "/ui/nav", (r, c) => Deferred(() => PlayInput.UiNav(r)) },
                 { "/input/press", (r, c) => Deferred(() => PlayInput.Press(r)) },
                 { "/input/stick", (r, c) => Deferred(() => PlayInput.Stick(r)) },
                 { "/input/tap", (r, c) => Deferred(() => PlayInput.Tap(r)) },

@@ -54,7 +54,7 @@ public sealed class PurgeSquadAcceptanceTests : IDisposable
         using GraphStore read = GraphStore.Open(root, StoreMode.ReadOnly, graphDirectory: _graph);
         string topBar = Assert.Single(read.KeysInFile("Assets/Prefabs/UI/TopBar.prefab.meta"));
         Page<EdgeHit> into = read.EdgesIntoAsset(topBar[2..], EdgeKindSet.Of(EdgeKind.InstanceOf), 1000);
-        Assert.Contains(into.Items, e => e.Edge.File == "Assets/Scenes/Hub.unity" && e.Resolved);
+        Assert.Contains(into.Items, e => e.Edge.File == "Assets/Scenes/GalaxyMap.unity" && e.Resolved);
 
         string content = Path.Combine(root, "Assets", "Scenes", "GalaxyMap.unity");
         clock.Restart();

@@ -30,14 +30,22 @@ namespace UnityGraph.Bridge
             return MakeFolders(path) ?? Answer.Line("created folder " + path + Written(path));
         }
 
-        /// <summary>`/asset/create?path=&amp;type=&amp;shader=`: a folder, a material (`type=Material`) or a ScriptableObject by type name.</summary>
+        /// <summary>
+        /// `/asset/create?path=&amp;type=&amp;shader=`: a folder, a material (`type=Material`), a ScriptableObject by type
+        /// name, or a UI Toolkit file (`.uxml`, `.uss`, `.tss`, type optional) with Unity's starting content.
+        /// </summary>
         public static Reply Create(Request request)
         {
             string path = Clean(request.Get("path"));
             string type = (request.Get("type") ?? "").Trim();
+            if (UiFile(path, type))
+            {
+                return CreateUiFile(request, path, type);
+            }
+
             if (type.Length == 0)
             {
-                return Answer.Error("no type given (Folder, Material, or a ScriptableObject type)");
+                return Answer.Error("no type given (Folder, Material, a ScriptableObject type, or a .uxml, .uss or .tss path)");
             }
 
             if (string.Equals(type, "Folder", StringComparison.OrdinalIgnoreCase))
@@ -66,6 +74,7 @@ namespace UnityGraph.Bridge
 
             UnityEngine.Object made;
             string kind;
+            HashSet<string> themes = null;
             if (material)
             {
                 string named = request.Get("shader");
@@ -88,6 +97,7 @@ namespace UnityGraph.Bridge
                     return Answer.Error(error);
                 }
 
+                themes = Themes();
                 made = ScriptableObject.CreateInstance(scriptable);
                 if (made == null)
                 {
@@ -104,8 +114,59 @@ namespace UnityGraph.Bridge
                 return Answer.Error("Unity did not create " + path + ": ug console says why");
             }
 
+            // A PanelSettings made where the project has no theme writes Unity's default runtime theme (SPEC-play-input, Setup).
+            // Otherwise the answer names the theme Unity picked: the first it finds, not always the default one.
+            string theme = themes == null ? null : Themes().Except(themes).FirstOrDefault();
+            string note = theme != null ? "; Unity also created its default theme " + theme
+                : made is UnityEngine.UIElements.PanelSettings panel ? "; theme " + (panel.themeStyleSheet == null ? "none" : AssetDatabase.GetAssetPath(panel.themeStyleSheet)) : "";
+            return Answer.Line("created " + path + " (" + kind + note + ")" + Written(path));
+        }
+
+        // Unity's starting content for the UI Toolkit files, as its Create menu writes them.
+        private static readonly Dictionary<string, string> _uiFiles = new Dictionary<string, string>
+        {
+            { ".uxml", "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\" xmlns:uie=\"UnityEditor.UIElements\" editor-extension-mode=\"False\">\n</ui:UXML>\n" },
+            { ".uss", "VisualElement {}\n" },
+            { ".tss", "@import url(\"unity-theme://default\");\nVisualElement {}\n" },
+        };
+
+        private static bool UiFile(string path, string type) =>
+            type.Length == 0 ? _uiFiles.ContainsKey(Path.GetExtension(path).ToLowerInvariant()) : _uiFiles.ContainsKey("." + type.ToLowerInvariant());
+
+        private static Reply CreateUiFile(Request request, string path, string type)
+        {
+            string refused = Target(request, path, "path");
+            if (refused != null)
+            {
+                return Answer.Error(refused);
+            }
+
+            string extension = Path.GetExtension(path).ToLowerInvariant();
+            if (type.Length > 0 && extension != "." + type.ToLowerInvariant())
+            {
+                return Answer.Error("a " + type.ToUpperInvariant() + " path must end in ." + type.ToLowerInvariant() + ": " + path);
+            }
+
+            string missing = FolderMissing(path);
+            if (missing != null)
+            {
+                return Answer.Error(missing);
+            }
+
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), path), _uiFiles[extension], new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset(path);
+            if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path, AssetPathToGUIDOptions.OnlyExistingAssets)))
+            {
+                return Answer.Error("Unity did not import " + path + ": ug console says why");
+            }
+
+            string kind = extension == ".uxml" ? "UXML, empty" : extension == ".uss" ? "USS" : "TSS, imports Unity's default theme";
             return Answer.Line("created " + path + " (" + kind + ")" + Written(path));
         }
+
+        // The theme style sheets in the project.
+        private static HashSet<string> Themes() =>
+            new HashSet<string>(AssetDatabase.FindAssets("t:ThemeStyleSheet").Select(AssetDatabase.GUIDToAssetPath), StringComparer.Ordinal);
 
         /// <summary>`/asset/move?from=&amp;to=`: an asset or folder moved, its GUID kept.</summary>
         public static Reply Move(Request request) =>

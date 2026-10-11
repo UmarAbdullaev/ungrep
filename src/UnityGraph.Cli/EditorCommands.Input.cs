@@ -5,7 +5,7 @@ using UnityGraph.Core;
 namespace UnityGraph.Cli;
 
 /// <summary>
-/// The play-input commands (SPEC-play-input, Commands): `ug ui`, `ug click` and the device actions. They are
+/// The play-input commands (SPEC-play-input, Commands): `ug ui`, `ug click`, `ug nav` and the device actions. They are
 /// editor-ops steps with the module switch `play-input` and bridge 0.4.0 as their minimum. An action
 /// finishes in the editor after its length, so its request waits that long plus ten seconds.
 /// </summary>
@@ -14,14 +14,28 @@ internal static partial class EditorCommands
     private static IEnumerable<Command> InputCommands()
     {
         var all = new Option<bool>("--all") { Description = "Also list disabled, blocked and off-screen elements (up to 150 lines)." };
-        yield return Command("ui", "The interactable uGUI elements a player could use now: address, kind, label or value, screen position.", [all], (root, config, r) =>
+        yield return Command("ui", "The uGUI and UI Toolkit elements a player could use: address, kind, label or value, classes, screen place; edit mode too.", [all], (root, config, r) =>
             Op(root, config, "ui", new OpRequest(Query("/ui", ("all", r.GetValue(all) ? "true" : null))) { PlayInput = true }));
 
-        var element = new Argument<string>("element") { Description = "An address from ug ui (Canvas/Menu/Play), a label (Play), or a screen point x,y." };
-        var value = new Option<string?>("--value") { Description = "Operate the element's component instead of clicking: a slider or scrollbar number, input text, dropdown option, toggle on/off." };
+        var element = new Argument<string>("element") { Description = "An address from ug ui (Canvas/Menu/Play, a UI Toolkit element Menu/Play), a label (Play), or a screen point x,y." };
+        var value = new Option<string?>("--value") { Description = "Set the element's value instead of clicking: a slider or scrollbar number, input text, dropdown or radio option, toggle on/off, foldout open/closed, a field's value." };
         Option<bool> clickShot = ShotOption();
-        yield return Command("click", "Click an element through the EventSystem (pointer enter, down, up, click), as a mouse would; play mode only.", [element, value, clickShot], (root, config, r) =>
+        yield return Command("click", "Click an element as a mouse would (uGUI through the EventSystem, UI Toolkit through its panel); play mode only.", [element, value, clickShot], (root, config, r) =>
             Input(root, config, "click", Query("/ui/click", ("element", r.GetValue(element)), ("value", r.GetValue(value))), 0, r.GetValue(clickShot)));
+
+        var direction = new Argument<string>("direction") { Description = "submit, cancel, up, down, left, right, next or previous (next and previous: UI Toolkit only)." };
+        var navElement = new Argument<string?>("element") { Description = "Focus this element first: an address or label from ug ui. Default: what has the focus.", Arity = ArgumentArity.ZeroOrOne };
+        Option<bool> navShot = ShotOption();
+        yield return Command("nav", "Send a gamepad/keyboard UI navigation event to the focused element: submit, cancel or a move; play mode only.", [direction, navElement, navShot], (root, config, r) =>
+        {
+            string way = r.GetValue(direction)!.ToLowerInvariant();
+            if (way is not ("submit" or "cancel" or "up" or "down" or "left" or "right" or "next" or "previous"))
+            {
+                return (1, "direction is submit, cancel, up, down, left, right, next or previous\n");
+            }
+
+            return Input(root, config, "nav", Query("/ui/nav", ("direction", way), ("element", r.GetValue(navElement))), 0, r.GetValue(navShot), uiToolkit: true);
+        });
 
         var key = new Argument<string>("key") { Description = "A key (Space, Enter, A, LeftShift, UpArrow, 1), a gamepad button (pad:south, start, lshoulder) or a mouse button (mouse:left)." };
         Option<double?> pressHold = HoldOption("0.1");
@@ -109,9 +123,9 @@ internal static partial class EditorCommands
 
     // The request waits for the action to run in the editor: its length plus ten seconds. --shot adds the
     // game view picture's line; a picture that cannot be taken adds its refusal and leaves the action's result.
-    private static (int ExitCode, string Text) Input(string root, UnityGraphConfig config, string command, string pathAndQuery, double length, bool shot = false)
+    private static (int ExitCode, string Text) Input(string root, UnityGraphConfig config, string command, string pathAndQuery, double length, bool shot = false, bool uiToolkit = false)
     {
-        (int exitCode, string text) = Op(root, config, command, new OpRequest(pathAndQuery, [], TimeSpan.FromSeconds(length + 10), TimeSpan.FromSeconds(60)) { PlayInput = true });
+        (int exitCode, string text) = Op(root, config, command, new OpRequest(pathAndQuery, [], TimeSpan.FromSeconds(length + 10), TimeSpan.FromSeconds(60)) { PlayInput = true, UiToolkit = uiToolkit });
         if (!shot || _opFailed)
         {
             return (exitCode, text);

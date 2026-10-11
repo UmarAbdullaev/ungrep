@@ -114,6 +114,40 @@ public sealed class EditorOpsCommandTests : IDisposable
     }
 
     [Theory]
+    [InlineData("/tree?ui=Menu", "tree", "--ui", "Menu")]
+    [InlineData("/tree?depth=3&ui=Menu%2FPanel", "tree", "--ui", "Menu/Panel", "--depth", "3")]
+    [InlineData("/inspect?object=Menu%2FPlay", "inspect", "Menu/Play")]
+    [InlineData("/set?object=Menu%2FPlay&field=style.width&value=50%25", "set", "Menu/Play", "style.width", "50%")]
+    [InlineData("/shot?view=Assets%2FUI%2FMenu.uxml", "shot", "Assets/UI/Menu.uxml")]
+    [InlineData("/shot?view=Assets%2FUI%2FMenu.uxml&width=540&height=960&panel=Assets%2FUI%2FPanel.asset", "shot", "Assets/UI/Menu.uxml", "--panel", "Assets/UI/Panel.asset", "--width", "540", "--height", "960")]
+    [InlineData("/asset/create?path=Assets%2FUI%2FMenu.uxml", "asset", "create", "Assets/UI/Menu.uxml")]
+    [InlineData("/asset/create?path=Assets%2FUI%2FGame.tss&type=TSS", "asset", "create", "Assets/UI/Game.tss", "TSS")]
+    public void Ui_toolkit_requests_carry_their_addresses_and_options(string request, params string[] args)
+    {
+        _bridge.Publish(_root, bridge: "0.7.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"Menu  UIDocument  Assets/UI/Menu.uxml\"]}");
+
+        var (exitCode, output) = Run(args);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("Menu  UIDocument  Assets/UI/Menu.uxml\n", output);
+        Assert.Equal(["/status", request], _bridge.Requests);
+    }
+
+    [Fact]
+    public void A_bridge_before_ui_toolkit_refuses_tree_ui_and_uxml_shots()
+    {
+        _bridge.Publish(_root, bridge: "0.6.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"ok\"]}");
+
+        Assert.Equal("bridge 0.6.0 is too old for ug tree --ui: run ug bridge install again\n", Run("tree", "--ui", "Menu").Output);
+        Assert.Equal("bridge 0.6.0 is too old for ug shot Assets/UI/Menu.uxml: run ug bridge install again\n", Run("shot", "Assets/UI/Menu.uxml").Output);
+        Assert.Equal("bridge 0.6.0 is too old for ug shot --panel: run ug bridge install again\n", Run("shot", "game", "--panel", "Assets/UI/Panel.asset").Output);
+        Assert.Equal("ok\n", Run("tree", "Menu").Output);
+        Assert.Equal(["/status", "/status", "/status", "/status", "/tree?object=Menu"], _bridge.Requests);
+    }
+
+    [Theory]
     [InlineData("/shot?from=0%2C10%2C-10&look=Enemy", "shot", "--from", "0,10,-10", "--look", "Enemy")]
     [InlineData("/shot?view=Main%20Camera&rotation=30%2C45%2C0&fov=40.5", "shot", "Main Camera", "--rotation", "30,45,0", "--fov", "40.5")]
     [InlineData("/shot?look=1%2C0%2C2&camera=Rig%2FCam", "shot", "--look", "1,0,2", "--camera", "Rig/Cam")]

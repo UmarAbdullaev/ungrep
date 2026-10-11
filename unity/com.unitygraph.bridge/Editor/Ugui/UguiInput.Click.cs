@@ -256,6 +256,86 @@ namespace UnityGraph.Bridge
             return Answer.Line(set + Quote(before) + " -> " + Quote(DropdownText(dropdown)));
         }
 
+        /// <summary>`ug nav`: submit, cancel or a move on the selected object, as the input modules send them.</summary>
+        public Reply Nav(string direction, string element)
+        {
+            EventSystem events = EventSystem.current;
+            if (events == null)
+            {
+                return Answer.Error("no EventSystem in the loaded scenes: ug nav needs one (add it in edit mode: GameObject > UI > Event System)");
+            }
+
+            if (direction == "next" || direction == "previous")
+            {
+                return Answer.Error("uGUI has no next/previous: use up, down, left or right");
+            }
+
+            if (element != null)
+            {
+                PlayInput.ScreenSize(out int width, out int height);
+                GameObject target = Resolve(element, width, height, events, out string error);
+                if (target == null)
+                {
+                    return Answer.Error(error);
+                }
+
+                Selectable selectable = target.GetComponentInParent<Selectable>();
+                if (selectable == null || !selectable.IsInteractable())
+                {
+                    return Answer.Error(Addresses.Of(target) + " cannot be selected (no interactable Selectable)");
+                }
+
+                events.SetSelectedGameObject(selectable.gameObject);
+            }
+
+            GameObject selected = events.currentSelectedGameObject;
+            if (selected == null)
+            {
+                return Answer.Error("nothing has the focus: give an element (ug nav " + direction + " Menu/Play)");
+            }
+
+            if (direction == "submit" || direction == "cancel")
+            {
+                if (direction == "submit")
+                {
+                    ExecuteEvents.Execute(selected, new BaseEventData(events), ExecuteEvents.submitHandler);
+                }
+                else
+                {
+                    ExecuteEvents.Execute(selected, new BaseEventData(events), ExecuteEvents.cancelHandler);
+                }
+
+                return Answer.Line("nav " + direction + " on " + Described(selected, false));
+            }
+
+            Vector2 vector = direction == "up" ? Vector2.up : direction == "down" ? Vector2.down : direction == "left" ? Vector2.left : Vector2.right;
+            var axis = new AxisEventData(events)
+            {
+                moveVector = vector,
+                moveDir = direction == "up" ? MoveDirection.Up : direction == "down" ? MoveDirection.Down : direction == "left" ? MoveDirection.Left : MoveDirection.Right,
+            };
+            ExecuteEvents.Execute(selected, axis, ExecuteEvents.moveHandler);
+            GameObject now = events.currentSelectedGameObject;
+            string after = now == null ? "nothing" : now == selected ? Described(now, true) : Addresses.Of(now);
+            return Answer.Line("nav " + direction + ": " + Addresses.Of(selected) + " -> " + after);
+        }
+
+        // `Menu/Play (button "Play")`; with the value for one that kept the focus (`(focus kept, 0.6)`).
+        private static string Described(GameObject go, bool kept)
+        {
+            Selectable selectable = go.GetComponent<Selectable>();
+            if (selectable == null)
+            {
+                return Addresses.Of(go) + (kept ? " (focus kept)" : "");
+            }
+
+            string kind = KindOf(selectable);
+            string label = LabelOf(go);
+            return kept
+                ? Addresses.Of(go) + " (focus kept, " + Detail(kind, selectable, label, go) + ")"
+                : Addresses.Of(go) + " (" + kind + " " + Quote(label) + ")";
+        }
+
         // `640,360`: a point in Game view pixels, y down.
         private static string Where(Vector2 point, int height) =>
             Mathf.RoundToInt(point.x).ToString(CultureInfo.InvariantCulture) + "," + Mathf.RoundToInt(height - point.y).ToString(CultureInfo.InvariantCulture);

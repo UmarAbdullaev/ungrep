@@ -74,11 +74,53 @@ namespace UnityGraph.Bridge.Tests
             StringAssert.StartsWith("{\"error\":\"no Material, Folder or ScriptableObject type UgDat (near: UgData", Ask("/asset/create", "path", Folder + "/X.asset", "type", "UgDat"));
             StringAssert.StartsWith("{\"error\":\"no Material, Folder or ScriptableObject type SceneView", Ask("/asset/create", "path", Folder + "/X.asset", "type", "SceneView"));
             Assert.AreEqual(Err("a ScriptableObject path must end in .asset: " + Folder + "/X.mat"), Ask("/asset/create", "path", Folder + "/X.mat", "type", "UgData"));
-            Assert.AreEqual(Err("no type given (Folder, Material, or a ScriptableObject type)"), Ask("/asset/create", "path", Folder + "/X.asset"));
+            Assert.AreEqual(Err("no type given (Folder, Material, a ScriptableObject type, or a .uxml, .uss or .tss path)"), Ask("/asset/create", "path", Folder + "/X.asset"));
             Assert.AreEqual(Err(NotInAssets + "ProjectSettings/X.asset"), Ask("/asset/create", "path", "ProjectSettings/X.asset", "type", "UgData"));
             Assert.AreEqual(
                 Err("Packages/com.x/X.asset is in a package, which ug does not edit: copy it into Assets/ first"),
                 Ask("/asset/create", "path", "Packages/com.x/X.asset", "type", "UgData"));
+        }
+
+        [Test]
+        public void Create_writes_ui_toolkit_files_with_unitys_starting_content()
+        {
+            string root = Path.GetDirectoryName(Application.dataPath) + "/";
+            Assert.AreEqual(
+                Lines("created " + Folder + "/Menu.uxml (UXML, empty)  (written " + Folder + "/Menu.uxml" + Written),
+                Ask("/asset/create", "path", Folder + "/Menu.uxml"));
+            Assert.AreEqual(
+                "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\" xmlns:uie=\"UnityEditor.UIElements\" editor-extension-mode=\"False\">\n</ui:UXML>\n",
+                File.ReadAllText(root + Folder + "/Menu.uxml"));
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.VisualTreeAsset>(Folder + "/Menu.uxml"));
+
+            Assert.AreEqual(Lines("created " + Folder + "/Menu.uss (USS)  (written " + Folder + "/Menu.uss" + Written), Ask("/asset/create", "path", Folder + "/Menu.uss", "type", "uss"));
+            Assert.AreEqual("VisualElement {}\n", File.ReadAllText(root + Folder + "/Menu.uss"));
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.StyleSheet>(Folder + "/Menu.uss"));
+
+            Assert.AreEqual(
+                Lines("created " + Folder + "/Game.tss (TSS, imports Unity's default theme)  (written " + Folder + "/Game.tss" + Written),
+                Ask("/asset/create", "path", Folder + "/Game.tss"));
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<UnityEngine.UIElements.ThemeStyleSheet>(Folder + "/Game.tss"));
+
+            Assert.AreEqual(Err(Folder + "/Menu.uxml already exists: ug does not overwrite it"), Ask("/asset/create", "path", Folder + "/Menu.uxml"));
+            Assert.AreEqual(Err("a USS path must end in .uss: " + Folder + "/X.uxml"), Ask("/asset/create", "path", Folder + "/X.uxml", "type", "USS"));
+            Assert.AreEqual(Err("the folder " + Folder + "/Nope does not exist: ug asset folder " + Folder + "/Nope makes it"), Ask("/asset/create", "path", Folder + "/Nope/X.uss"));
+
+            // The project has a theme now (Game.tss), so Unity gives the PanelSettings one and writes none of its own.
+            bool themes = AssetDatabase.IsValidFolder("Assets/UI Toolkit");
+            try
+            {
+                Assert.AreEqual(
+                    Lines("created " + Folder + "/Panel.asset (UnityEngine.UIElements.PanelSettings; theme " + Folder + "/Game.tss)  (written " + Folder + "/Panel.asset" + Written),
+                    Ask("/asset/create", "path", Folder + "/Panel.asset", "type", "PanelSettings"));
+            }
+            finally
+            {
+                if (!themes)
+                {
+                    AssetDatabase.DeleteAsset("Assets/UI Toolkit");
+                }
+            }
         }
 
         [Test]

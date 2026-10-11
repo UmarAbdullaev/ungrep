@@ -12,7 +12,7 @@ using UnityEngine.UI;
 namespace UnityGraph.Bridge
 {
     /// <summary>
-    /// `ug ui` and `ug click` for uGUI (specs/SPEC-play-input.md). Elements are the Selectables and
+    /// The uGUI half of `ug ui`, `ug click` and `ug nav` (specs/SPEC-play-input.md). Elements are the Selectables and
     /// click handlers under a Canvas; a click is sent where a mouse would, through the EventSystem's
     /// raycast. TextMeshPro's input field, dropdown and text are reached by reflection, so the
     /// assembly does not depend on a package that may be absent (it is part of com.unity.ugui only
@@ -21,10 +21,6 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal sealed partial class UguiInput : IUiInput
     {
-        private const int DefaultLines = 40;
-        private const int AllLines = 150;
-        private const int LabelLength = 30;
-
         private static readonly Vector3[] _corners = new Vector3[4];
 
         static UguiInput()
@@ -48,59 +44,34 @@ namespace UnityGraph.Bridge
             public string State;
         }
 
-        public Reply List(bool all)
+        public bool HasSelection => EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null;
+
+        /// <summary>
+        /// The elements for `ug ui`, centre y down. In edit mode no EventSystem or raycaster is running,
+        /// so nothing is checked for blocking; the headline then asks only whether an EventSystem exists.
+        /// </summary>
+        public void Gather(List<UiItem> into, int width, int height, out int canvases, out bool noEventSystem)
         {
-            if (!PlayInput.ScreenSize(out int width, out int height))
-            {
-                return Answer.Error("the Game view has no size (this editor runs without a window): ug ui needs one");
-            }
-
-            EventSystem events = EventSystem.current;
-            List<Element> elements = Gather(width, height, events);
-            int canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)
+            EventSystem events = EditorApplication.isPlaying ? EventSystem.current : null;
+            canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)
                 .Count(c => c.isRootCanvas && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded);
-            int documents = UnityEngine.Object.FindObjectsByType<UnityEngine.UIElements.UIDocument>(FindObjectsSortMode.None).Count(d => d.isActiveAndEnabled);
-
-            string head = "ui  " + width + "x" + height + "  " + (EditorApplication.isPaused ? "paused" : "playing") + "  "
-                + (canvases == 0 ? "no canvas" : Answer.Count(canvases, "canvas", "canvases"));
-            if (events == null)
+            noEventSystem = EditorApplication.isPlaying
+                ? events == null
+                : !UnityEngine.Object.FindObjectsByType<EventSystem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Any(e => e.enabled && e.gameObject.scene.IsValid());
+            foreach (Element element in Gather(width, height, events))
             {
-                head += "  no EventSystem (nothing receives clicks)";
+                into.Add(new UiItem
+                {
+                    Address = element.Address,
+                    Kind = element.Kind,
+                    Detail = element.Detail,
+                    Label = element.Label,
+                    Name = element.Object.name,
+                    Center = new Vector2(element.Center.x, height - element.Center.y),
+                    Size = element.Size,
+                    State = element.State,
+                });
             }
-
-            if (documents > 0)
-            {
-                head += ", " + Answer.Count(documents, "UI Toolkit document", "UI Toolkit documents") + " not listed";
-            }
-
-            var lines = new List<string> { head };
-            List<Element> shown = all ? elements : elements.Where(e => e.State == null).ToList();
-            int limit = all ? AllLines : DefaultLines;
-            foreach (Element element in shown.Take(limit))
-            {
-                lines.Add(Line(element, height, all));
-            }
-
-            var more = new List<string>();
-            if (!all && elements.Count > shown.Count)
-            {
-                var states = elements.Where(e => e.State != null)
-                    .GroupBy(e => e.State.StartsWith("blocked", StringComparison.Ordinal) ? "blocked" : e.State)
-                    .Select(g => g.Count().ToString(CultureInfo.InvariantCulture) + " " + g.Key);
-                more.Add(Answer.Count(elements.Count - shown.Count, "more", "more") + " not usable (" + string.Join(", ", states) + "): ug ui --all");
-            }
-
-            if (shown.Count > limit)
-            {
-                more.Add("(+" + (shown.Count - limit).ToString(CultureInfo.InvariantCulture) + " more" + (all ? " not shown)" : ": ug ui --all)"));
-            }
-
-            if (more.Count > 0)
-            {
-                lines.Add("  " + string.Join("; ", more));
-            }
-
-            return Answer.Lines(lines);
         }
 
         // The elements a player could meet, in reading order: top to bottom, then left to right.
@@ -110,7 +81,7 @@ namespace UnityGraph.Bridge
             var seen = new HashSet<GameObject>();
             foreach (Selectable selectable in UnityEngine.Object.FindObjectsByType<Selectable>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
-                if (selectable.isActiveAndEnabled && selectable.gameObject.scene.IsValid() && seen.Add(selectable.gameObject))
+                if (selectable.enabled && selectable.gameObject.activeInHierarchy && selectable.gameObject.scene.IsValid() && seen.Add(selectable.gameObject))
                 {
                     Add(found, selectable.gameObject, selectable, width, height, events);
                 }
@@ -118,7 +89,7 @@ namespace UnityGraph.Bridge
 
             foreach (MonoBehaviour behaviour in UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
-                if (behaviour is IPointerClickHandler && !(behaviour is Selectable) && behaviour.isActiveAndEnabled && behaviour.gameObject.scene.IsValid()
+                if (behaviour is IPointerClickHandler && !(behaviour is Selectable) && behaviour.enabled && behaviour.gameObject.activeInHierarchy && behaviour.gameObject.scene.IsValid()
                     && behaviour.GetComponentInParent<Selectable>() == null && behaviour.GetComponentInParent<Canvas>() != null && seen.Add(behaviour.gameObject))
                 {
                     Add(found, behaviour.gameObject, null, width, height, events);
@@ -170,14 +141,6 @@ namespace UnityGraph.Bridge
 
             found.Add(element);
         }
-
-        private static string Line(Element element, int height, bool withState) =>
-            element.Address + "  " + element.Kind + "  " + element.Detail + "  "
-            + Mathf.RoundToInt(element.Center.x).ToString(CultureInfo.InvariantCulture) + ","
-            + Mathf.RoundToInt(height - element.Center.y).ToString(CultureInfo.InvariantCulture) + "  "
-            + Mathf.RoundToInt(element.Size.x).ToString(CultureInfo.InvariantCulture) + "x"
-            + Mathf.RoundToInt(element.Size.y).ToString(CultureInfo.InvariantCulture)
-            + (withState && element.State != null ? "  " + element.State : "");
 
         // The element's rectangle on screen: centre and size in pixels, Unity's origin (bottom left).
         private static bool Bounds(RectTransform rect, out Vector2 center, out Vector2 size)
@@ -312,16 +275,11 @@ namespace UnityGraph.Bridge
             return "";
         }
 
-        private static string Cut(string text)
-        {
-            text = text.Replace('\r', ' ').Replace('\n', ' ').Trim();
-            return text.Length <= LabelLength ? text : text.Substring(0, LabelLength - 3) + "...";
-        }
+        private static string Cut(string text) => UiItem.Cut(text);
 
-        private static string Quote(string text) => "\"" + Cut(text) + "\"";
+        private static string Quote(string text) => UiItem.Quote(text);
 
-        private static string Number(float value, bool whole) =>
-            whole ? Mathf.RoundToInt(value).ToString(CultureInfo.InvariantCulture) : value.ToString("0.##", CultureInfo.InvariantCulture);
+        private static string Number(float value, bool whole) => UiItem.Number(value, whole);
 
         private static List<string> DropdownOptions(Selectable dropdown)
         {

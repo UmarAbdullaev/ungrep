@@ -202,6 +202,9 @@ internal static partial class EditorCommands
         /// <summary>A camera request (`ug shot` viewpoints and sheets, `ug camera`): needs bridge 0.6.0.</summary>
         public bool Camera { get; init; }
 
+        /// <summary>A UI Toolkit request (`ug nav`, `ug tree --ui`, a UXML shot): needs bridge 0.7.0.</summary>
+        public bool UiToolkit { get; init; }
+
         /// <summary>The option that needs the newer bridge, named in the refusal: `ug shot --angles`.</summary>
         public string? Option { get; init; }
 
@@ -276,7 +279,7 @@ internal static partial class EditorCommands
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + ": run ug bridge install again\n");
         }
 
-        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras))
+        if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras) || (request.UiToolkit && !client.HasUiToolkit))
         {
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + (request.Option == null ? "" : " " + request.Option) + ": run ug bridge install again\n");
         }
@@ -363,14 +366,15 @@ internal static partial class EditorCommands
         yield return Ops("pause", "pause", "Pause play mode; ug play resumes.", [], _ => new OpRequest("/pause"));
 
         Argument<string?> treeObject = Optional("object", Address + " Default: the loaded scenes' roots.");
-        var depth = new Option<int?>("--depth") { Description = "Levels to show. Default: 2." };
-        yield return Ops("tree", "tree", "The live hierarchy under an object: names, components, active state.", [treeObject, depth], r =>
-            new OpRequest(Query("/tree", ("object", r.GetValue(treeObject)), ("depth", Number(r.GetValue(depth))))));
+        var depth = new Option<int?>("--depth") { Description = "Levels to show. Default: 2 (10 with --ui)." };
+        Option<string?> treeUi = Text("--ui", "Show the UI Toolkit visual tree under this object's UIDocument or an element (Menu, Menu/Pause): type, classes, text, screen place, state.");
+        yield return Ops("tree", "tree", "The live hierarchy under an object: names, components, active state; --ui for a UI Toolkit visual tree.", [treeObject, depth, treeUi], r =>
+            new OpRequest(Query("/tree", ("object", r.GetValue(treeObject)), ("depth", Number(r.GetValue(depth))), ("ui", r.GetValue(treeUi)))) { UiToolkit = r.GetValue(treeUi) != null, Option = r.GetValue(treeUi) != null ? "--ui" : null });
 
-        Argument<string> inspected = Required("object", Address);
+        Argument<string> inspected = Required("object", Address + " Or a UI Toolkit element: Menu/Play.");
         Option<string?> inspectComponent = Text("--component", "Show this component's fields: its type name, #n for the n-th.");
         Option<bool> inspectImporter = Flag("--importer", "Show an asset's import settings.");
-        yield return Ops("inspect", "inspect", "An object's components, or one component's serialized fields, live.", [inspected, inspectComponent, inspectImporter], r =>
+        yield return Ops("inspect", "inspect", "An object's components, one component's serialized fields, or a UI Toolkit element's state and styles, live.", [inspected, inspectComponent, inspectImporter], r =>
             new OpRequest(Query("/inspect", ("object", r.GetValue(inspected)), ("component", r.GetValue(inspectComponent)), ("importer", True(r.GetValue(inspectImporter))))));
 
         var objects = new Command("object", "Create, delete, rename, move, toggle and duplicate game objects (unsaved until ug save).");
@@ -421,8 +425,8 @@ internal static partial class EditorCommands
             new OpRequest(Query("/component/remove", ("object", r.GetValue(removeFrom)), ("component", r.GetValue(component))), r.GetValue(removeFrom))));
         yield return components;
 
-        Argument<string> target = Required("object", Address);
-        Argument<string> field = Required("field", "Serialized or display name: speed, m_LocalPosition, waves[2].count, list.size.");
+        Argument<string> target = Required("object", Address + " Or a UI Toolkit element (live only, no undo): Menu/Play.");
+        Argument<string> field = Required("field", "Serialized or display name: speed, m_LocalPosition, waves[2].count, list.size. An element: text, tooltip, name, enabled, display, visibility, class (+a -b ~c), value, style.<uss name>.");
         Argument<string> value = Required("value", "Number, true/false, text, enum name, 1,2,3, #ff8800, an object address, an asset path, or null.");
         Option<string?> setComponent = Text("--component", "The component with the field. Default: the object, then the one component that has it.");
         Option<bool> setImporter = Flag("--importer", "Set an asset's import setting, then reimport.");
@@ -484,9 +488,9 @@ internal static partial class EditorCommands
         assets.Subcommands.Add(Ops("folder", "asset folder", "Create a folder (and any missing parents).", [folderPath], r =>
             new OpRequest(Query("/asset/folder", ("path", r.GetValue(folderPath))), r.GetValue(folderPath))));
         Argument<string> createPath = Required("path", "Where to create it, like Assets/Materials/Paint.mat or Assets/Data/Wave1.asset. Refused when it exists.");
-        Argument<string> createType = Required("type", "Folder, Material, or a ScriptableObject type name.");
+        Argument<string?> createType = Optional("type", "Folder, Material, a ScriptableObject type name (PanelSettings); none for a .uxml, .uss or .tss path.");
         Option<string?> createShader = Text("--shader", "Shader for a Material, like Universal Render Pipeline/Lit. Default: the render pipeline's.");
-        assets.Subcommands.Add(Ops("create", "asset create", "Create a folder, a material or a ScriptableObject asset.", [createPath, createType, createShader], r =>
+        assets.Subcommands.Add(Ops("create", "asset create", "Create a folder, a material, a ScriptableObject asset, or a UXML, USS or TSS file with Unity's starting content.", [createPath, createType, createShader], r =>
             new OpRequest(
                 Query("/asset/create", ("path", r.GetValue(createPath)), ("type", r.GetValue(createType)), ("shader", r.GetValue(createShader))),
                 r.GetValue(createPath))));

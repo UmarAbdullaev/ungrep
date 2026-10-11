@@ -149,7 +149,7 @@ namespace UnityGraph.Bridge.Tests
                 Assert.Ignore("no graphics device (-nographics)");
             }
 
-            StringAssert.StartsWith("{\"error\":\"no enabled camera in the loaded scenes", Ask("/shot", "view", "game"));
+            StringAssert.StartsWith("{\"error\":\"no enabled camera or UI Toolkit document in the loaded scenes", Ask("/shot", "view", "game"));
         }
 
         // Viewpoints and sheets (SPEC-editor-ops, Viewpoints): refusals come before the device check.

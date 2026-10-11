@@ -88,7 +88,7 @@ namespace UnityGraph.Bridge.Tests
         // An EventSystem registers itself in OnEnable, which edit mode does not run; the test runs it by hand.
         private void Lifecycle(string method) => typeof(EventSystem).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(_events, null);
 
-        private static List<string> List(bool all = false) => PlayInput.Ui.List(all).Lines.ToList();
+        private static List<string> List(bool all = false) => PlayInput.List(all).Lines.ToList();
 
         [Test]
         public void The_list_shows_kinds_labels_and_values_in_reading_order()

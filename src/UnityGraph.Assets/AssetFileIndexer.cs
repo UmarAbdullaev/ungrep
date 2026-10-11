@@ -9,7 +9,8 @@ namespace UnityGraph.Assets;
 
 /// <summary>
 /// Turns one `.meta` file or one Unity YAML content file into graph rows (SPEC-asset-index, Node
-/// rules and Edge rules). Reads nothing but that file and, for a content file, its own `.meta`.
+/// rules and Edge rules). Reads nothing but that file and, for a content file, its own `.meta`;
+/// a UXML, USS or TSS file also reads the `.meta` of each file it names (AssetFileIndexer.Ui.cs).
 /// </summary>
 internal static partial class AssetFileIndexer
 {
@@ -62,8 +63,11 @@ internal static partial class AssetFileIndexer
         return new FileContribution(record, [node], []);
     }
 
-    /// <summary>The objects and edges inside a scene, prefab or other Unity YAML asset.</summary>
-    public static FileContribution Content(string root, string path, List<string> problems)
+    /// <summary>
+    /// The objects and edges inside a scene, prefab or other Unity YAML asset, or the references of a
+    /// UXML, USS or TSS file; <paramref name="resources"/> finds `resource(...)` targets for those.
+    /// </summary>
+    public static FileContribution Content(string root, string path, List<string> problems, Func<string, IReadOnlyList<string>>? resources = null)
     {
         (FileRecord record, byte[]? bytes) = Load(root, path, problems);
         if (bytes is null)
@@ -88,6 +92,11 @@ internal static partial class AssetFileIndexer
         }
 
         string text = Encoding.UTF8.GetString(bytes);
+        if (AssetTypes.IsUiFile(path))
+        {
+            return UiFile(root, path, guid, text.TrimStart('﻿'), record, problems, resources);
+        }
+
         if (!text.StartsWith("%YAML", StringComparison.Ordinal))
         {
             return new FileContribution(record with { Status = FileStatus.Binary }, [], []);

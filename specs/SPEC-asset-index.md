@@ -53,6 +53,7 @@ skips (name starts with `.` or ends with `~`). Two kinds of tracked file, both w
   `.playable`, `.mixer`, `.spriteatlas`, `.physicMaterial`, `.physicsMaterial2D`,
   `.lighting`, `.preset`, `.signal`, `.renderTexture`, `.terrainlayer`, `.flare`, `.guiskin`,
   `.brush`. A file that doesn't start with `%YAML` is recorded with status `binary` and no rows.
+  Since U2 also `.uxml`, `.uss` and `.tss`, read as text (UI Toolkit files below).
 
 A content file's GUID comes from its own `.meta`. With no `.meta` (Unity hasn't imported it
 yet), the file is recorded with status `error`, no rows, and a problem line.
@@ -175,6 +176,53 @@ Details:
   count. A method inherited from a base class has the base's key, so its edge is unresolved in
   v1; query reports it as such.
 
+## UI Toolkit files (U2)
+
+`.uxml`, `.uss` and `.tss` files are own content files read as text (UTF-8), not YAML. They add no
+nodes (the asset node comes from the `.meta`) and only `references` edges, the existing kind, so the
+graph schema stays at 1: from `a:G` (the file's own asset) to `a:<target guid>`, at the line where
+the reference is, `field` saying where it came from. No new node or edge kind.
+
+| In | Reference | `field` |
+| --- | --- | --- |
+| UXML | `<Template src="...">` (any namespace prefix: `ui:Template`, `engine:Template`) | `Template` |
+| UXML | `<Style src="...">` | `Style` |
+| UXML | any other attribute whose value is a `project://database/...` URI (Unity 6 asset attributes) | the attribute name |
+| UXML | `url(...)` and `resource(...)` inside a `style="..."` attribute | `style` |
+| USS, TSS | `url(...)` (backgrounds, fonts, cursors) | `url` |
+| USS, TSS | `resource(...)` | `resource` |
+| USS, TSS | `@import url(...)` or `@import "..."` | `@import` |
+
+What a reference names, in this order:
+
+1. A `project://database/<path>?...&guid=<G>...` URI: the GUID in it (`exact`). Without a GUID,
+   its path as in 3.
+2. `unity-theme://...` and other non-file schemes (`unity-theme://default` in a theme): skipped,
+   built in.
+3. A path: relative to the file's folder (`Menu.uss`, `../Images/bg.png`), else from the project
+   root for `/Assets/...`, `Assets/...`, `/Packages/...` and `Packages/...`. The target's GUID is
+   read from its `.meta` when the file is indexed (`exact`). A package that is not embedded lives
+   in `Library/PackageCache`, which the index does not read (Boundaries): a reference into it is
+   skipped without a problem line (open point 4). A path with no file or no `.meta` is a
+   problem line (`Assets/UI/Menu.uxml:3: Menu.uss not found`), as Unity's importer would complain.
+4. `resource("Images/bg")`: every tracked file under a `Resources/` folder whose path below that
+   folder, without extension, is `Images/bg` (Unity's `Resources.Load` rule), one edge each,
+   `heuristic` (which one Unity loads depends on the type it asks for). None: a problem line.
+
+USS comments (`/* */`) are skipped; quotes around a URL are optional. A UXML that is not
+well-formed XML gives a problem line and no rows (status `error`), like a file without `.meta`.
+
+Reading a target's `.meta` is the one read outside the file and its own `.meta`. When that target
+later gets another GUID (deleted and re-created), the edge points at the old asset until the
+UXML/USS changes or `ug index --full`, as with any edge into a removed object (Incremental
+reindex).
+
+`UIDocument` → UXML and PanelSettings, and PanelSettings → theme, need nothing new: they are
+serialized object references in the scene, prefab or `.asset` YAML (`sourceAsset`,
+`m_PanelSettings`, `themeUss`) and already give `references` edges with those `field`s (checked with
+a test). `asset_type` stays `other` for the three extensions: a new type would need every
+existing `.uxml.meta` reindexed, which is a schema bump (open point 3).
+
 ## Incremental reindex
 
 - `CheckFreshness(stats, Indexer.Asset)` over the tracked files (stats from the directory walk,
@@ -254,8 +302,8 @@ so both indexers share them.
   without `.meta`, then its `.meta`; a no-op leaves identical rows.
 - **Determinism:** two full indexes, identical rows.
 - **purge-squad acceptance** (`UG_PURGE_SQUAD`, graph in a temp folder, nothing written into
-  purge-squad): no problems beyond recorded binary files, `Hub.unity` places the `TopBar`
-  instance, counts and times recorded in Measured.
+  purge-squad): no problems beyond recorded binary files, `GalaxyMap.unity` places the
+  `TopBar` instance (`Hub.unity` until purge-squad stripped the hub), counts and times recorded in Measured.
 - Coverage ≥ 80% lines on Assets.
 
 ## Boundaries
@@ -288,3 +336,8 @@ purge-squad, 2026-09-29, Release build, warm file cache.
    by source GUID; resolving the source prefab's root name needs a cross-file lookup.
 2. Whether vendored YAML is ever worth reading (an own scene placing a vendored prefab already
    links to it through `instance_of`).
+3. `asset_type` values for UI Toolkit files (`ui_document` for `.uxml`, `style_sheet` for `.uss` and
+   `.tss`): they stay `other` until the next graph schema bump, which reindexes every `.meta`
+   (asking the user first, as for any bump).
+4. Whether a UXML/USS reference into a non-embedded package should read that package's `.meta`
+   in `Library/PackageCache` for an exact edge (reading `Library/` is an ask-first boundary).

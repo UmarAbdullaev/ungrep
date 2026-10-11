@@ -5,16 +5,6 @@ using UnityEngine;
 
 namespace UnityGraph.Bridge
 {
-    /// <summary>The uGUI side of play-input, set by the Ugui assembly when com.unity.ugui is present.</summary>
-    internal interface IUiInput
-    {
-        /// <summary>The `ug ui` lines.</summary>
-        Reply List(bool all);
-
-        /// <summary>`ug click`: an element address or label, or `x,y` in Game view pixels (y down); a value operates the component.</summary>
-        Reply Click(string element, string value);
-    }
-
     /// <summary>The device side of play-input, set by the InputSystem assembly when com.unity.inputsystem is present.</summary>
     internal interface IDeviceInput
     {
@@ -35,10 +25,10 @@ namespace UnityGraph.Bridge
     }
 
     /// <summary>
-    /// The play-input requests (specs/SPEC-play-input.md): `ug ui` and `ug click` here, the device
-    /// actions beside them. Play mode only, nothing saved, no Undo: every action is a runtime event.
+    /// The play-input requests (specs/SPEC-play-input.md): the device actions here, `ug ui`, `ug click`
+    /// and `ug nav` in PlayInput.Ui.cs. Play mode only, nothing saved, no Undo: every action is a runtime event.
     /// </summary>
-    internal static class PlayInput
+    internal static partial class PlayInput
     {
         internal static IUiInput Ui { get; set; }
 
@@ -46,30 +36,6 @@ namespace UnityGraph.Bridge
 
         /// <summary>The bridge's console buffer, for the digest of what an action logged; set by the bridge.</summary>
         internal static ConsoleBuffer Console { get; set; }
-
-        public static Reply UiList(Request request)
-        {
-            Reply refused = NeedPlaying(false) ?? NoUgui();
-            return refused ?? Ui.List(request.Get("all") == "true");
-        }
-
-        public static Func<Reply> UiClick(Request request)
-        {
-            string element = request.Get("element");
-            Reply refused = NeedPlaying(false) ?? NoUgui();
-            if (refused == null && string.IsNullOrWhiteSpace(element))
-            {
-                refused = Answer.Error("ug click needs an element: an address or label from ug ui, or x,y");
-            }
-
-            if (refused != null)
-            {
-                return () => refused;
-            }
-
-            string value = request.Get("value");
-            return InputQueue.Start(new PlayAction("click") { Start = () => Ui.Click(element.Trim(), value) });
-        }
 
         public static Func<Reply> Press(Request request)
         {
@@ -342,8 +308,5 @@ namespace UnityGraph.Bridge
                 && float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out x)
                 && float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out y);
         }
-
-        private static Reply NoUgui() =>
-            Ui == null ? Answer.Error("com.unity.ugui is not in this project: ug ui and ug click need it") : null;
     }
 }

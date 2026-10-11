@@ -6,7 +6,8 @@ namespace UnityGraph.Cli;
 /// <summary>
 /// `ug shot` (SPEC-editor-ops, Endpoints and Viewpoints): the game view, the scene view or one camera,
 /// and with bridge 0.6.0 a temporary camera placed with --from, --look and --rotation, the scene view
-/// framed on an object, and contact sheets around a target (--angles, --orbit).
+/// framed on an object, and contact sheets around a target (--angles, --orbit); with 0.7.0 UI Toolkit
+/// documents in the game view, one document alone, and a UXML file (--panel).
 /// </summary>
 internal static partial class EditorCommands
 {
@@ -17,7 +18,7 @@ internal static partial class EditorCommands
     {
         var view = new Argument<string?>("view")
         {
-            Description = "game (default), scene, or a camera's object address; with --angles or --orbit the object or point x,y,z to circle.",
+            Description = "game (default), scene, a camera's object address, an object with a UIDocument (that document alone), or a .uxml path; with --angles or --orbit the object or point x,y,z to circle.",
             Arity = ArgumentArity.ZeroOrOne,
         };
         var width = new Option<int?>("--width") { Description = "Pixels, 64 to 2048: the picture, or one tile of a sheet. Default: 960 (sheets 320 for --angles, 240 for --orbit)." };
@@ -37,12 +38,14 @@ internal static partial class EditorCommands
         };
         var elevations = new Option<string?>("--elevations") { Description = "With --orbit: the rows' elevations in degrees, -89 to 89, up to 6. Default: 0,30,-15." };
         var distance = new Option<double?>("--distance") { Description = "With --angles or --orbit: how far the camera stands from the target. Default: the target fills each tile." };
+        var panel = new Option<string?>("--panel") { Description = "With a .uxml view: the PanelSettings asset to draw it with. Default: the project's first PanelSettings." };
         Option[] cameraOptions = [angles, orbit, frame, from, look, rotation, fov, camera, keep, elevations, distance];
         return Ops("shot", "shot", "Save a picture of the game view, the scene view, one camera, a viewpoint or a sheet of views around an object to Library/unitygraph/shots/ and print its path.",
-            [view, width, height, from, look, rotation, fov, camera, frame, keep, angles, orbit, elevations, distance], r =>
+            [view, width, height, from, look, rotation, fov, camera, frame, keep, angles, orbit, elevations, distance, panel], r =>
             {
                 bool sheet = r.GetValue(angles) || r.GetResult(orbit) != null;
                 Option? needs = cameraOptions.FirstOrDefault(option => r.GetResult(option) is { Implicit: false });
+                bool uxml = r.GetValue(panel) != null || (r.GetValue(view)?.EndsWith(".uxml", StringComparison.OrdinalIgnoreCase) ?? false);
                 return new OpRequest(Query("/shot",
                     ("view", r.GetValue(view)),
                     ("width", Text(r.GetValue(width))),
@@ -57,10 +60,12 @@ internal static partial class EditorCommands
                     ("angles", r.GetValue(angles) ? "true" : null),
                     ("orbit", r.GetResult(orbit) == null ? null : Text(r.GetValue(orbit)) ?? ""),
                     ("elevations", r.GetValue(elevations)),
-                    ("distance", Text(r.GetValue(distance)))))
+                    ("distance", Text(r.GetValue(distance))),
+                    ("panel", r.GetValue(panel))))
                 {
                     Camera = needs != null,
-                    Option = needs?.Name,
+                    UiToolkit = uxml,
+                    Option = needs?.Name ?? (uxml ? (r.GetValue(panel) != null ? "--panel" : r.GetValue(view)) : null),
                     Timeout = sheet ? _sheetTimeout : OpTimeout,
                 };
             });

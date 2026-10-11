@@ -206,6 +206,41 @@ public sealed class PlayInputCommandTests : LoopFixture
         Assert.Equal(["/status", "/input/press?key=Space"], Bridge.Requests);
     }
 
+    [Theory]
+    [InlineData("/ui/nav?direction=down", "nav", "down")]
+    [InlineData("/ui/nav?direction=submit&element=Menu%2FPlay", "nav", "submit", "Menu/Play")]
+    [InlineData("/ui/nav?direction=next&element=Volume", "nav", "Next", "Volume")]
+    public void Nav_sends_the_direction_and_the_element(string request, params string[] args)
+    {
+        Serve(_ => "{\"lines\":[\"nav down: Menu/Play -> Menu/Quit\",\"  now: nothing changed\"]}", "0.7.0");
+
+        (int exitCode, string output) = Run(args);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("nav down: Menu/Play -> Menu/Quit\n  now: nothing changed\n", output);
+        Assert.Equal(["/status", request], Bridge.Requests);
+    }
+
+    [Fact]
+    public void Nav_refuses_an_unknown_direction_and_a_bridge_before_ui_toolkit()
+    {
+        Serve(_ => "{\"lines\":[\"never\"]}", "0.6.0");
+
+        Assert.Equal("direction is submit, cancel, up, down, left, right, next or previous\n", Run("nav", "sideways").Output);
+        Assert.Empty(Bridge.Requests);
+        Assert.Equal("bridge 0.6.0 is too old for ug nav: run ug bridge install again\n", Run("nav", "down").Output);
+        Assert.Equal(["/status"], Bridge.Requests);
+    }
+
+    [Fact]
+    public void Nav_takes_shot()
+    {
+        Serve(path => path.StartsWith("/shot", StringComparison.Ordinal) ? "{\"lines\":[\"picture\"]}" : "{\"lines\":[\"ok\"]}", "0.7.0");
+
+        Assert.Equal("ok\npicture\n", Run("nav", "up", "--shot").Output);
+        Assert.Equal(["/status", "/ui/nav?direction=up", "/status", "/shot?view=game"], Bridge.Requests);
+    }
+
     // answer: the bridge's body for a path and query; the status call is answered the way a bridge does.
     private void Serve(Func<string, string> answer, string bridge = "0.4.0")
     {

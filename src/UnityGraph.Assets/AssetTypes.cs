@@ -11,6 +11,7 @@ public static class AssetTypes
         ".unity", ".prefab", ".asset", ".mat", ".controller", ".overrideController", ".anim", ".mask",
         ".playable", ".mixer", ".spriteatlas", ".physicMaterial", ".physicsMaterial2D", ".lighting",
         ".preset", ".signal", ".renderTexture", ".terrainlayer", ".flare", ".guiskin", ".brush",
+        ".uxml", ".uss", ".tss",
     };
 
     private static readonly Dictionary<string, string> _types = Build(
@@ -27,8 +28,11 @@ public static class AssetTypes
         ("audio", [".wav", ".mp3", ".ogg", ".aif", ".aiff", ".flac"]),
         ("model", [".fbx", ".obj", ".blend", ".dae", ".3ds", ".max", ".ma", ".mb"]));
 
-    /// <summary>A Unity YAML asset whose content is indexed when it isn't vendored.</summary>
+    /// <summary>A Unity YAML asset, or a UI Toolkit text file, whose content is indexed when it isn't vendored.</summary>
     public static bool IsContent(string path) => _content.Contains(Path.GetExtension(path));
+
+    /// <summary>UXML, USS and TSS: read as text, not YAML (SPEC-asset-index, UI Toolkit files).</summary>
+    public static bool IsUiFile(string path) => Path.GetExtension(path).ToLowerInvariant() is ".uxml" or ".uss" or ".tss";
 
     /// <summary>Scenes and prefabs: GameObject hierarchies rather than one main object.</summary>
     public static bool IsHierarchy(string path) =>

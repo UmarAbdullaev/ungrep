@@ -387,7 +387,8 @@ namespace UnityGraph.Bridge
             UnityEngine.Object target = Addresses.FindObject(address, out string error);
             if (target == null)
             {
-                return Answer.Error(error);
+                UiToolkit.Target element = UiToolkit.Find(address, out string elementError);
+                return element != null ? UiToolkit.Set(element, field, value) : Answer.Error(elementError ?? error);
             }
 
             if (target is GameObject)
@@ -756,6 +757,13 @@ namespace UnityGraph.Bridge
             }
 
             serialized.Update();
+            if (target is UnityEngine.UIElements.UIDocument document && document.isActiveAndEnabled)
+            {
+                // A UIDocument set while enabled keeps its old panel (or none) until it is enabled again (SPEC-play-input, spike 1).
+                document.enabled = false;
+                document.enabled = true;
+            }
+
             string suffix = owner != null ? Answer.Unsaved(owner) : Answer.UnsavedAsset(target);
             return Answer.Line(prefix + shown + "  " + before + " -> " + Values.Format(p) + suffix);
         }

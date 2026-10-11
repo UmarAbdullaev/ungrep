@@ -12,10 +12,10 @@ using UnityEngine.UIElements;
 namespace UnityGraph.Bridge
 {
     /// <summary>
-    /// `/shot` (SPEC-editor-ops, Endpoints): renders the Game view's cameras, the Scene view or one
-    /// camera to a PNG under Library/unitygraph/shots/. Claude reads the file only when it needs to
+    /// `/shot` (SPEC-editor-ops, Endpoints): renders the Game view's cameras and UI Toolkit panels, the
+    /// Scene view, one camera or one UI Toolkit document to a PNG under Library/unitygraph/shots/. Claude reads the file only when it needs to
     /// see. Nothing in the project changes; cameras get their target texture back. Viewpoints and
-    /// sheets through a temporary camera are in ShotOps.Views.cs.
+    /// sheets through a temporary camera are in ShotOps.Views.cs, UI Toolkit in ShotOps.Ui.cs.
     /// </summary>
     internal static partial class ShotOps
     {
@@ -40,22 +40,36 @@ namespace UnityGraph.Bridge
                 return refused;
             }
 
+            string panel = request.Get("panel");
+            if (view.EndsWith(".uxml", StringComparison.OrdinalIgnoreCase))
+            {
+                return NoGraphics() ?? Uxml(view, string.IsNullOrWhiteSpace(panel) ? null : panel.Trim(), width, height);
+            }
+
+            if (!string.IsNullOrWhiteSpace(panel))
+            {
+                return Answer.Error("--panel goes with a .uxml path: ug shot Assets/UI/Menu.uxml --panel Assets/UI/Panel.asset");
+            }
+
             if ((view == "game" || view == "scene") && NoGraphics() is Reply none)
             {
                 return none;
             }
 
             var cameras = new List<Camera>();
+            List<PanelSettings> panels = null;
             string what;
             if (view == "game")
             {
                 cameras = Cameras().ToList();
-                if (cameras.Count == 0)
+                List<UiToolkit.Document> documents = UiToolkit.Documents(out UiToolkit.Census census, out string problem);
+                if (cameras.Count == 0 && documents.Count == 0)
                 {
-                    return Answer.Error("no enabled camera in the loaded scenes: nothing to show in the Game view (ug object create --primitive ... or add a Camera)");
+                    return Answer.Error("no enabled camera or UI Toolkit document in the loaded scenes: nothing to show in the Game view (ug object create --primitive ... or add a Camera)");
                 }
 
-                what = "Game view, " + Answer.Count(cameras.Count, "camera", "cameras");
+                panels = documents.Select(d => UiToolkit.SettingsOf(d.Component)).Distinct().ToList();
+                what = "Game view, " + (cameras.Count == 0 ? "no camera" : Answer.Count(cameras.Count, "camera", "cameras")) + Drawn(documents.Count, census.Elsewhere, problem);
             }
             else if (view == "scene")
             {
@@ -67,6 +81,10 @@ namespace UnityGraph.Bridge
 
                 cameras.Add(sceneView.camera);
                 what = "Scene view";
+            }
+            else if (Addresses.Find(view, out _) is GameObject holder && holder.GetComponent<Camera>() == null && holder.GetComponent<UIDocument>() is UIDocument document)
+            {
+                return NoGraphics() ?? DocumentShot(document, width, height);
             }
             else
             {
@@ -80,7 +98,7 @@ namespace UnityGraph.Bridge
                 what = "camera " + Addresses.Of(camera.gameObject);
             }
 
-            return NoGraphics() ?? Render(cameras, width, height, Name(view), what, view != "scene");
+            return NoGraphics() ?? Render(cameras, width, height, Name(view), what, view != "scene", panels);
         }
 
         private const string NoSceneView = "no Scene view is open in the editor: open one (Window > General > Scene) or use ug shot game";
@@ -137,28 +155,41 @@ namespace UnityGraph.Bridge
             Camera.allCameras.Where(camera => camera.enabled && camera.gameObject.scene.IsValid() && camera.targetTexture == null && camera.cameraType == CameraType.Game)
                 .OrderBy(camera => camera.depth);
 
-        // `screen`: the picture is what the Game view shows, so overlay canvases are drawn and UI Toolkit documents
-        // that cannot be are counted; the Scene view and viewpoints show the world only.
-        private static Reply Render(List<Camera> cameras, int width, int height, string name, string what, bool screen)
+        // `screen`: the picture is what the Game view shows, so overlay canvases are drawn; the Scene view and
+        // viewpoints show the world only. `panels` are UI Toolkit panels drawn over the cameras (ShotOps.Ui.cs);
+        // without cameras the picture starts as `clear`.
+        private static Reply Render(List<Camera> cameras, int width, int height, string name, string what, bool screen, List<PanelSettings> panels = null, Color? clear = null)
         {
             RenderTexture texture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             RenderTexture previous = RenderTexture.active;
             var saved = cameras.ToDictionary(camera => camera, camera => camera.targetTexture);
-            List<Action> restore = screen ? DrawOverlays(cameras[cameras.Count - 1]) : new List<Action>();
+            List<Action> restore = screen && cameras.Count > 0 ? DrawOverlays(cameras[cameras.Count - 1]) : new List<Action>();
             Texture2D image = null;
             try
             {
+                if (cameras.Count == 0)
+                {
+                    RenderTexture.active = texture;
+                    GL.Clear(true, true, clear ?? Color.black);
+                }
+
                 foreach (Camera camera in cameras)
                 {
                     camera.targetTexture = texture;
                     camera.Render();
                 }
 
+                string undrawn = panels == null || panels.Count == 0 ? null : DrawPanels(panels, texture);
+                if (undrawn != null)
+                {
+                    return Answer.Error(undrawn);
+                }
+
                 RenderTexture.active = texture;
                 image = new Texture2D(width, height, TextureFormat.RGB24, false);
                 image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 image.Apply();
-                return Save(image, name, what + (screen ? Undrawn() : ""));
+                return Save(image, name, what);
             }
             finally
             {
@@ -198,14 +229,6 @@ namespace UnityGraph.Bridge
             Directory.CreateDirectory(Path.GetDirectoryName(full));
             File.WriteAllBytes(full, png);
             return Answer.Line(relative + "  " + image.width + "x" + image.height + "  " + Kilobytes(png.Length) + "  (" + what + (EditorApplication.isPlaying ? ", playing" : "") + ")");
-        }
-
-        // UI Toolkit panels are drawn by the screen too, and Camera.Render has no way to include them: say so,
-        // so a shot without the UI is not read as a UI that is missing.
-        private static string Undrawn()
-        {
-            int documents = UnityEngine.Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None).Count(d => d.isActiveAndEnabled);
-            return documents == 0 ? "" : ", " + Answer.Count(documents, "UI Toolkit document", "UI Toolkit documents") + " not drawn";
         }
 
         // Screen Space - Overlay canvases are drawn by the screen, not by any camera, so Camera.Render leaves

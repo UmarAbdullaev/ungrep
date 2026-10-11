@@ -138,9 +138,10 @@ public sealed partial class EditorEndToEndTests
         Assert.Matches(@"^(compiled in \d+\.\d s|no script changes): 0 errors\n$", Ug(log, "compile"));
         Assert.Matches(@"^ran BridgeHost\.InputProbe\.Build\(\) in [\d.]+ ms\n  result: ""built""\n(  changed: .+\n)?$", Ug(log, "run", "BridgeHost.InputProbe.Build"));
 
-        // In edit mode every action is refused, and nothing is held.
+        // In edit mode ug ui lists, every action is refused, and nothing is held.
         Assert.Equal("not playing: ug play first\n", Ug(log, "press", "Space"));
-        Assert.Equal("not playing: ug play first\n", Ug(log, "ui"));
+        Assert.Matches(@"^ui  \d+x\d+  edit mode  1 canvas\n(.*\n)*Canvas/Start  button  ""Start""", Ug(log, "ui"));
+        Assert.Equal("not playing: ug play first\n", Ug(log, "nav", "submit"));
         Assert.Equal("not playing: ug play first\n", Ug(log, "click", "Start"));
 
         Ug(log, "play");

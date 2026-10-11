@@ -41,7 +41,7 @@ namespace UnityGraph.Bridge.Tests
             Assert.AreEqual("not playing: ug play first", Error(PlayInput.Wait(Query("seconds", "1"))));
             Assert.AreEqual("not playing: ug play first", Error(PlayInput.Step(Query("frames", "2"))));
             Assert.AreEqual("not playing: ug play first", Error(PlayInput.UiClick(Query("element", "Play"))));
-            StringAssert.StartsWith("{\"error\":\"not playing", PlayInput.UiList(Query()).Body);
+            Assert.AreEqual("not playing: ug play first", Error(PlayInput.UiNav(Query("direction", "down"))));
         }
 
         [Test]
