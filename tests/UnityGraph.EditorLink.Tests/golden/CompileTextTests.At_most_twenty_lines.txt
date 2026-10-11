@@ -19,4 +19,4 @@ compiled in 4.1 s: 23 errors
   Assets/Scripts/Many.cs:18:1  CS0246  The type or namespace name 'T18' could not be found
   Assets/Scripts/Many.cs:19:1  CS0246  The type or namespace name 'T19' could not be found
   Assets/Scripts/Many.cs:20:1  CS0246  The type or namespace name 'T20' could not be found
-  (+3 more errors)
+  (+3 more errors: ug compile --all)

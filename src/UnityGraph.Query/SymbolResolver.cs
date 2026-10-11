@@ -20,7 +20,7 @@ public static class SymbolResolver
     private const int Candidates = 500;
     private static readonly NodeKindSet _sceneObjects = NodeKindSet.Of(NodeKind.GameObject, NodeKind.PrefabInstance);
 
-    public static Resolution Resolve(GraphStore store, string text)
+    public static Resolution Resolve(GraphStore store, string text, bool all = false)
     {
         text = text.Trim();
         if (text.StartsWith("cs:", StringComparison.Ordinal) || text.StartsWith("a:", StringComparison.Ordinal) || text.StartsWith("o:", StringComparison.Ordinal))
@@ -37,12 +37,12 @@ public static class SymbolResolver
         {
             string meta = (text.EndsWith(".meta", StringComparison.Ordinal) ? text : text + ".meta").TrimStart('/');
             Node? asset = store.KeysInFile(meta).Select(store.GetNode).FirstOrDefault(n => n?.Kind == NodeKind.Asset);
-            return asset is null ? Objects(store, text.Trim('/')) : One(asset);
+            return asset is null ? Objects(store, text.Trim('/'), all) : One(asset);
         }
 
         if (text.Contains('.', StringComparison.Ordinal) && !text.Contains('(', StringComparison.Ordinal))
         {
-            List<Node> assets = store.FindByName(text, NodeKindSet.Of(NodeKind.Asset), Candidates).Items.ToList();
+            List<Node> assets = store.FindByName(text, NodeKindSet.Of(NodeKind.Asset), all ? int.MaxValue - 1 : Candidates).Items.ToList();
             List<Node> files = assets.Where(n => n.Name == text).ToList();
             files = files.Count > 0 ? files : assets.Where(n => string.Equals(n.Name, text, StringComparison.OrdinalIgnoreCase)).ToList();
             if (files.Count > 0)
@@ -57,10 +57,10 @@ public static class SymbolResolver
         string last = name[(name.LastIndexOf('.') + 1)..];
         if (last.Length == 0)
         {
-            return Objects(store, text);
+            return Objects(store, text, all);
         }
 
-        List<Node> named = store.FindByName(last, NodeKindSet.All, Candidates).Items
+        List<Node> named = store.FindByName(last, NodeKindSet.All, all ? int.MaxValue - 1 : Candidates).Items
             .Where(n => string.Equals(n.Name, last, StringComparison.OrdinalIgnoreCase))
             .ToList();
         if (parameters is not null)
@@ -77,7 +77,7 @@ public static class SymbolResolver
 
         if (matches.Count == 0 && parameters is null)
         {
-            return Objects(store, text);
+            return Objects(store, text, all);
         }
 
         bool oneSymbol = matches.Count <= 1
@@ -87,7 +87,7 @@ public static class SymbolResolver
     }
 
     // Game objects and prefab instances named `text`, or whose hierarchy path ends with it on a `/`.
-    private static Resolution Objects(GraphStore store, string text)
+    private static Resolution Objects(GraphStore store, string text, bool all)
     {
         string name = text[(text.LastIndexOf('/') + 1)..];
         if (name.Length == 0)
@@ -95,7 +95,7 @@ public static class SymbolResolver
             return new Resolution([], false);
         }
 
-        List<Node> named = store.FindByName(name, _sceneObjects, Candidates).Items.ToList();
+        List<Node> named = store.FindByName(name, _sceneObjects, all ? int.MaxValue - 1 : Candidates).Items.ToList();
         foreach (StringComparison comparison in (StringComparison[])[StringComparison.Ordinal, StringComparison.OrdinalIgnoreCase])
         {
             List<Node> matches = named

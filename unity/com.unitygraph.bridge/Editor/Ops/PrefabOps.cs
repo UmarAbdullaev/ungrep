@@ -9,9 +9,9 @@ namespace UnityGraph.Bridge
 {
     /// <summary>
     /// Prefab requests on scene objects (SPEC-editor-ops, Endpoints): save an object as a prefab and
-    /// keep it linked, apply or revert an instance's overrides, unpack an instance. Each is one undo
-    /// group named `ug prefab <sub>`; the scene stays unsaved until `ug save`. Create and apply write
-    /// a prefab asset at once (Safety rule 3), so they refuse packages and vendored folders (rule 7).
+    /// keep it linked, list, apply or revert an instance's overrides, unpack an instance. Each edit is
+    /// one undo group named `ug prefab <sub>`; the scene stays unsaved until `ug save`. Create and apply
+    /// write a prefab asset at once (Safety rule 3), so they refuse packages and vendored folders (rule 7).
     /// </summary>
     internal static class PrefabOps
     {
@@ -69,6 +69,21 @@ namespace UnityGraph.Bridge
             });
         }
 
+        /// <summary>`/prefab/overrides?object=`: every override on an instance, one line each, read-only (C1).</summary>
+        public static Reply List(Request request)
+        {
+            Reply refused = Resolve(request, "prefab overrides", out GameObject target, out string asset);
+            if (refused != null)
+            {
+                return refused;
+            }
+
+            List<Override> all = Collect(target);
+            var lines = new List<string> { Addresses.Of(target) + "  instance of " + asset + "  " + (all.Count == 0 ? "no overrides" : Answer.Count(all.Count, "override", "overrides")) };
+            lines.AddRange(all.Select(o => "  " + Addresses.Of(o.On) + "  " + o.What + o.Value));
+            return Answer.Lines(lines);
+        }
+
         /// <summary>`/prefab/apply?object=`: an instance's overrides written into its prefab asset.</summary>
         public static Reply Apply(Request request) => Instance(request, "prefab apply", (target, asset) =>
         {
@@ -120,6 +135,31 @@ namespace UnityGraph.Bridge
         // Resolves the instance root the request names and runs the edit as one undo group.
         private static Reply Instance(Request request, string command, Func<GameObject, string, Reply> edit)
         {
+            string refused = EditOps.ReadOnly(request.Get("object"));
+            if (refused != null)
+            {
+                return Answer.Error(refused);
+            }
+
+            Reply problem = Resolve(request, command, out GameObject target, out string asset);
+            if (problem != null)
+            {
+                return problem;
+            }
+
+            return Answer.Undoable(command, () =>
+            {
+                Reply reply = edit(target, asset);
+                Named(target);
+                return reply;
+            });
+        }
+
+        // The outermost instance root the request names and its prefab asset, or the refusal.
+        private static Reply Resolve(Request request, string command, out GameObject target, out string asset)
+        {
+            target = null;
+            asset = null;
             string address = request.Get("object");
             if (string.IsNullOrWhiteSpace(address))
             {
@@ -127,13 +167,7 @@ namespace UnityGraph.Bridge
             }
 
             address = address.Trim();
-            string refused = EditOps.ReadOnly(address);
-            if (refused != null)
-            {
-                return Answer.Error(refused);
-            }
-
-            GameObject target = Addresses.Find(address, out string error);
+            target = Addresses.Find(address, out string error);
             if (target == null)
             {
                 return Answer.Error(error);
@@ -144,7 +178,7 @@ namespace UnityGraph.Bridge
                 return Answer.Error(address + " is in a prefab asset: " + command + " works on prefab instances in the loaded scenes");
             }
 
-            refused = PartOfInstance(target);
+            string refused = PartOfInstance(target);
             if (refused != null)
             {
                 return Answer.Error(refused);
@@ -155,18 +189,8 @@ namespace UnityGraph.Bridge
                 return Answer.Error(address + " is not a prefab instance: ug prefab create " + address + " <path> makes a prefab from it");
             }
 
-            string asset = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(target);
-            if (string.IsNullOrEmpty(asset))
-            {
-                return Answer.Error(address + " is an instance of a missing prefab");
-            }
-
-            return Answer.Undoable(command, () =>
-            {
-                Reply reply = edit(target, asset);
-                Named(target);
-                return reply;
-            });
+            asset = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(target);
+            return string.IsNullOrEmpty(asset) ? Answer.Error(address + " is an instance of a missing prefab") : null;
         }
 
         // Unity's prefab operations register undo records under their own names, and the last record
@@ -237,28 +261,49 @@ namespace UnityGraph.Bridge
             "  (written " + asset + "; " + Answer.Unsaved(scene).Substring("  (".Length);
 
         /// <summary>
-        /// The overrides on an instance, one line per object that has some: changed fields as
-        /// `Component.field`, and added or removed components and objects. Root name, position and
-        /// rotation, which every scene instance overrides, are left out.
+        /// The overrides on an instance for apply and revert, one line per object that has some, at
+        /// most 40 objects; past them the line names `ug prefab overrides`, which lists them all.
         /// </summary>
         private static List<string> Overrides(GameObject root, out int count)
         {
-            var order = new List<GameObject>();
-            var items = new Dictionary<GameObject, List<string>>();
-            int total = 0;
-
-            void Add(GameObject on, string item)
+            List<Override> all = Collect(root);
+            count = all.Count;
+            List<IGrouping<GameObject, Override>> objects = all.GroupBy(o => o.On).ToList();
+            List<string> lines = objects.Take(MaxLines)
+                .Select(g => "  " + Addresses.Of(g.Key) + "  " + string.Join(", ", g.Select(o => o.What)))
+                .ToList();
+            if (objects.Count > MaxLines)
             {
-                if (!items.TryGetValue(on, out List<string> list))
-                {
-                    items[on] = list = new List<string>();
-                    order.Add(on);
-                }
+                lines.Add("... " + Answer.Count(objects.Count - MaxLines, "more object", "more objects") + " (ug prefab overrides " + Addresses.Of(root)
+                    + " lists every override before an apply or revert)");
+            }
 
-                if (!list.Contains(item))
+            return lines;
+        }
+
+        // One override: the instance object it is on, what it is, and a changed field's value now.
+        private struct Override
+        {
+            public GameObject On;
+            public string What;
+            public string Value;
+        }
+
+        /// <summary>
+        /// Every override on an instance: changed fields as `Component.field` with their value, and
+        /// added or removed components and objects. Root name, position and rotation, which every
+        /// scene instance overrides, are left out.
+        /// </summary>
+        private static List<Override> Collect(GameObject root)
+        {
+            var all = new List<Override>();
+            var seen = new HashSet<string>();
+
+            void Add(GameObject on, string item, string value = "")
+            {
+                if (seen.Add(on.GetInstanceID().ToString(System.Globalization.CultureInfo.InvariantCulture) + " " + item))
                 {
-                    list.Add(item);
-                    total++;
+                    all.Add(new Override { On = on, What = item, Value = value });
                 }
             }
 
@@ -282,15 +327,15 @@ namespace UnityGraph.Bridge
 
                 if (!owners.TryGetValue(modification.target, out UnityEngine.Object owner))
                 {
-                    Add(root, modification.target.GetType().Name + "." + modification.propertyPath);
+                    Add(root, modification.target.GetType().Name + "." + modification.propertyPath, ValueOf(null, modification));
                 }
                 else if (owner is Component component)
                 {
-                    Add(component.gameObject, Addresses.ComponentName(component) + "." + modification.propertyPath);
+                    Add(component.gameObject, Addresses.ComponentName(component) + "." + modification.propertyPath, ValueOf(component, modification));
                 }
                 else
                 {
-                    Add((GameObject)owner, modification.propertyPath);
+                    Add((GameObject)owner, modification.propertyPath, ValueOf(owner, modification));
                 }
             }
 
@@ -314,16 +359,25 @@ namespace UnityGraph.Bridge
                 Add(removed.parentOfRemovedGameObjectInInstance, "removed object " + removed.assetGameObject.name);
             }
 
-            count = total;
-            List<string> lines = order.Take(MaxLines)
-                .Select(go => "  " + Addresses.Of(go) + "  " + string.Join(", ", items[go]))
-                .ToList();
-            if (order.Count > MaxLines)
+            return all;
+        }
+
+        // ` = 90` or ` -> Assets/Mats/Red.mat`: the field's value on the instance now, as ug inspect shows it.
+        private static string ValueOf(UnityEngine.Object owner, PropertyModification modification)
+        {
+            if (owner != null)
             {
-                lines.Add("... " + Answer.Count(order.Count - MaxLines, "more object", "more objects"));
+                using (var serialized = new SerializedObject(owner))
+                {
+                    SerializedProperty property = serialized.FindProperty(modification.propertyPath);
+                    if (property != null)
+                    {
+                        return (property.propertyType == SerializedPropertyType.ObjectReference ? " -> " : " = ") + Values.Whole(property);
+                    }
+                }
             }
 
-            return lines;
+            return modification.objectReference != null ? " -> " + Values.Reference(modification.objectReference, 0) : " = " + modification.value;
         }
 
         private static void Map(Dictionary<UnityEngine.Object, UnityEngine.Object> owners, UnityEngine.Object instance)

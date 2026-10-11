@@ -27,7 +27,7 @@ namespace UnityGraph.Bridge
     [InitializeOnLoad]
     internal static class Bridge
     {
-        public const string Version = "0.8.0";
+        public const string Version = "0.9.0";
 
         private const string PortKey = "unitygraph.bridge.port";
         private const string TokenKey = "unitygraph.bridge.token";
@@ -153,7 +153,7 @@ namespace UnityGraph.Bridge
         }
 
         private static void OnLog(string condition, string stackTrace, LogType type) =>
-            _console.Add(ConsoleBuffer.TypeName(type), condition, StackFrames.OwnFrame(stackTrace, ProjectRoot));
+            _console.Add(ConsoleBuffer.TypeName(type), condition, StackFrames.OwnFrame(stackTrace, ProjectRoot), stackTrace);
 
         private static void RefreshStatus()
         {
@@ -230,13 +230,24 @@ namespace UnityGraph.Bridge
 
         private static Reply ConsoleEntries(Request request)
         {
+            var json = new Json().Object().Field("last", _console.LastId).Field("oldest", _console.OldestId).Key("entries").Array();
+            if (long.TryParse(request.Get("id"), NumberStyles.None, CultureInfo.InvariantCulture, out long id))
+            {
+                ConsoleBuffer.Entry found = _console.Find(id);
+                if (found != null)
+                {
+                    ConsoleBuffer.Write(json, found);
+                }
+
+                return Reply.Ok(json.EndArray().EndObject().ToString());
+            }
+
             long after = long.TryParse(request.Get("after"), NumberStyles.None, CultureInfo.InvariantCulture, out long a) ? a : 0;
+            long before = long.TryParse(request.Get("before"), NumberStyles.None, CultureInfo.InvariantCulture, out long b) ? b : 0;
             int limit = int.TryParse(request.Get("limit"), NumberStyles.None, CultureInfo.InvariantCulture, out int l) ? Math.Max(1, Math.Min(l, 500)) : 50;
             string types = request.Get("types");
             HashSet<string> wanted = string.IsNullOrEmpty(types) ? null : new HashSet<string>(types.Split(','), StringComparer.Ordinal);
-
-            var json = new Json().Object().Field("last", _console.LastId).Key("entries").Array();
-            foreach (ConsoleBuffer.Entry entry in _console.Query(after, limit, wanted))
+            foreach (ConsoleBuffer.Entry entry in _console.Query(after, limit, wanted, before))
             {
                 ConsoleBuffer.Write(json, entry);
             }

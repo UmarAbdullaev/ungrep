@@ -11,8 +11,8 @@ Graph (no Unity; one call beats grep; answers carry `file:line`, read only those
 Open editor (bridge; "Unity not reachable" answers are from Editor.log: check age):
 - `status`, `compile` (after each script edit, not Editor.log), `bridge`
 - code: `run <Type.Method> [args]` (static; `set`-style args; `--list`); `eval "<C#>"` or `--file x.cs` (edits: `Undo.RecordObject`)
-- read: `scene`, `tree`, `inspect`, `find --live`, `perf` (`--record <s>`; `memory`, `snapshot`, more: `--help`)
-- edit: `object`, `component`, `set` (structs, lists, curves too), `event`, `prefab`, `camera` (Cinemachine too), `undo`, `redo`, `select`, `save`, `play`, `stop`, `pause`
+- read: `scene`, `tree`, `inspect`, `find --live`, `perf` (`--record <s>`; `memory`, `snapshot`, `--help`)
+- edit: `object`, `component`, `set` (structs, lists, curves), `event`, `prefab` (`overrides`), `camera` (Cinemachine), `undo`, `redo`, `select`, `save`, `play`, `stop`, `pause`
 - assets and project: `asset`, `project`, `package`
 - loop: `console` (`--after <id>`: new only), `test`, `log` (last play), `play --for <s>`; Stop hook reports compile errors
 - play-test (each prints what changed, `--shot` a picture): `ui` lists UI elements; `click <label|addr|x,y> [--value v]`, `nav <dir>`, `press <key>`, `stick left 1,0`, `tap|swipe x,y`, `wait <s>`, `play --step` (paused)

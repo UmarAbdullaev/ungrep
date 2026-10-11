@@ -438,10 +438,11 @@ namespace UnityGraph.Bridge
             if (string.IsNullOrWhiteSpace(address))
             {
                 UnityEngine.Object[] selected = Selection.objects;
-                var lines = selected.Take(MaxSelected).Select(Shown).ToList();
-                if (selected.Length > MaxSelected)
+                int shown = request.Get("all") == "true" ? int.MaxValue : MaxSelected;
+                var lines = selected.Take(shown).Select(Shown).ToList();
+                if (selected.Length > shown)
                 {
-                    lines.Add("... " + Answer.Count(selected.Length - MaxSelected, "more", "more"));
+                    lines.Add("... " + Answer.Count(selected.Length - shown, "more", "more") + ": ug select --all");
                 }
 
                 return Answer.Lines(lines.Count == 0 ? new List<string> { "nothing selected" } : lines);
@@ -686,7 +687,7 @@ namespace UnityGraph.Bridge
         }
 
         // The game object itself when it has the field, else the one component that has it.
-        private static UnityEngine.Object FieldOwner(GameObject target, string field, out string error)
+        internal static UnityEngine.Object FieldOwner(GameObject target, string field, out string error)
         {
             if (Values.Find(new SerializedObject(target), field, out error) != null)
             {
@@ -793,7 +794,7 @@ namespace UnityGraph.Bridge
                 .FirstOrDefault(n => n.Length > 0 && current.FindPropertyIndex(n) >= 0);
             if (name == null)
             {
-                var names = Enumerable.Range(0, current.GetPropertyCount()).Select(current.GetPropertyName).Take(20);
+                var names = Enumerable.Range(0, current.GetPropertyCount()).Select(current.GetPropertyName);
                 return Answer.Error("no property " + field + " on " + path + " (shader " + current.name + ": " + string.Join(", ", names) + ")");
             }
 

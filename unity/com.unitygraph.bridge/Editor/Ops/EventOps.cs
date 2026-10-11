@@ -346,8 +346,7 @@ namespace UnityGraph.Bridge
                 IEnumerable<string> own = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                     .Where(m => m.ReturnType == typeof(void) && !m.IsSpecialName)
                     .Select(m => m.Name)
-                    .Distinct()
-                    .Take(15);
+                    .Distinct();
                 error = type.Name + " has no public void method " + name + " (its own: " + string.Join(", ", own) + ")";
                 return null;
             }

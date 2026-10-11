@@ -37,6 +37,9 @@ namespace UnityGraph.Bridge
         public string State;
         public bool Toolkit;
 
+        /// <summary>Whether <see cref="Cut"/> shortened this element's label or value.</summary>
+        public bool LabelCut;
+
         public string Line(bool withState) =>
             Address + "  " + Kind + "  " + Detail + (string.IsNullOrEmpty(Classes) ? "" : "  " + Classes) + "  "
             + Mathf.RoundToInt(Center.x).ToString(CultureInfo.InvariantCulture) + "," + Mathf.RoundToInt(Center.y).ToString(CultureInfo.InvariantCulture) + "  "
@@ -45,14 +48,29 @@ namespace UnityGraph.Bridge
 
         private const int LabelLength = 30;
 
+        /// <summary>How many texts <see cref="Cut"/> has shortened: `ug ui` and `ug tree --ui` compare it to name `ug inspect`.</summary>
+        public static int Cuts;
+
+        /// <summary>The last line of an answer with a cut label.</summary>
+        public const string CutNote = "(labels cut at 30 characters: ug inspect <element>)";
+
         /// <summary>One line of text, cut for a line of output.</summary>
         public static string Cut(string text)
         {
             text = (text ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
-            return text.Length <= LabelLength ? text : text.Substring(0, LabelLength - 3) + "...";
+            if (text.Length <= LabelLength)
+            {
+                return text;
+            }
+
+            Cuts++;
+            return text.Substring(0, LabelLength - 3) + "...";
         }
 
         public static string Quote(string text) => "\"" + Cut(text) + "\"";
+
+        /// <summary>The whole text in quotes, line breaks as `\n`: `ug inspect`.</summary>
+        public static string Whole(string text) => "\"" + (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\\n") + "\"";
 
         public static string Number(float value, bool whole) =>
             whole ? Mathf.RoundToInt(value).ToString(CultureInfo.InvariantCulture) : value.ToString("0.##", CultureInfo.InvariantCulture);
@@ -68,7 +86,8 @@ namespace UnityGraph.Bridge
         private static readonly string[] _directions = { "submit", "cancel", "up", "down", "left", "right", "next", "previous" };
 
         /// <summary>`/ui`: reads, so edit mode too.</summary>
-        public static Reply UiList(Request request) => List(request.Get("all") == "true");
+        public static Reply UiList(Request request) =>
+            List(request.Get("all") == "true", int.TryParse(request.Get("from"), NumberStyles.None, CultureInfo.InvariantCulture, out int from) ? from : 0);
 
         public static Func<Reply> UiClick(Request request)
         {
@@ -105,7 +124,7 @@ namespace UnityGraph.Bridge
         }
 
         /// <summary>The `ug ui` lines: uGUI and UI Toolkit together in reading order.</summary>
-        internal static Reply List(bool all)
+        internal static Reply List(bool all, int from = 0)
         {
             if (!ScreenSize(out int width, out int height))
             {
@@ -126,7 +145,14 @@ namespace UnityGraph.Bridge
             var lines = new List<string> { Head(width, height, canvases, noEvents, census) };
             List<UiItem> shown = all ? items : items.Where(e => e.State == null).ToList();
             int limit = all ? AllLines : DefaultLines;
-            foreach (UiItem item in shown.Take(limit))
+            if (from > 0 && from >= shown.Count)
+            {
+                lines.Add("  (nothing from element " + from.ToString(CultureInfo.InvariantCulture) + ": " + Answer.Count(shown.Count, "element", "elements") + ")");
+                return Answer.Lines(lines);
+            }
+
+            List<UiItem> page = shown.Skip(from).Take(limit).ToList();
+            foreach (UiItem item in page)
             {
                 lines.Add(item.Line(all));
             }
@@ -140,14 +166,20 @@ namespace UnityGraph.Bridge
                 more.Add(Answer.Count(items.Count - shown.Count, "more", "more") + " not usable (" + string.Join(", ", states) + "): ug ui --all");
             }
 
-            if (shown.Count > limit)
+            int left = shown.Count - from - page.Count;
+            if (left > 0)
             {
-                more.Add("(+" + (shown.Count - limit).ToString(CultureInfo.InvariantCulture) + " more" + (all ? " not shown)" : ": ug ui --all)"));
+                more.Add("(+" + left.ToString(CultureInfo.InvariantCulture) + " more: ug ui --all" + (all ? " --from " + (from + page.Count).ToString(CultureInfo.InvariantCulture) : "") + ")");
             }
 
             if (more.Count > 0)
             {
                 lines.Add("  " + string.Join("; ", more));
+            }
+
+            if (page.Any(e => e.LabelCut))
+            {
+                lines.Add("  " + UiItem.CutNote);
             }
 
             return Answer.Lines(lines);
@@ -294,7 +326,8 @@ namespace UnityGraph.Bridge
 
             return Answer.Error(matches.Count == 0
                 ? addressError + " (ug ui lists the elements)"
-                : "ambiguous: \"" + element + "\" (" + string.Join(", ", matches.Take(MaxNames).Select(e => e.Address)) + (matches.Count > MaxNames ? ", ..." : "") + ")");
+                : "ambiguous: \"" + element + "\" (" + string.Join(", ", matches.Take(MaxNames).Select(e => e.Address))
+                    + (matches.Count > MaxNames ? ", ... " + (matches.Count - MaxNames).ToString(CultureInfo.InvariantCulture) + " more: ug ui --all" : "") + ")");
         }
 
         private static Reply NoUgui(string command) =>

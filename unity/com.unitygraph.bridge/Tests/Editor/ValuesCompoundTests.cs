@@ -114,6 +114,38 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void A_cut_value_says_so_and_whole_shows_every_item_and_level()
+        {
+            Assert.IsNull(Set("numbers", "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11"));
+            Assert.AreEqual("0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ... 2 more", Values.Format(_serialized.FindProperty("numbers"), out bool cut));
+            Assert.IsTrue(cut);
+            Assert.AreEqual("0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11", Values.Whole(_serialized.FindProperty("numbers")));
+
+            Assert.AreEqual("{inner: {...}, level: 0}", Values.Format(_serialized.FindProperty("nest"), out cut));
+            Assert.IsTrue(cut);
+            Assert.AreEqual("{inner: {count: 0, offset: 0, 0, 0, name: \"\"}, level: 0}", Values.Whole(_serialized.FindProperty("nest")));
+
+            Assert.AreEqual("{count: 0, offset: 0, 0, 0, name: \"\"}", Values.Format(_serialized.FindProperty("pair"), out cut));
+            Assert.IsFalse(cut);
+
+            var colors = new GradientColorKey[8];
+            var alphas = new GradientAlphaKey[8];
+            for (int i = 0; i < 8; i++)
+            {
+                colors[i] = new GradientColorKey(Color.red, i / 10f);
+                alphas[i] = new GradientAlphaKey(1f, i / 10f + 0.05f);
+            }
+
+            _holder.gradient.SetKeys(colors, alphas);
+            _serialized.Update();
+            StringAssert.EndsWith(", ... 6 more", Values.Format(_serialized.FindProperty("gradient"), out cut));
+            Assert.IsTrue(cut);
+            string whole = Values.Whole(_serialized.FindProperty("gradient"));
+            Assert.AreEqual(16, whole.Split('@').Length - 1);
+            StringAssert.DoesNotContain("more", whole);
+        }
+
+        [Test]
         public void A_serialize_reference_takes_a_type_and_its_fields()
         {
             Assert.IsNull(Set("shape", "Circle {radius: 4, label: \"big\"}"));

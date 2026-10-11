@@ -127,7 +127,22 @@ public sealed partial class IndexCommandTests : IDisposable
         string text = IndexCommand.Render(summary, rebuilt: true);
 
         Assert.StartsWith("indexed 1 files (1 own, 0 vendored): 2 nodes, 3 edges in 1.3 s\n  warning: p1\n", text, StringComparison.Ordinal);
-        Assert.EndsWith("  warning: p10\n  ... and 2 more warnings\n", text, StringComparison.Ordinal);
+        Assert.EndsWith("  warning: p10\n  ... and 2 more warnings: Library/unitygraph/index-warnings.txt\n", text, StringComparison.Ordinal);
+        Assert.EndsWith("  ... and 2 more warnings\n", IndexCommand.Render(summary, rebuilt: true, warnings: null), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_index_rewrites_the_warnings_file_with_all_its_warnings()
+    {
+        string file = Path.Combine(_root, "Library", "unitygraph", "index-warnings.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, "stale\n");
+
+        var output = new StringWriter();
+        Assert.Equal(0, CliApp.Run(["index", "--project", _root, "--full"], output, new StringWriter()));
+
+        string[] shown = [.. output.ToString().ReplaceLineEndings("\n").Split('\n').Where(l => l.StartsWith("  warning: ", StringComparison.Ordinal)).Select(l => l["  warning: ".Length..])];
+        Assert.Equal(shown, File.ReadAllText(file).Split('\n', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static void Copy(string from, string to)

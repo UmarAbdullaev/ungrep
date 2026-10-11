@@ -229,7 +229,7 @@ namespace UnityGraph.Bridge.Tests
             // csc records `#line "snippet"` against the source's folder; ug's compile keeps the name as written.
             string source = Path.Combine(Scratch, "snippet");
             Assert.AreEqual(
-                "error: snippet threw after N ms: InvalidOperationException: from the snippet 3\n  at " + source + ":3",
+                "error: snippet threw after N ms: InvalidOperationException: from the snippet 3\n  at " + source + ":3\n  whole exception: Library/unitygraph/exception.txt",
                 Eval(_snippet, "__UgSnippet.Run", "snippet", source));
             Assert.AreEqual("ran __UgSnippet.Twice(int x, int times) in N ms\n  result: 42", Eval(_snippet, "__UgSnippet.Twice", null, "Tools/Lab.cs", "21"));
             Assert.AreEqual("ran __UgSnippet.Twice(int x, int times) in N ms\n  result: 63", Eval(_snippet, "__UgSnippet.Twice", null, "Tools/Lab.cs", "21", "times=3"));

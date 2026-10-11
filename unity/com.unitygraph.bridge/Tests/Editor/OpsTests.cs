@@ -312,6 +312,71 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void Inspect_names_the_rest_of_a_cut_value_and_field_shows_it_whole()
+        {
+            var holder = ScriptableObject.CreateInstance<ValueHolder>();
+            holder.numbers = new int[250];
+            for (int i = 0; i < holder.numbers.Length; i++)
+            {
+                holder.numbers[i] = i;
+            }
+
+            string path = Folder + "/Holder.asset";
+            AssetDatabase.CreateAsset(holder, path);
+
+            string body = Ask("/inspect", "object", path);
+            StringAssert.Contains("\"  numbers  int[250]  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ... 240 more\"", body);
+            StringAssert.Contains("\"  nest  Nest  {inner: {...}, level: 0}\"", body);
+            StringAssert.EndsWith(",\"  (values cut: ug inspect " + path + " --field numbers)\"]}", body);
+
+            body = Ask("/inspect", "object", path, "field", "numbers");
+            StringAssert.StartsWith("{\"lines\":[\"" + path + "  ValueHolder  ", body);
+            StringAssert.Contains("  numbers  int[250]\",\"  [0]  0\",\"  [1]  1\"", body);
+            StringAssert.EndsWith(",\"  [199]  199\",\"  ... 50 more: ug inspect " + path + " --field numbers --from 200\"]}", body);
+
+            body = Ask("/inspect", "object", path, "field", "numbers", "from", "200");
+            StringAssert.Contains("  numbers  int[250]\",\"  [200]  200\"", body);
+            StringAssert.EndsWith(",\"  [249]  249\"]}", body);
+            StringAssert.EndsWith(",\"  (nothing from 300: 250 elements)\"]}", Ask("/inspect", "object", path, "field", "numbers", "from", "300"));
+
+            StringAssert.EndsWith("  nest  Nest\",\"  {inner: {count: 0, offset: 0, 0, 0, name: \\\"\\\"}, level: 0}\"]}", Ask("/inspect", "object", path, "field", "nest"));
+            StringAssert.EndsWith("  numbers[3]  int\",\"  3\"]}", Ask("/inspect", "object", path, "field", "numbers[3]"));
+            StringAssert.StartsWith("{\"error\":", Ask("/inspect", "object", path, "field", "nope"));
+        }
+
+        [Test]
+        public void Inspect_from_pages_fields_and_material_properties()
+        {
+            var holder = ScriptableObject.CreateInstance<ValueHolder>();
+            string path = Folder + "/Holder.asset";
+            AssetDatabase.CreateAsset(holder, path);
+
+            string body = Ask("/inspect", "object", path, "from", "9");
+            StringAssert.Contains("\",\"  numbers  int[0]  empty\",\"  nest  Nest  {inner: {...}, level: 0}\"", body);
+            StringAssert.DoesNotContain("  bounds  ", body);
+            StringAssert.EndsWith(",\"  (nothing from field 20: 11 fields)\"]}", Ask("/inspect", "object", path, "from", "20"));
+
+            string all = Ask("/inspect", "object", MaterialPath);
+            string rest = Ask("/inspect", "object", MaterialPath, "from", "1");
+            StringAssert.Contains("  _Color  Color  1, 1, 1, 1", all);
+            Assert.Less(rest.Length, all.Length);
+            StringAssert.StartsWith("{\"lines\":[\"" + MaterialPath + "  Material  shader Unlit/Color\"", rest);
+            Assert.AreEqual(Lines(MaterialPath + "  Material  _Color  Color  1, 1, 1, 1"), Ask("/inspect", "object", MaterialPath, "field", "_Color"));
+        }
+
+        [Test]
+        public void An_overview_past_ten_children_names_the_tree_that_lists_them()
+        {
+            GameObject level = Find("Level");
+            for (int i = 0; i < 9; i++)
+            {
+                new GameObject("Crate" + i).transform.SetParent(level.transform);
+            }
+
+            StringAssert.EndsWith(",\"  children: Enemy#1, Enemy#2, Player, Crate0, Crate1, Crate2, Crate3, Crate4, Crate5, Crate6, ... 2 more (ug tree Level --depth 1)\"]}", Ask("/inspect", "object", "Level"));
+        }
+
+        [Test]
         public void Find_matches_names_tags_layers_and_components()
         {
             Assert.AreEqual(Lines("Level/Enemy#1", "Level/Enemy#2"), Ask("/find", "name", "enemy"));
@@ -319,6 +384,58 @@ namespace UnityGraph.Bridge.Tests
             Assert.AreEqual(Lines("no object in the loaded scenes matches"), Ask("/find", "name", "enemy", "tag", "Player"));
             Assert.AreEqual(Err("no layer Nope"), Ask("/find", "layer", "Nope"));
             Assert.AreEqual(Err("give a name, --tag, --layer or --component"), Ask("/find"));
+        }
+
+        [Test]
+        public void Past_100_matches_find_names_all_which_lists_every_one()
+        {
+            GameObject level = Find("Level");
+            for (int i = 0; i < 101; i++)
+            {
+                new GameObject("Crate" + i).transform.SetParent(level.transform);
+            }
+
+            string cut = Ask("/find", "name", "crate");
+            string all = Ask("/find", "name", "crate", "all", "true");
+
+            StringAssert.EndsWith(",\"... 1 more (101 in all): narrow the filters, or ug find crate --live --all\"]}", cut);
+            StringAssert.Contains("\"Level/Crate100\"", all);
+            StringAssert.DoesNotContain("more", all);
+        }
+
+        [Test]
+        public void Past_three_changed_objects_the_digest_writes_every_change_to_its_file()
+        {
+            Digest before = Digest.Take(null);
+            GameObject level = Find("Level");
+            for (int i = 0; i < 5; i++)
+            {
+                new GameObject("Spawned" + i).transform.SetParent(level.transform);
+            }
+
+            UnityEngine.Object.DestroyImmediate(Find("Level/Enemy#2"));
+            string part = before.Objects();
+
+            StringAssert.IsMatch(@"^changed Spawned\d \(new\), Spawned\d \(new\), Spawned\d \(new\), \+2 more \(Library/unitygraph/digest\.txt\), 1 gone$", part);
+            string[] written = System.IO.File.ReadAllText(System.IO.Path.Combine(Bridge.ProjectRoot, Digest.ChangesFile)).TrimEnd('\n').Split('\n');
+            CollectionAssert.AreEquivalent(
+                new[] { "Level/Spawned0 (new)", "Level/Spawned1 (new)", "Level/Spawned2 (new)", "Level/Spawned3 (new)", "Level/Spawned4 (new)", "Enemy (gone)" }, written);
+            Assert.AreEqual("Enemy (gone)", written[written.Length - 1]);
+        }
+
+        [Test]
+        public void An_ambiguous_address_past_ten_names_find_live()
+        {
+            GameObject level = Find("Level");
+            for (int i = 0; i < 12; i++)
+            {
+                new GameObject("Box").transform.SetParent(level.transform);
+            }
+
+            string answer = Ask("/inspect", "object", "Level/Box");
+
+            StringAssert.StartsWith("{\"error\":\"ambiguous: Box (12 in ", answer);
+            StringAssert.EndsWith(", ... 2 more: ug find --live Box\"}", answer);
         }
     }
 }

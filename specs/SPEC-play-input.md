@@ -207,8 +207,8 @@ Parts, in this order, joined with `; `, left out when empty; with none: `nothing
   unloaded).
 - **objects**: `changed Player (moved), Door (inactive), Bullet#3 (new), 2 gone`: game objects of
   the loaded scenes compared by instance id on active state, parent, name and world position (moved
-  = more than 0.01); at most 3 named, then `+N more`. Component values are not compared
-  (`ug inspect` reads them). Above 20,000 objects the part is `objects not compared (over 20000)`.
+  = more than 0.01); at most 3 named, then `+N more (Library/unitygraph/digest.txt)` (C1). Component values are not compared
+  (`ug inspect` reads them). Above 20,000 objects the part is `objects not compared (over 20000, ...)` (C1).
 - **play**: `play stopped` when the game left play mode meanwhile (a script quit, an exception
   stopped it): the answer ends there.
 
@@ -493,6 +493,35 @@ graph (SPEC-asset-index, UI Toolkit files).
 - `ug shot` swaps `PanelSettings.targetTexture` for one render and puts it back in a `finally`,
   without Undo or a dirty flag; the UXML shot's game object and PanelSettings copy are
   `HideAndDontSave` and destroyed after.
+
+## Nothing out of reach (C1, bridge 0.9.0)
+
+User rule (2026-10-10): answers stay compact and say how to get what they leave out. Defaults keep
+their size; the new flags need bridge 0.9.0 and are refused by name on an older one.
+
+- **`ug ui --all --from <n>`** starts at element line `n`; `--all`'s cap of 150 stays per answer
+  and its last line becomes `(+N more: ug ui --all --from 150)` (was `(+N more not shown)`).
+  Past the end: `(nothing from element 50: 12 elements)`. `--from` without `--all` is refused (`--from
+  pages ug ui --all`); the default's 40 usable lines keep naming `ug ui --all`.
+- **Labels.** `ug ui` and `ug tree --ui` still cut a label or text at 30 characters. When any was
+  cut, the answer's last line says `(labels cut at 30 characters: ug inspect <element>)`.
+- **`ug inspect <element>`** shows text, tooltip and value whole (line breaks as `\n`), and every
+  option of a choice control (was: 30 characters and 5 options), and style values whole (were cut
+  at 30 characters). Its 40-line cap is dropped: the answer has at most 16 lines. A `--value`
+  refusal lists every option (`has no option Nope (options: ...)`, uGUI dropdowns too).
+- **Digest.** Still 3 named changed objects in the `  now:` line; past them `+N more` becomes
+  `+N more (Library/unitygraph/digest.txt)`, a file with every change, one per line (`Level/Door
+  (inactive)`, a gone object by its last name: `Bullet (gone)`), written by that action when it
+  names more (a later one that names more overwrites it); `+N more (digest file not written:
+  <reason>)` when it cannot be written. Still 2 new error rows;
+  past them a row `  +N more errors: ug console --after <id>`, ending ` --whole` when a shown row was
+  cut (160 characters or its first line); with no more errors such a cut adds the row `  (whole
+  text: ug console --after <id> --whole)`. The 20,000-object snapshot stays: it
+  bounds the cost of the snapshot each action takes; the part reads `objects not compared (over
+  20000, a bound on the snapshot's cost: ug find --live and ug tree read objects)`.
+- Ambiguous elements past 5 (`ug click`) or 10 (UI Toolkit) name `ug ui --all` and `ug tree --ui`:
+  `ambiguous: "Play" (a, b, c, d, e, ... 2 more: ug ui --all)`, `ambiguous: Dup (12 in Menu/Panel):
+  ..., ... 2 more: ug tree --ui Menu/Panel`.
 
 ## Bridge change (0.4.0)
 

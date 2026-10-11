@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditorInternal;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace UnityGraph.Bridge.Tests
@@ -54,6 +55,11 @@ namespace UnityGraph.Bridge.Tests
             StringAssert.Contains(" fps), p99 ", body);
             StringAssert.Contains("\"self ms a frame, share, calls a frame:\"", body);
             StringAssert.Contains("\"spikes over ", body);
+            if (body.Contains("frames; slowest:"))
+            {
+                StringAssert.IsMatch("\"  a spike's other markers: ug perf --frames (\\d+)-\\1\"", body);
+            }
+
             Assert.IsFalse(ProfilerDriver.enabled, "--record turns off the profiler it turned on");
         }
 
@@ -219,6 +225,7 @@ namespace UnityGraph.Bridge.Tests
         public void Counters_refuse_unknown_names_and_categories()
         {
             StringAssert.StartsWith("{\"error\":\"no counter named Draw Calls (containing it: ", Ask("/perf/counters", "names", "Draw Calls"));
+            StringAssert.EndsWith(" more: ug perf counters --category <c> lists a category's)\"}", Ask("/perf/counters", "names", "Count"));
             StringAssert.StartsWith("{\"error\":\"no profiler category Nope: ", Ask("/perf/counters", "category", "Nope"));
             Assert.AreEqual(Err("--markers needs --category: ug perf counters --category Scripts --markers"), Ask("/perf/counters", "markers", "true"));
             Assert.AreEqual(Err("--markers lists a category's markers: give --category, not names"), Ask("/perf/counters", "names", "Draw Calls Count", "markers", "true"));
@@ -250,7 +257,37 @@ namespace UnityGraph.Bridge.Tests
             StringAssert.Contains(" (native sizes, Profiler.GetRuntimeMemorySizeLong; edit mode)\",\"by type  ", body);
             StringAssert.Contains("\"top objects:\",\"  ", body);
             StringAssert.Contains(" more: ug perf memory --top 9\"]}", body);
+            StringAssert.Contains(" types (ug perf memory --top 9; --type <T>)\"", body);
+            StringAssert.Contains(" more: ug perf memory --type <T> narrows them (500 is --top's most)\"]}", Ask("/perf/memory", "top", "500"));
             Assert.AreEqual(Err("--top is 1 to 500"), Ask("/perf/memory", "top", "501"));
+        }
+
+        [Test]
+        public void Memory_object_top_sets_how_many_sub_assets_and_used_assets()
+        {
+            const string many = Folder + "/Many.asset";
+            AssetDatabase.CreateAsset(new Material(Shader.Find("Unlit/Color")) { name = "Many" }, many);
+            for (int i = 0; i < 24; i++)
+            {
+                AssetDatabase.AddObjectToAsset(new Mesh { name = "Part" + i }, many);
+            }
+
+            AssetDatabase.SaveAssets();
+            var painted = new GameObject("Painted");
+            painted.transform.SetParent(GameObject.Find("Level").transform);
+            var materials = new Material[7];
+            for (int i = 0; i < materials.Length; i++)
+            {
+                materials[i] = new Material(Shader.Find("Unlit/Color"));
+                AssetDatabase.CreateAsset(materials[i], Folder + "/Coat" + i + ".mat");
+            }
+
+            painted.AddComponent<MeshRenderer>().sharedMaterials = materials;
+
+            StringAssert.Contains(",\"  ... 5 more sub-assets: ug perf memory --object " + many + " --top 60\"", Ask("/perf/memory", "object", many));
+            StringAssert.DoesNotContain("more sub-assets", Ask("/perf/memory", "object", many, "top", "30"));
+            StringAssert.IsMatch(", \\+\\d+: ug perf memory --object Level/Painted --top 15\"\\]\\}$", Ask("/perf/memory", "object", "Level/Painted"));
+            StringAssert.DoesNotContain("--top", Ask("/perf/memory", "object", "Level/Painted", "top", "50"));
         }
 
         [Test]

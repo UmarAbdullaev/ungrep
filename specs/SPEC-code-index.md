@@ -92,9 +92,9 @@ is a config error that `ug doctor` names.
 | Symbol | Kind | `name` | Lines | `props` |
 | --- | --- | --- | --- | --- |
 | class, struct, interface, enum, delegate, record | `type` | metadata name without arity (`List`) | declaration incl. attributes | `subkind`, `access`, `static`/`abstract`/`sealed` when true, `generic` arity when > 0, `unity` (see below) |
-| method, operator, conversion, destructor | `method` | symbol name | declaration | `sig` (e.g. `Open(int, bool)`, ≤ 120 chars), `access`, `static`/`virtual`/`abstract`/`override`/`async` when true, `message` / `entry` (see below) |
+| method, operator, conversion, destructor | `method` | symbol name | declaration | `sig` (e.g. `Open(int, bool)`, whole), `access`, `static`/`virtual`/`abstract`/`override`/`async` when true, `message` / `entry` (see below) |
 | constructor | `method` | the type's name | declaration | as method, plus `subkind: constructor` |
-| field, enum member | `field` | field name | declarator | `type` (display string, ≤ 80 chars), `access`, `static`/`const`/`readonly` when true, `serialized`, `serialize_reference`, `former` (list) |
+| field, enum member | `field` | field name | declarator | `type` (display string, whole), `access`, `static`/`const`/`readonly` when true, `serialized`, `serialize_reference`, `former` (list) |
 | property, indexer | `property` | property name (`this[]` for indexers) | declaration | `type`, `access`, `serialized` for `[field: SerializeField]`, `former` |
 | event | `event` | event name | declaration | `type`, `access` |
 
@@ -177,9 +177,9 @@ serialization table test (SPEC Testing strategy).
   `this`) and its base types are searched (an override hides the method it overrides), and a
   single match is `exact`; `nameof(M)` is always exact. `SendMessage` family: every method with
   that name on an indexed `MonoBehaviour` subclass in the caller's compilation or one it
-  references (a message can't reach a type the caller's assembly can't see), `heuristic`, at
-  most 20 targets in key order (props `truncated: true` on each when capped). No match → no
-  edge.
+  references (a message can't reach a type the caller's assembly can't see), `heuristic`, every
+  target in key order (no cap since C1; graphs built before keep the old 20 and `truncated: true`
+  until `ug index --full`). No match → no edge.
 - **`script_defines`:** only when the `.meta` exists, has a `guid:` line, and the file declares
   a top-level (non-nested) class whose name equals the file name; the asset node itself comes
   from `asset-index` (the edge is unresolved until then).
@@ -246,7 +246,10 @@ ug index [--project <dir>] [--full]
 indexed 1,160 files (412 own, 748 vendored): 14,203 nodes, 61,877 edges in 11.4 s
 ```
 
-One line on success; problems follow as `  warning: ...` lines, at most 10 and a count. Exit 0
+One line on success; problems follow as `  warning: ...` lines, at most 10 and a count. Past 10
+the count line names the file that holds every warning: `  ... and 32 more warnings:
+Library/unitygraph/index-warnings.txt` (the graph directory, one warning per line; rewritten by
+each `ug index`, so it is empty after an index without warnings and nothing is deleted, C1). Exit 0
 unless the graph can't be written. `--graph-dir <dir>` (hidden) puts the graph and its lock
 somewhere other than `Library/unitygraph/`, so purge-squad can be measured without writing into
 it; `GraphStore.Open`/`OpenStaging` gain an optional `graphDirectory` for it.

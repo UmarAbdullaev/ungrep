@@ -160,9 +160,11 @@ $ ug run Game.EditorTools.LabTools.OpenLab
 ran Game.EditorTools.LabTools.OpenLab in 12 ms
 ```
 
-- `ug compile` lists errors only, at most 20 lines (`(+N more errors)` after), warnings as a
-  count; `--warnings` lists them too. Sorted by file, line, column; duplicates across assemblies
-  once.
+- `ug compile` lists errors only, at most 20 lines (`(+N more errors: ug compile --all)` after),
+  warnings as a count; `--warnings` lists them too. Sorted by file, line, column; duplicates across
+  assemblies once. `--all` lists every line (C1); with `--warnings` every warning too. The Editor.log
+  fallback takes `--all` the same way. The compile gate's reason keeps the 20-line cap and its
+  last line names `ug compile --all`.
 - `ug bridge install` prints the two ways to add the package: Unity's Package Manager "Add
   package from disk" on `unity/com.unitygraph.bridge/package.json` in the plugin folder (Unity
   edits its own manifest; we never touch `Packages/`), or `ug bridge install --copy`, which
@@ -239,8 +241,9 @@ Game.Tools  3 static methods
   parameter, a number for a floating one, an enum name, `true`/`false`, the right count of numbers for
   a vector, an address or `null` for an object; a whole number for a floating parameter is one step
   looser; `string`, `object` and `Parse` are the loosest. A tie answers `ambiguous call` and the tied
-  overloads, one per line. No fit: with one candidate its first problem and its signature, with
-  several every overload (at most 10, `+N more`).
+  overloads, one per line, all of them (C1). No fit: with one candidate its first problem and its
+  signature, with several every overload (at most 10, then `+N more overloads: ug run --list
+  <Type.Method>`).
 - **Named arguments.** `name=value` sets the parameter `name` (so optional ones before it can be
   skipped), after the positional ones. A positional text that starts with a parameter name and `=`
   is written with a leading `\` (`\count=3` is the text `count=3`).
@@ -276,7 +279,8 @@ Game.Tools  3 static methods
 - **`ug run --list [filter]`**: the static methods of the project's assemblies whose `Type.Method`
   contains `filter` (case-insensitive; a trailing `.` means the type's own), grouped by type with
   signatures as `ug api` prints them and defaults shown, at most 40 lines, then `(+N more: give a
-  longer filter)`; without a filter, the types that have static methods with their counts.
+  longer filter, or ug run --list <filter> --all)`; `--all` lists every line (C1, bridge 0.9.0);
+  without a filter, the types that have static methods with their counts.
   `ug run --list --menu [filter]`: menu items (`TypeCache` `[MenuItem]` methods of every loaded
   assembly, Unity's too) as `path  Type.Method`. Offline, `ug find` finds methods in the graph.
 - A bridge older than 0.5.0: `bridge 0.4.0 is too old for ug run: run ug bridge install again`.
@@ -428,8 +432,29 @@ ran Build.Arena(int waves, Difficulty level) in 41 ms
 - When anything was cut, the whole value (strings whole, collections up to 1,000 items, two levels
   deep) goes to `Library/unitygraph/result.txt` and the result line ends `(+more:
   Library/unitygraph/result.txt)`: running the code again would repeat its side effects, reading
-  the file does not.
-- Then the `out`, console and `changed:` lines.
+  the file does not. The file's own bounds (1,000 items, two levels, 200 members) bound the walk
+  of an object graph that may be cyclic or huge; they stay (C1), and the file says where it cut
+  (`... +N more`, `{...}`): `ug eval` returning the inner value reads further.
+- A throw (C1): the whole exception goes to `Library/unitygraph/exception.txt`, `ToString()` of the
+  unwrapped exception, so every inner exception with its message and stack trace (an
+  `AggregateException` with several inner exceptions lists each). The answer gains one line after
+  the frame: `  whole exception: Library/unitygraph/exception.txt`. A file that cannot be written
+  says so instead (`  (exception file not written: <reason>)`). Each throw overwrites the file.
+- Then the `out`, console and `changed:` lines. The console lines' text is cut at 160 characters
+  and at most 5 are shown, the rest named by `ug console --after <id>`; `ug console --whole` shows
+  them whole (SPEC-unity-loop, C1). When a shown line was cut (past 160 characters or past its first
+  line), that `more` line ends `--whole`, or with 5 or fewer a line of its own says `  (whole text:
+  ug console --after <id> --whole)`.
+
+## Bridge 0.9.0 (C1)
+
+C1 gives each hard cap an escape (SPEC-unity-loop, SPEC-editor-ops, SPEC-query, SPEC-play-input,
+"Nothing out of reach"). The bridge's part is one version: package and `Bridge.Version` 0.9.0,
+`MinimumFullBridge` in the client. Every new flag that needs the bridge is refused on an older one
+by name, before the request goes out: `bridge 0.8.0 is too old for ug inspect --field: run ug
+bridge install again`. Plain commands keep working on older bridges. `ug compile --all` and the
+exception file need no new request (`--all` formats what the client already gets; an older bridge
+just does not write the file).
 
 ## Performance targets
 

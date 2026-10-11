@@ -16,9 +16,7 @@ namespace UnityGraph.Code;
 /// </summary>
 internal sealed class FileIndexer : CSharpSyntaxWalker
 {
-    private const int MaxSignature = 120;
-    private const int MaxTypeName = 80;
-    private const int MaxMessageTargets = 20;
+
 
     private static readonly HashSet<string> _dispatchers = new(StringComparer.Ordinal)
     {
@@ -499,7 +497,6 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
 
         List<IMethodSymbol> targets;
         bool exact;
-        string? truncated = null;
         if (argument is InvocationExpressionSyntax nameofCall && IsNameof(nameofCall))
         {
             if (nameofCall.ArgumentList.Arguments.FirstOrDefault()?.Expression is not { } named)
@@ -518,12 +515,6 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
                 targets = _workspace.MessageTargets(_model.Compilation, name)
                     .OrderBy(m => KeyOf(m), StringComparer.Ordinal)
                     .ToList();
-                if (targets.Count > MaxMessageTargets)
-                {
-                    targets = targets.Take(MaxMessageTargets).ToList();
-                    truncated = "{\"truncated\":true}";
-                }
-
                 exact = false;
             }
             else
@@ -544,7 +535,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
         {
             if (_workspace.IsIndexedSource(target.OriginalDefinition) && KeyOf(target) is { } key)
             {
-                AddEdge(_sourceKey!, EdgeKind.Dispatches, key, exact ? Confidence.Exact : Confidence.Heuristic, argument, truncated);
+                AddEdge(_sourceKey!, EdgeKind.Dispatches, key, exact ? Confidence.Exact : Confidence.Heuristic, argument);
             }
         }
     }
@@ -636,7 +627,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
                 props.Text("entry", UnityRules.EntryOf(type));
                 break;
             case IMethodSymbol method:
-                props.Text("sig", Clip(Signature(method), MaxSignature));
+                props.Text("sig", Signature(method));
                 props.Text("access", Access(method.DeclaredAccessibility));
                 props.Text("subkind", method.MethodKind is MethodKind.Constructor or MethodKind.StaticConstructor ? "constructor" : null);
                 props.Flag("static", method.IsStatic);
@@ -648,7 +639,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
                 props.Text("entry", UnityRules.EntryOf(method));
                 break;
             case IFieldSymbol field:
-                props.Text("type", Clip(field.Type.ToDisplayString(_typeFormat), MaxTypeName));
+                props.Text("type", field.Type.ToDisplayString(_typeFormat));
                 props.Text("access", Access(field.DeclaredAccessibility));
                 props.Flag("static", field.IsStatic && !field.IsConst);
                 props.Flag("const", field.IsConst);
@@ -658,7 +649,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
                 props.List("former", UnityRules.FormerNames(field));
                 break;
             case IPropertySymbol property:
-                props.Text("type", Clip(property.Type.ToDisplayString(_typeFormat), MaxTypeName));
+                props.Text("type", property.Type.ToDisplayString(_typeFormat));
                 props.Text("access", Access(property.DeclaredAccessibility));
                 props.Flag("static", property.IsStatic);
                 if (BackingField(property) is { } backing)
@@ -670,7 +661,7 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
 
                 break;
             case IEventSymbol @event:
-                props.Text("type", Clip(@event.Type.ToDisplayString(_typeFormat), MaxTypeName));
+                props.Text("type", @event.Type.ToDisplayString(_typeFormat));
                 props.Text("access", Access(@event.DeclaredAccessibility));
                 props.Flag("static", @event.IsStatic);
                 break;
@@ -703,7 +694,6 @@ internal sealed class FileIndexer : CSharpSyntaxWalker
         return sig.Append(')').ToString();
     }
 
-    private static string Clip(string text, int max) => text.Length <= max ? text : text[..(max - 3)] + "...";
 
     private static string Access(Accessibility access) => access switch
     {

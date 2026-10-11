@@ -64,6 +64,23 @@ public sealed class EditorDocsAndBatchTests : IDisposable
     }
 
     [Fact]
+    public void A_cut_page_names_a_bigger_budget_and_budget_shows_more()
+    {
+        string file = Path.Combine(_root, "Long.html");
+        File.WriteAllText(file, "<body>" + string.Concat(Enumerable.Range(1, 800).Select(i => "<p>Line number " + i + " of the page.</p>")) + "</body>");
+        Answer(_ => new Json("local", file).Text);
+
+        string cut = Run("docs", "Manual/Long").Output;
+        string more = Run("docs", "Manual/Long", "--budget", "8000").Output;
+
+        Assert.EndsWith("... cut to 1200 tokens: ug docs Manual/Long --budget 2400; the whole page: " + file + "\n", cut, StringComparison.Ordinal);
+        Assert.Contains("Line number 800 of the page.", more, StringComparison.Ordinal);
+        Assert.DoesNotContain("cut to", more, StringComparison.Ordinal);
+        Assert.Equal(1, Run("docs", "Manual/Long", "--budget", "100").ExitCode);
+        Assert.Contains("--budget must be 200 to 8000", Run("docs", "Manual/Long", "--budget", "9000").Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void An_unknown_type_falls_back_to_the_online_page_then_the_cache()
     {
         Answer(_ => Online("Manual/Prefabs is not in the local documentation", PageUrl));

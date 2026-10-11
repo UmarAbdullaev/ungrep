@@ -58,6 +58,19 @@ public sealed class CompileTextTests : IDisposable
         Golden.Match(CompileText.Format(Outcome(changed: true, many), warnings: false));
     }
 
+    [Fact]
+    public void All_lists_every_line_and_a_cut_warning_list_names_its_command()
+    {
+        CompileMessage[] many = Enumerable.Range(1, 23)
+            .Select(i => Error("Assets/Scripts/Many.cs", i, 1, "CS0246", "The type or namespace name 'T" + i.ToString(CultureInfo.InvariantCulture) + "' could not be found"))
+            .ToArray();
+
+        string all = CompileText.Format(Outcome(changed: true, many), warnings: false, all: true);
+        Assert.Equal(24, all.TrimEnd('\n').Split('\n').Length);
+        Assert.DoesNotContain("more", all, StringComparison.Ordinal);
+        Assert.EndsWith("  (+3 more messages: ug compile --warnings --all)\n", CompileText.Format(Outcome(changed: true, many), warnings: true), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("unity6-failed.log")]
     [InlineData("unity6-fixed.log")]

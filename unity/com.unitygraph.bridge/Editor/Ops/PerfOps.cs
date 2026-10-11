@@ -433,6 +433,7 @@ namespace UnityGraph.Bridge
             private readonly Dictionary<string, double[]> _callers = new Dictionary<string, double[]>(StringComparer.Ordinal);
             private readonly List<KeyValuePair<int, float>> _times = new List<KeyValuePair<int, float>>();
             private readonly Dictionary<int, string> _tops = new Dictionary<int, string>();
+            private readonly HashSet<int> _cutTops = new HashSet<int>();
             private readonly List<int> _items = new List<int>();
             private readonly List<int> _children = new List<int>();
             private int _next;
@@ -493,6 +494,10 @@ namespace UnityGraph.Bridge
                     }
 
                     _tops[frame] = string.Join(", ", top.OrderByDescending(p => p.Value).Take(3).Select(p => p.Key + " " + Ms(p.Value)));
+                    if (top.Count > 3)
+                    {
+                        _cutTops.Add(frame);
+                    }
                 }
             }
 
@@ -564,6 +569,11 @@ namespace UnityGraph.Bridge
                 }
 
                 More(lines, spikes.Count, spikesTop, more);
+                if (spikes.Take(spikesTop).Any(s => _cutTops.Contains(s.Key)))
+                {
+                    int slowest = spikes[0].Key;
+                    lines.Add("  a spike's other markers: ug perf --frames " + slowest + "-" + slowest);
+                }
                 return UnityGraph.Bridge.Answer.Lines(lines);
             }
 

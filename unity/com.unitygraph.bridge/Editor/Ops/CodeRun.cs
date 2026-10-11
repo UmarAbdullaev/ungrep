@@ -24,6 +24,7 @@ namespace UnityGraph.Bridge
         public const int MaxLogs = 5;
         public const double DefaultTimeout = 60;
         public const string ResultFile = "Library/unitygraph/result.txt";
+        public const string ExceptionFile = "Library/unitygraph/exception.txt";
         private const int MaxMessage = 300;
         private const int MaxLogText = 160;
 
@@ -177,6 +178,8 @@ namespace UnityGraph.Bridge
                 {
                     lines.Add("  at " + frame);
                 }
+
+                lines.Add(WriteException(error));
             }
             else
             {
@@ -204,6 +207,22 @@ namespace UnityGraph.Bridge
 
             // A throw is a failed step: `ug batch` stops on an error answer.
             return error != null ? Answer.Error(string.Join("\n", lines)) : Answer.Lines(lines);
+        }
+
+        // The whole exception, every inner one with its stack, to the exception file; the line that names it.
+        private static string WriteException(Exception error)
+        {
+            try
+            {
+                string path = Path.Combine(Bridge.ProjectRoot, ExceptionFile);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, error + "\n");
+                return "  whole exception: " + ExceptionFile;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                return "  (exception file not written: " + e.Message + ")";
+            }
         }
 
         private static Reply StillRunning(Pending run)
@@ -255,21 +274,30 @@ namespace UnityGraph.Bridge
             }
 
             List<ConsoleBuffer.Entry> entries = run.Console.Query(run.ConsoleId, ConsoleBuffer.Capacity, null);
+            bool cut = false;
             foreach (ConsoleBuffer.Entry entry in entries.Take(MaxLogs))
             {
+                string first = FirstLine(entry.Text);
+                cut |= first.Length > MaxLogText || first != (entry.Text ?? "").Trim();
                 int count = entry.Count;
                 if (run.Tail != null && entry.Count > run.Tail.Count && entry.Type == run.Tail.Type && entry.Text == run.Tail.Text && entry.Frame == run.Tail.Frame)
                 {
                     count -= run.Tail.Count;
                 }
 
-                lines.Add("  " + entry.Type + ": " + Clip(FirstLine(entry.Text), MaxLogText) + (count > 1 ? " x" + count.ToString(CultureInfo.InvariantCulture) : "")
+                lines.Add("  " + entry.Type + ": " + Clip(first, MaxLogText) + (count > 1 ? " x" + count.ToString(CultureInfo.InvariantCulture) : "")
                     + (entry.Frame == null ? "" : "  " + entry.Frame));
             }
 
+            // A cut text (past 160 characters, or past its first line) adds --whole to the line that names the console.
+            string again = "ug console --after " + run.ConsoleId.ToString(CultureInfo.InvariantCulture) + (cut ? " --whole" : "");
             if (entries.Count > MaxLogs)
             {
-                lines.Add("  (+" + (entries.Count - MaxLogs).ToString(CultureInfo.InvariantCulture) + " more: ug console --after " + run.ConsoleId.ToString(CultureInfo.InvariantCulture) + ")");
+                lines.Add("  (+" + (entries.Count - MaxLogs).ToString(CultureInfo.InvariantCulture) + " more: " + again + ")");
+            }
+            else if (cut)
+            {
+                lines.Add("  (whole text: " + again + ")");
             }
 
             return lines;

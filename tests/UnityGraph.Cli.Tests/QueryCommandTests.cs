@@ -121,6 +121,29 @@ public sealed partial class QueryCommandTests : IDisposable
     }
 
     [Fact]
+    public void From_and_all_reach_the_engine_and_json_or_live_refuse_from()
+    {
+        Run("find", "x");
+        string whole = Run("explain", "LabStage", "--members", "--budget", "2000").Output;
+
+        Assert.Equal(whole[(whole.IndexOf('\n') + 1)..], Run("explain", "LabStage", "--members", "--budget", "2000", "--from", "1").Output);
+        Assert.EndsWith("  more  ug explain LabStage --members | ug refs LabStage\n", Run("explain", "LabStage", "--all").Output, StringComparison.Ordinal);
+        Assert.Equal("(nothing past line 900: the answer has 9 lines)\n", Run("find", "Turntable", "--from", "900").Output);
+
+        foreach ((string[] args, string message) in new[]
+        {
+            (new[] { "outline", "Turntable.cs", "--json", "--from", "2" }, "--from pages text answers; --json answers are cut at the budget"),
+            (new[] { "impact", "LabStage", "--from", "-1" }, "--from must be 0 or more"),
+            (new[] { "find", "Player", "--live", "--from", "1" }, "--from pages graph answers; --live answers whole with --all"),
+        })
+        {
+            var error = new StringWriter();
+            Assert.NotEqual(0, CliApp.Run([.. args, "--project", _root], new StringWriter(), error));
+            Assert.Contains(message, error.ToString(), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Query_off_says_so()
     {
         Directory.CreateDirectory(Path.Combine(_root, ".claude"));

@@ -182,7 +182,8 @@ namespace UnityGraph.Bridge
                 else if (matches.Count > 1)
                 {
                     error = "ambiguous: " + name + " (" + matches.Count.ToString(CultureInfo.InvariantCulture) + " in " + where + "): "
-                        + string.Join(", ", matches.Take(MaxCandidates).Select(Of));
+                        + string.Join(", ", matches.Take(MaxCandidates).Select(Of))
+                        + (matches.Count > MaxCandidates ? ", ... " + (matches.Count - MaxCandidates).ToString(CultureInfo.InvariantCulture) + " more: ug find --live " + name : "");
                     return null;
                 }
                 else

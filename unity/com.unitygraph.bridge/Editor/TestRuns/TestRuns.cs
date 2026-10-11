@@ -7,14 +7,16 @@ namespace UnityGraph.Bridge
 {
     /// <summary>
     /// Test runs through <see cref="TestRunnerApi"/>. The running id and each finished run's
-    /// answer live in SessionState, so a PlayMode run's domain reloads do not lose them.
+    /// answer live in SessionState, so a PlayMode run's domain reloads do not lose them. Every
+    /// failure is kept with its message and stack, each up to <see cref="ConsoleBuffer.MaxText"/>
+    /// characters (SPEC-unity-loop, Nothing out of reach); an empty id reads the last run.
     /// </summary>
     [InitializeOnLoad]
     internal sealed class TestRuns : ITestRuns, ICallbacks
     {
         private const string RunningKey = "unitygraph.tests.running";
         private const string ResultKey = "unitygraph.tests.result.";
-        private const int MaxFailures = 50;
+        private const string LastKey = "unitygraph.tests.last";
 
         private readonly TestRunnerApi _api;
 
@@ -64,6 +66,7 @@ namespace UnityGraph.Bridge
             else
             {
                 MoveResult("pending", id);
+                SessionState.SetString(LastKey, id);
             }
 
             return id;
@@ -71,6 +74,15 @@ namespace UnityGraph.Bridge
 
         public string Result(string id)
         {
+            if (id.Length == 0)
+            {
+                id = SessionState.GetString(LastKey, "");
+                if (id.Length == 0)
+                {
+                    return new Json().Object().Field("state", "none").EndObject().ToString();
+                }
+            }
+
             string running = SessionState.GetString(RunningKey, "");
             if (running.Length > 0 && running == id)
             {
@@ -103,16 +115,18 @@ namespace UnityGraph.Bridge
                 .Field("inconclusive", result.InconclusiveCount)
                 .Field("seconds", result.Duration)
                 .Key("failures").Array();
-            for (int i = 0; i < failed.Count && i < MaxFailures; i++)
+            foreach (ITestResultAdaptor failure in failed)
             {
                 json.Object()
-                    .Field("name", failed[i].FullName)
-                    .Field("message", failed[i].Message)
-                    .Field("frame", StackFrames.OwnFrame(failed[i].StackTrace, Bridge.ProjectRoot))
+                    .Field("name", failure.FullName)
+                    .Field("message", failure.Message == null ? null : ConsoleBuffer.Bound(failure.Message))
+                    .Field("frame", StackFrames.OwnFrame(failure.StackTrace, Bridge.ProjectRoot))
+                    .Field("stack", string.IsNullOrEmpty(failure.StackTrace) ? null : ConsoleBuffer.Bound(failure.StackTrace.TrimEnd()))
                     .EndObject();
             }
 
             SessionState.SetString(ResultKey + id, json.EndArray().EndObject().ToString());
+            SessionState.SetString(LastKey, id);
             SessionState.EraseString(RunningKey);
         }
 

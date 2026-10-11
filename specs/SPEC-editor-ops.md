@@ -50,7 +50,7 @@ Requested 2026-09-30: cover everything the Unity MCP server ("MCP for Unity") of
 | `manage_gameobject`, `manage_components` | `ug object`, `ug component`, `ug set`, `ug event` (UnityEvent calls such as `Button.onClick`) |
 | `manage_editor` | `ug play|stop|pause`, `ug undo|redo`, `ug select`, `ug project` (tags, layers) |
 | `execute_menu_item` | `ug run <menu path>` (editor-link's runner already calls `ExecuteMenuItem`) |
-| `manage_prefabs` | `ug prefab create|apply|revert|unpack`, prefab-content addresses; `instantiate` is `ug object create --prefab`, no second command |
+| `manage_prefabs` | `ug prefab create|apply|revert|unpack`, prefab-content addresses; `instantiate` is `ug object create --prefab`, no second command. `ug prefab overrides` (C1) lists an instance's overrides, which `manage_prefabs` has no action for |
 | `manage_asset`, `manage_material`, `manage_texture` | `ug asset folder|create|move|rename|duplicate|delete|reimport`; `ug set` on materials and importers |
 | `manage_packages` | `ug package list|add|remove` through Unity's Package Manager API (no `search`/`resolve`: `add` resolves, and browsing a registry is a network use rule 10 does not cover) |
 | `manage_camera` (screenshot) | `ug shot game|scene|<camera>`: a PNG Claude reads only when needed |
@@ -108,7 +108,7 @@ appends the time taken (`playing (entered in 2.1 s)`).
 | `/save?path=` | Saves modified loaded scenes (or the one given) and dirty assets. The only request that writes scene or asset files. |
 | `/play`, `/stop`, `/pause` | Sets `EditorApplication.isPlaying`/`isPaused`. `/play` is refused while compile errors exist. Answers at once; the client waits for the state (domain reloads handled as in the compile flow). `/stop` answers the play session's time and error/warning counts. |
 | `/tree?object=&depth=` | Children of an object (or the roots of the loaded scenes) to `depth` (default 2): name, active, components, child count past the depth. At most 200 lines. |
-| `/inspect?object=&component=` | Components of an object, or one component's visible serialized fields: name, type, value (object references as addresses or asset paths; arrays with length and the first 10 items). At most 150 lines. |
+| `/inspect?object=&component=` | Components of an object, or one component's visible serialized fields: name, type, value (object references as addresses or asset paths; arrays with length and the first 10 items). At most 150 lines. Bridge 0.9.0 adds `field=` (one field whole) and `from=` (paging): Nothing out of reach. |
 | `/object/create?name=&parent=&prefab=&primitive=` | New empty object, primitive, or a prefab instance kept linked to its prefab. |
 | `/object/delete?object=` | Deletes an object and its children. |
 | `/object/rename?object=&name=` | |
@@ -125,7 +125,7 @@ Added for parity (O6–O9; same rules, same answer shape):
 
 | Request | Does |
 | --- | --- |
-| `/find?name=&tag=&layer=&component=` | Live objects matching all given filters, as addresses. At most 100. |
+| `/find?name=&tag=&layer=&component=` | Live objects matching all given filters, as addresses. At most 100 (`all=true` from bridge 0.9.0: every match). |
 | `/object/duplicate?object=`, `/object/move?...&scene=` | Duplicate next to the original; move a root object to another loaded scene. |
 | `/scene/new?path=&additive=`, `/scene/close?path=`, `/scene/active?path=` | New scene saved at `path`; close (refused when modified); set the active scene. |
 | `/undo`, `/redo`, `/select?object=&clear=` | Unity's Undo/Redo (answers the group name, `ug <command>`); selection read, set or cleared. |
@@ -459,6 +459,74 @@ left it paused, and `ug stop` found 0 errors. In the `UG_UNITY` end to end (batc
 process): `--record 1` 416 ms, about 390 tokens; `--frames` over a stopped session 1.13 s; two
 counters 13 ms; `memory --top 5` 11 ms, about 157 tokens; `snapshot take` 645 ms (183 MB);
 `compare` 24 ms, about 223 tokens; a 0.3 s `.raw` log 54.5 MB.
+
+## Nothing out of reach (C1, bridge 0.9.0)
+
+User rule (2026-10-10): full capability, nothing left out to save tokens; answers stay compact and
+name the command that shows the rest. An audit (2026-10-11) found caps whose cut part no `ug`
+command could reach. Each now has an escape; default answers keep their caps and size. The new
+flags need bridge 0.9.0 and are refused by name on an older one (SPEC-editor-link, Bridge 0.9.0).
+
+- **`ug inspect <object> --field <path>`** reads one serialized field whole. The component is
+  found as `ug set` finds it (`--component`, else the game object, then the one component with the
+  field); `--importer` reads an importer setting, and on a material `<path>` is a shader property.
+  `<path>` is `ug set`'s (`waves`, `waves[2].count`, `m_LocalPosition`). Answer: the head line
+  (`Level/Spawner  WaveSpawner  waves  Wave[12]`), then for an array or list one line per element,
+  `  [3]  {count: 5, delay: 1.5, enemy: Assets/Prefabs/Grunt.prefab}`, else one line with the
+  value. Values are whole: lists, curve keys and gradient keys all, structs nested to any depth
+  (Unity's serialization depth bounds them; a cycle of `SerializeReference` objects stops at 32
+  levels, a memory bound), strings whole with `\n`. At most 200 elements per answer (a transport
+  bound); past them `  ... 300 more: ug inspect Level/Spawner --component
+  WaveSpawner --field waves --from 200`. `--from <n>` starts at element `n`.
+- **Field and property lists page.** A component's fields and a material's properties stop at 150
+  lines as before, now with `  ... 12 more fields: ug inspect <object> --component <C> --from 150`
+  (a material: `more properties`; materials had no `more` line). `--from <n>` starts at field `n`.
+- **Cut values are said.** Arrays, lists and curve keys still show 10 items and structs one level
+  (`{...}` deeper); gradients now say `... N more` past 10 stops too (they were cut silently). When
+  any value of a field list was cut, the last line is `  (values cut: ug inspect <object>
+  --component <C> --field <name>)`. The overview's children list ends `, ... N more (ug tree
+  <object> --depth 1)`.
+- **`ug prefab overrides <instance>`** lists an instance's overrides, read-only (`/prefab/overrides
+  ?object=`): the head `Level/Crate  instance of Assets/Prefabs/Crate.prefab  4 overrides`, then one
+  line per override: `  Level/Crate/Lid  Hinge.limits.max = 90` (an object reference as `->
+  <address or path>`), `  Level/Crate  added Rigidbody`, `removed BoxCollider`, `  Level/Crate/Tag
+  added object`, `removed object Barrel`. Root name, position and rotation, which every scene
+  instance overrides, are left out, as in apply. Every override, no cap; `no overrides` when none.
+  `ug prefab apply|revert` keep their 40-object report, now ending `... N more objects (ug prefab
+  overrides <instance> lists every override before an apply or revert)`. MCP parity: MCP for
+  Unity's `manage_prefabs` has no override listing (its actions are `get_info`, `get_hierarchy`,
+  `create_from_gameobject`, `modify_contents`), nor has `unity-editor-mcp` (`apply_prefab_overrides`,
+  `revert_prefab_overrides` only), so this goes beyond both.
+- **`--all`** on `ug find --live` (every match, not 100), `ug select` (every selected object, not
+  20), `ug run --list` (every line, not 40) and `ug api` (every member name, constructor, overload,
+  candidate of an ambiguous name and enum value: no name budgets, no 25-overload or 4-constructor
+  cap). Each cut answer names its `--all`. `ug tree` already names how to reach the rest (a
+  narrower object or `--depth`).
+- **`ug docs <page> --budget <t>`** (200 to 8,000, default `answerBudget`): the cut line becomes
+  `... cut to 1200 tokens: ug docs <page> --budget 2400; the whole page: <file or URL>`.
+- **`ug perf memory --object <x> --top <n>`**: `--top` now also sets how many sub-assets (default
+  20) and used assets (default 5) are listed, and their cut lines name it (`... 31 more sub-assets:
+  ug perf memory --object Assets/Hero.fbx --top 60`, `uses  12 assets, 9.1 MB: ..., +7: ug perf
+  memory --object Player --top 15`; bridge 0.9.0). Without `--object`, `--top` also sets how many
+  types the `by type` line names (default 8; its cut reads `+31 types (ug perf memory --top 24;
+  --type <T>)`). The top-objects list stays at
+  most 500 (`--top`'s range); at 500 its `more` line says `ug perf memory --type <T> narrows them
+  (500 is --top's most)`. `ug perf --record` and `--frames` add one line after the spikes when a
+  shown spike frame has more than its top 3 markers: `  a spike's other markers: ug perf --frames
+  3011-3011` (the slowest spike).
+- **Refusals that list choices** list them whole or name the command that does: enum names,
+  shader properties (`ug set` on a material), a type's methods (`ug event add`), gamepad buttons
+  and `SerializeReference` types were cut silently and are now whole; ambiguous addresses and
+  elements past 10 (5 for `ug click`) name `ug find --live <name>`, `ug ui --all` or `ug tree --ui`.
+  An unknown key's five example keys end `... (every key: ug api UnityEngine.InputSystem.Key
+  --all)`; an unknown counter's names past 10 end `... N more: ug perf counters --category <c>
+  lists a category's`. Near-name suggestions (`; near: ...`) stay at 5: they are guesses, not a list.
+- **Caps that stay, as memory or transport bounds:** the console ring (2,000 entries) and its
+  per-entry text and stack (8,000 characters each); the request body (16 MB) and the server's
+  64 queued requests; shot sizes (2,048 px, sheets 4,096 px); the profiler's recorded frames (2,000);
+  `ug perf memory --top` (500); 200 elements per `--field` page; the result file's walk (1,000
+  items, two levels, 200 members); the play digest's object snapshot (20,000 objects:
+  SPEC-play-input, Digest). Each says where it cut.
 
 ## Safety rules
 

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -164,6 +166,22 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void A_missing_material_property_lists_every_property_of_the_shader()
+        {
+            const string standard = Folder + "/Standard.mat";
+            Shader shader = Shader.Find("Standard");
+            AssetDatabase.CreateAsset(new Material(shader), standard);
+
+            string refusal = Ask("/set", "object", standard, "field", "glow", "value", "1");
+
+            Assert.Greater(shader.GetPropertyCount(), 20, "Standard has more properties than the old cap");
+            for (int i = 0; i < shader.GetPropertyCount(); i++)
+            {
+                StringAssert.Contains(shader.GetPropertyName(i), refusal);
+            }
+        }
+
+        [Test]
         public void A_refused_edit_leaves_the_undo_history_and_its_names_as_they_were()
         {
             Ask("/object/rename", "object", "Level/Player", "name", "Hero");
@@ -187,6 +205,28 @@ namespace UnityGraph.Bridge.Tests
             Assert.AreEqual(Lines("Level/Hero"), Ask("/select"));
             Assert.AreEqual(Lines("nothing selected"), Ask("/select", "clear", "true"));
             Assert.AreEqual(Lines("nothing selected"), Ask("/select"));
+        }
+
+        [Test]
+        public void Past_20_selected_select_names_all_which_lists_every_one()
+        {
+            GameObject level = Find("Level");
+            var picked = new List<UnityEngine.Object>();
+            for (int i = 0; i < 25; i++)
+            {
+                var go = new GameObject("Pick" + i);
+                go.transform.SetParent(level.transform);
+                picked.Add(go);
+            }
+
+            Selection.objects = picked.ToArray();
+            string cut = Ask("/select");
+            string all = Ask("/select", "all", "true");
+            Selection.objects = new UnityEngine.Object[0];
+
+            StringAssert.EndsWith(",\"... 5 more: ug select --all\"]}", cut);
+            StringAssert.DoesNotContain("more", all);
+            Assert.AreEqual(25, all.Split(new[] { "\",\"" }, StringSplitOptions.None).Length, all);
         }
     }
 }

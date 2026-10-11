@@ -13,8 +13,16 @@ public static partial class DocsTrimmer
 {
     private const int BytesPerToken = 4;
 
-    /// <summary>Text of <paramref name="html"/>, at most <paramref name="budgetTokens"/> tokens; the last line says when it was cut.</summary>
-    public static string Trim(string html, int budgetTokens, string source)
+    private const int MaxBudget = 8000;
+
+    /// <summary>
+    /// Text of <paramref name="html"/>, at most <paramref name="budgetTokens"/> tokens; the last line says when it was cut
+    /// and, given the command that asked (<paramref name="again"/>), the budget that shows more.
+    /// </summary>
+    public static string Trim(string html, int budgetTokens, string source, string? again = null) => Cut(Plain(html), budgetTokens, source, again);
+
+    /// <summary>The whole text of <paramref name="html"/>: main content, headings and list items kept, markup dropped.</summary>
+    public static string Plain(string html)
     {
         string body = Main(html);
         body = DroppedElements().Replace(body, " ");
@@ -44,19 +52,29 @@ public static partial class DocsTrimmer
             lines.RemoveAt(lines.Count - 1);
         }
 
+        return string.Concat(lines.Select(l => l + "\n"));
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> cut on a line to <paramref name="budgetTokens"/>: `... cut to 1200 tokens: ug docs
+    /// Manual/Prefabs --budget 2400; the whole page: <paramref name="source"/>`.
+    /// </summary>
+    public static string Cut(string text, int budgetTokens, string source, string? again = null)
+    {
         int budget = budgetTokens * BytesPerToken;
-        var text = new StringBuilder();
-        foreach (string line in lines)
+        var kept = new StringBuilder();
+        foreach (string line in text.TrimEnd('\n').Split('\n'))
         {
-            if (text.Length + line.Length + 1 > budget)
+            if (kept.Length + line.Length + 1 > budget)
             {
-                return text.ToString().TrimEnd() + "\n... cut to " + budgetTokens.ToString(CultureInfo.InvariantCulture) + " tokens; the whole page: " + source + "\n";
+                string more = again != null && budgetTokens < MaxBudget ? ": " + again + " --budget " + Math.Min(budgetTokens * 2, MaxBudget).ToString(CultureInfo.InvariantCulture) : "";
+                return kept.ToString().TrimEnd() + "\n... cut to " + budgetTokens.ToString(CultureInfo.InvariantCulture) + " tokens" + more + "; the whole page: " + source + "\n";
             }
 
-            text.Append(line).Append('\n');
+            kept.Append(line).Append('\n');
         }
 
-        return text.ToString();
+        return text.Length == 0 ? "" : kept.ToString();
     }
 
     // The page's own content: inside <main>, or the `content` container Unity's pages use, else the body.
@@ -267,15 +285,19 @@ public static class DocsFetcher
 /// <summary>Turns the bridge's `local` / `online` answers into page text: local file, then cache, then a fetch.</summary>
 public static class DocsPages
 {
-    /// <summary>The text to print for <paramref name="answer"/>: a page, or the bridge's error with why nothing was fetched (<paramref name="found"/> false).</summary>
-    public static string Text(OpAnswer answer, bool online, int budgetTokens, DocsCache cache, Func<string, DocsFetchResult> fetch, out bool found)
+    /// <summary>
+    /// The text to print for <paramref name="answer"/>: a page, or the bridge's error with why nothing was fetched
+    /// (<paramref name="found"/> false). The cache keeps whole pages; each answer is cut to its own budget, and the
+    /// cut line names <paramref name="again"/> with a bigger one.
+    /// </summary>
+    public static string Text(OpAnswer answer, bool online, int budgetTokens, DocsCache cache, Func<string, DocsFetchResult> fetch, out bool found, string? again = null)
     {
         found = true;
         if (answer.Local != null)
         {
             try
             {
-                return Trimmed(File.ReadAllText(answer.Local), budgetTokens, answer.Local);
+                return Shown(DocsTrimmer.Plain(File.ReadAllText(answer.Local)), budgetTokens, answer.Local, again);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -288,10 +310,11 @@ public static class DocsPages
         var notes = new List<string>();
         foreach (string url in answer.Online ?? [])
         {
-            if (cache.Get(url) is { } cached)
+            // Before C1 the cache held pages already cut to a budget: those are fetched again.
+            if (cache.Get(url) is { } cached && !cached.Contains("\n... cut to ", StringComparison.Ordinal))
             {
                 found = true;
-                return cached;
+                return Shown(cached, budgetTokens, url, again);
             }
 
             if (!online)
@@ -303,10 +326,10 @@ public static class DocsPages
             DocsFetchResult result = fetch(url);
             if (result.Html != null)
             {
-                string text = Trimmed(result.Html, budgetTokens, url);
-                cache.Put(url, text);
+                string whole = DocsTrimmer.Plain(result.Html);
+                cache.Put(url, whole);
                 found = true;
-                return text;
+                return Shown(whole, budgetTokens, url, again);
             }
 
             notes.Add(url + " (" + result.Problem + ")");
@@ -325,9 +348,9 @@ public static class DocsPages
         return lines.ToString();
     }
 
-    private static string Trimmed(string html, int budgetTokens, string source)
+    private static string Shown(string whole, int budgetTokens, string source, string? again)
     {
-        string text = DocsTrimmer.Trim(html, budgetTokens, source);
+        string text = DocsTrimmer.Cut(whole, budgetTokens, source, again);
         return text.Length > 0 ? text : "the page has no text: " + source + "\n";
     }
 }

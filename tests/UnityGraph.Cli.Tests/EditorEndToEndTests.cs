@@ -63,7 +63,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.8.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.9.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -78,6 +78,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Assert.Contains(": 1 error\n  Assets/Editor/Broken.cs:1:", failed, StringComparison.Ordinal);
         Assert.Contains("CS0103  The name 'spd' does not exist in the current context", failed, StringComparison.Ordinal);
         Assert.Contains("  last compile  1 error  ", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.Contains("CS0103  The name 'spd' does not exist in the current context", Ug(log, "compile", "--all"), StringComparison.Ordinal);
 
         File.WriteAllText(broken, "namespace BridgeHost { static class Broken { static int Speed() { return 1; } } }\n");
         clock.Restart();
@@ -87,8 +88,11 @@ public sealed partial class EditorEndToEndTests : IDisposable
 
         Assert.Matches(@"^ran BridgeHost\.FixtureMethods\.Hello\(\) in [\d.]+ ms\n  result: ""hello from BridgeHost""\n$", Ug(log, "run", "BridgeHost.FixtureMethods.Hello"));
         Assert.Matches(
-            @"^BridgeHost\.FixtureMethods\.Throws\(\) threw after [\d.]+ ms: InvalidOperationException: thrown on purpose\n  at Assets/Editor/FixtureMethods\.cs:\d+\n$",
+            @"^BridgeHost\.FixtureMethods\.Throws\(\) threw after [\d.]+ ms: InvalidOperationException: thrown on purpose\n  at Assets/Editor/FixtureMethods\.cs:\d+\n  whole exception: Library/unitygraph/exception\.txt\n$",
             Ug(log, "run", "BridgeHost.FixtureMethods.Throws"));
+        string exception = File.ReadAllText(Path.Combine(_root, "Library", "unitygraph", "exception.txt"));
+        Assert.Contains("InvalidOperationException: thrown on purpose", exception, StringComparison.Ordinal);
+        Assert.Contains("FixtureMethods.Throws", exception, StringComparison.Ordinal);
         Assert.StartsWith(
             "did not run UnityEditor.EditorApplication.Exit: UnityEditor.EditorApplication is Unity's, not the project's: ug eval",
             Ug(log, "run", "UnityEditor.EditorApplication.Exit"),
@@ -152,6 +156,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_root, "Assets", "Prefabs", "Crate.prefab")));
         Assert.Equal("added Turret to Crate  (Main.unity modified, not saved)\n", Ug(log, "component", "add", "Crate", "Turret"));
         Assert.Equal("Crate  Turret.speed  5 -> 9  (Main.unity modified, not saved)\n", Ug(log, "set", "Crate", "speed", "9", "--component", "Turret"));
+        Assert.Equal("Crate  instance of Assets/Prefabs/Crate.prefab  1 override\n  Crate  added Turret\n", Ug(log, "prefab", "overrides", "Crate"));
 
         clock.Restart();
         string applied = Ug(log, "prefab", "apply", "Crate");
@@ -167,10 +172,13 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Assert.Contains("speed: 9", File.ReadAllText(Path.Combine(_root, "Assets", "Prefabs", "Crate.prefab")), StringComparison.Ordinal);
 
         Assert.Equal("Crate  Turret.speed  9 -> 4  (Main.unity modified, not saved)\n", Ug(log, "set", "Crate", "speed", "4", "--component", "Turret"));
+        Assert.Equal("Crate  instance of Assets/Prefabs/Crate.prefab  1 override\n  Crate  Turret.speed = 4\n", Ug(log, "prefab", "overrides", "Crate"));
         Assert.Equal(
             "reverted 1 override on Crate  (Main.unity modified, not saved)\n  Crate  Turret.speed\n",
             Ug(log, "prefab", "revert", "Crate"));
         Assert.Contains("9", Ug(log, "inspect", "Crate", "--component", "Turret"), StringComparison.Ordinal);
+        Assert.Matches(@"^Crate  Turret.*  speed  \S+\n  9\n$", Ug(log, "inspect", "Crate", "--component", "Turret", "--field", "speed"));
+        Assert.Equal("Crate  instance of Assets/Prefabs/Crate.prefab  no overrides\n", Ug(log, "prefab", "overrides", "Crate"));
         Assert.Equal("no overrides on Crate to revert\n", Ug(log, "prefab", "revert", "Crate"));
 
         Assert.Equal("unpacked Crate from Assets/Prefabs/Crate.prefab  (Main.unity modified, not saved)\n", Ug(log, "prefab", "unpack", "Crate"));
@@ -188,6 +196,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
 
         Assert.Equal("selected Level/Spawn\n", Ug(log, "select", "Level/Spawn"));
         Assert.Equal("Level/Spawn\n", Ug(log, "select"));
+        Assert.Equal("Level/Spawn\n", Ug(log, "select", "--all"));
         Assert.Equal("nothing selected\n", Ug(log, "select", "--clear"));
         Assert.Equal("nothing selected\n", Ug(log, "select"));
 
@@ -311,7 +320,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.8.0  local", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.9.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
@@ -567,7 +576,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         clock.Restart();
         string looped = Ug(log, "eval", "--timeout", "2", "long n = 0;\nwhile (true) { n++; }");
         Report("ug eval of an endless loop, --timeout 2", clock.Elapsed);
-        Assert.Matches(@"^snippet threw after \d+ ms: TimeoutException: a loop kept the editor waiting for 2 s; ug stopped it\n  at snippet:2\n$", looped);
+        Assert.Matches(@"^snippet threw after \d+ ms: TimeoutException: a loop kept the editor waiting for 2 s; ug stopped it\n  at snippet:2\n  whole exception: Library/unitygraph/exception\.txt\n$", looped);
         Assert.StartsWith("Unity 6000.3.14f1  idle", Ug(log, "status"), StringComparison.Ordinal);
 
         // A file outside Assets/, so Unity does not compile it too.
@@ -583,7 +592,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Report("ug eval --file with arguments", clock.Elapsed);
         Assert.Matches(@"^ran Build\.Arena\(int waves, Vector3 at, string level\) in [\d.]+ ms\n  result: ""Hard 3 at 1""\n$", arena);
         Assert.Matches(
-            @"^Build\.Fail\(\) threw after [\d.]+ ms: InvalidOperationException: from the file\n  at " + System.Text.RegularExpressions.Regex.Escape(file.Replace('\\', '/')) + @":7\n$",
+            @"^Build\.Fail\(\) threw after [\d.]+ ms: InvalidOperationException: from the file\n  at " + System.Text.RegularExpressions.Regex.Escape(file.Replace('\\', '/')) + @":7\n  whole exception: Library/unitygraph/exception\.txt\n$",
             Ug(log, "eval", "--file", file, "--entry", "Build.Fail"));
 
         string batch = Ug(log, "batch", "eval var n = 2; n * 21", "eval \"Debug.isDebugBuild || true\"");
@@ -626,6 +635,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Report("ug console (1 error)", clock.Elapsed);
         Tokens("ug console answer", console);
         Assert.Matches(@"^console  \d+ errors?(, \d+ warnings?)?  \(last #\d+\)\n  error  e2e fixture error", console);
+        Assert.Matches(@"\n  error  #\d+  e2e fixture error", Ug(log, "console", "--whole"));
     }
 
     // unity-loop: the compile gate check, `ug test`, `ug play --for` and `ug log`.
@@ -662,6 +672,11 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Report("ug test (1 red, 1 green)", clock.Elapsed);
         Tokens("ug test red answer", red);
         Assert.Matches(@"^EditMode: 1 failed, 1 passed in \d+\.\d s\n  Assets/E2ETests/RedTests\.cs:8  E2E\.RedTests\.Fails  ", red);
+        Assert.Matches(@"^last run: 1 failed, 1 passed in \d+\.\d s\n  Assets/E2ETests/RedTests\.cs:8  E2E\.RedTests\.Fails  ", Ug(log, "test", "--failures"));
+        string failure = Ug(log, "test", "--failure", "Fails");
+        Assert.StartsWith("E2E.RedTests.Fails  Assets/E2ETests/RedTests.cs:8\n", failure, StringComparison.Ordinal);
+        Assert.Contains("Expected: 3", failure, StringComparison.Ordinal);
+        Assert.Contains("But was:  2", failure, StringComparison.Ordinal);
 
         clock.Restart();
         string green = Ug(log, "test", "--filter", "PlayLogTests");
@@ -674,6 +689,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Report("ug play --for 2", clock.Elapsed);
         Assert.Matches(@"^play \d+\.\d s, stopped \d\d:\d\d:\d\d\n  ", played);
         Assert.Equal(played, Ug(log, "log"));
+        Assert.StartsWith(played.Split('\n')[0] + "\n", Ug(log, "log", "--whole"), StringComparison.Ordinal);
     }
 
     private string Ug(string editorLog, params string[] args)

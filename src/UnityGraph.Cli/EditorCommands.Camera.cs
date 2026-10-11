@@ -118,12 +118,18 @@ internal static partial class EditorCommands
         Argument<string?> profile = Optional("profile", "A noise profile's name (6D Shake, Handheld_normal_mild) or asset path; none removes the noise.");
         var amplitude = new Option<double?>("--amplitude") { Description = "AmplitudeGain, 0 to 1000." };
         var frequency = new Option<double?>("--frequency") { Description = "FrequencyGain, 0 to 1000." };
-        camera.Subcommands.Add(Ops("noise", "camera noise", "Set a camera's noise (CinemachineBasicMultiChannelPerlin); with nothing, show it and the profiles.", [noisy, profile, amplitude, frequency], r =>
-            Request("/camera/noise", r.GetValue(noisy),
+        Option<bool> profilesAll = Flag("--all", "With nothing else: every profile, not the first 12 (bridge 0.9.0).");
+        camera.Subcommands.Add(Ops("noise", "camera noise", "Set a camera's noise (CinemachineBasicMultiChannelPerlin); with nothing, show it and the profiles.", [noisy, profile, amplitude, frequency, profilesAll], r =>
+        {
+            bool every = r.GetValue(profilesAll);
+            return Request("/camera/noise", r.GetValue(noisy),
                 ("camera", r.GetValue(noisy)),
                 ("profile", r.GetValue(profile)),
                 ("amplitude", Invariant(r.GetValue(amplitude))),
-                ("frequency", Invariant(r.GetValue(frequency))))));
+                ("frequency", Invariant(r.GetValue(frequency))),
+                ("all", True(every))) with
+            { Full = every, Option = every ? "--all" : null };
+        }));
 
         Option<string?> style = Text("--style", "Cut, EaseInOut, EaseIn, EaseOut, HardIn, HardOut, Linear or Custom.");
         var time = new Option<double?>("--time") { Description = "Blend seconds, 0 to 3600." };

@@ -49,8 +49,9 @@ internal static partial class EditorCommands
 
         var warnings = new Option<bool>("--warnings") { Description = "List warnings too, not only their count." };
         var timeout = new Option<int>("--timeout") { Description = "Seconds to wait for Unity. Default: 60.", DefaultValueFactory = _ => 60 };
-        yield return Command("compile", "Refresh, wait for the script compile, and list its errors.", [warnings, timeout], (root, result) =>
-            Compile(root, result.GetValue(warnings), TimeSpan.FromSeconds(Math.Max(1, result.GetValue(timeout))), editorLog ?? EditorLog.DefaultPath()));
+        var all = new Option<bool>("--all") { Description = "List every error (and with --warnings every warning), not the first 20." };
+        yield return Command("compile", "Refresh, wait for the script compile, and list its errors.", [warnings, timeout, all], (root, result) =>
+            Compile(root, result.GetValue(warnings), TimeSpan.FromSeconds(Math.Max(1, result.GetValue(timeout))), editorLog ?? EditorLog.DefaultPath(), result.GetValue(all)));
 
         var copy = new Option<bool>("--copy") { Description = "Copy the package into " + CopyFolder.Replace('\\', '/') + "/ instead of printing how to add it." };
         var bridge = new Command("bridge", "Add the editor bridge to the project, or remove it.");
@@ -107,19 +108,19 @@ internal static partial class EditorCommands
         return (0, text.ToString());
     }
 
-    public static (int ExitCode, string Text) Compile(string root, bool warnings, TimeSpan timeout, string? editorLog)
+    public static (int ExitCode, string Text) Compile(string root, bool warnings, TimeSpan timeout, string? editorLog, bool all = false)
     {
         BridgeConnection connection = BridgeClient.Connect(root, ProcessCheck);
         if (connection.Client == null)
         {
-            return (0, CompileText.Fallback(root, connection.Problem!, editorLog, warnings));
+            return (0, CompileText.Fallback(root, connection.Problem!, editorLog, warnings, all));
         }
 
         using BridgeClient client = connection.Client;
         CompileOutcome outcome = client.Compile(timeout);
         return (0, outcome.Problem == null
-            ? CompileText.Format(outcome, warnings)
-            : CompileText.Fallback(root, outcome.Problem, editorLog, warnings));
+            ? CompileText.Format(outcome, warnings, all)
+            : CompileText.Fallback(root, outcome.Problem, editorLog, warnings, all));
     }
 
     public static (int ExitCode, string Text) Install(string root, bool copy, string? package)
@@ -208,6 +209,15 @@ internal static partial class EditorCommands
         /// <summary>A profiler request (`ug perf --record`, `ug perf profiler`, ...): needs bridge 0.8.0.</summary>
         public bool Profiler { get; init; }
 
+        /// <summary>A C1 escape (`ug console --whole`, `ug inspect --field`, `--all`, ...): needs bridge 0.9.0.</summary>
+        public bool Full { get; init; }
+
+        /// <summary>The token budget for a docs page (`ug docs --budget`); null keeps the config's answer budget.</summary>
+        public int? Budget { get; init; }
+
+        /// <summary>The command that asks for this docs page again (`ug docs Manual/Prefabs`), named by a cut page.</summary>
+        public string? Again { get; init; }
+
         /// <summary>The option that needs the newer bridge, named in the refusal: `ug shot --angles`.</summary>
         public string? Option { get; init; }
 
@@ -283,7 +293,7 @@ internal static partial class EditorCommands
         }
 
         if ((request.PlayInput && !client.HasPlayInput) || (request.Code && !client.HasCode) || (request.Camera && !client.HasCameras) || (request.UiToolkit && !client.HasUiToolkit)
-            || (request.Profiler && !client.HasProfiler))
+            || (request.Profiler && !client.HasProfiler) || (request.Full && !client.HasFull))
         {
             return Failed("bridge " + client.Info.Bridge + " is too old for ug " + command + (request.Option == null ? "" : " " + request.Option) + ": run ug bridge install again\n");
         }
@@ -301,7 +311,7 @@ internal static partial class EditorCommands
 
         if (answer.Local != null || answer.Online != null)
         {
-            string page = DocsPages.Text(answer, config.DocsOnline, config.AnswerBudget, DocsCacheOverride ?? new DocsCache(DocsCache.DefaultFolder()), DocsFetchOverride ?? DocsFetcher.Fetch, out bool found);
+            string page = DocsPages.Text(answer, config.DocsOnline, request.Budget ?? config.AnswerBudget, DocsCacheOverride ?? new DocsCache(DocsCache.DefaultFolder()), DocsFetchOverride ?? DocsFetcher.Fetch, out bool found, request.Again);
             _opFailed = !found;
             return (0, page);
         }
@@ -330,9 +340,10 @@ internal static partial class EditorCommands
     }
 
     /// <summary>`ug find --live`: the loaded scenes' objects by name part, tag, layer and component.</summary>
-    public static (int ExitCode, string Text) LiveFind(string start, string? name, string? tag, string? layer, string? component) =>
+    public static (int ExitCode, string Text) LiveFind(string start, string? name, string? tag, string? layer, string? component, bool all = false) =>
         Start(start, (root, config) => Op(root, config, "find --live", new OpRequest(
-            Query("/find", ("name", name), ("tag", tag), ("layer", layer), ("component", component)))));
+            Query("/find", ("name", name), ("tag", tag), ("layer", layer), ("component", component), ("all", all ? "true" : null)))
+        { Full = all, Option = all ? "--all" : null }));
 
     private static IEnumerable<Command> OpsCommands()
     {
@@ -362,8 +373,9 @@ internal static partial class EditorCommands
         Option<int> playTimeout = Seconds();
         var playFor = new Option<int?>("--for") { Description = "Stay in play mode this many seconds (1 to 600), then stop and print the ug log digest." };
         var playStep = new Option<int?>("--step") { Description = "While paused, advance this many frames (1 to 600, default 1) and print what changed.", Arity = ArgumentArity.ZeroOrOne };
-        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log; --step advances paused frames.", [playTimeout, playFor, playStep], (root, config, r) =>
-            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor), r.GetResult(playStep) == null ? null : r.GetValue(playStep) ?? 1));
+        Option<bool> playWhole = Flag("--whole", "With --for: the log's rows with their ids, whole messages and stacks (bridge 0.9.0).");
+        yield return Command("play", "Enter play mode (or resume from pause) and wait until playing; --for plays a while, stops and prints the log; --step advances paused frames.", [playTimeout, playFor, playStep, playWhole], (root, config, r) =>
+            Play(root, config, r.GetValue(playTimeout), r.GetValue(playFor), r.GetResult(playStep) == null ? null : r.GetValue(playStep) ?? 1, r.GetValue(playWhole)));
         Option<int> stopTimeout = Seconds();
         yield return Ops("stop", "stop", "Leave play mode; says how long it played and what it logged.", [stopTimeout], r =>
             new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, r.GetValue(stopTimeout))) });
@@ -378,8 +390,15 @@ internal static partial class EditorCommands
         Argument<string> inspected = Required("object", Address + " Or a UI Toolkit element: Menu/Play.");
         Option<string?> inspectComponent = Text("--component", "Show this component's fields: its type name, #n for the n-th.");
         Option<bool> inspectImporter = Flag("--importer", "Show an asset's import settings.");
-        yield return Ops("inspect", "inspect", "An object's components, one component's serialized fields, or a UI Toolkit element's state and styles, live.", [inspected, inspectComponent, inspectImporter], r =>
-            new OpRequest(Query("/inspect", ("object", r.GetValue(inspected)), ("component", r.GetValue(inspectComponent)), ("importer", True(r.GetValue(inspectImporter))))));
+        Option<string?> inspectField = Text("--field", "One field whole, as ug set names it (waves, waves[2].count): every element and level (bridge 0.9.0).");
+        var inspectFrom = new Option<int?>("--from") { Description = "Start at this field, or with --field at this element (bridge 0.9.0)." };
+        yield return Ops("inspect", "inspect", "An object's components, one component's serialized fields, or a UI Toolkit element's state and styles, live.", [inspected, inspectComponent, inspectImporter, inspectField, inspectFrom], r =>
+            new OpRequest(Query("/inspect", ("object", r.GetValue(inspected)), ("component", r.GetValue(inspectComponent)), ("importer", True(r.GetValue(inspectImporter))),
+                ("field", r.GetValue(inspectField)), ("from", Number(r.GetValue(inspectFrom) is { } from ? Math.Max(0, from) : null))))
+            {
+                Full = r.GetValue(inspectField) != null || r.GetValue(inspectFrom) != null,
+                Option = r.GetValue(inspectField) != null ? "--field" : r.GetValue(inspectFrom) != null ? "--from" : null,
+            });
 
         var objects = new Command("object", "Create, delete, rename, move, toggle and duplicate game objects (unsaved until ug save).");
         Argument<string?> createName = Optional("name", "Name of the new object.");
@@ -465,7 +484,10 @@ internal static partial class EditorCommands
                 r.GetValue(eventFrom))));
         yield return events;
 
-        var prefabs = new Command("prefab", "Save an object as a prefab, apply or revert an instance's overrides, unpack an instance (`ug object create --prefab` instantiates).");
+        var prefabs = new Command("prefab", "Save an object as a prefab, list, apply or revert an instance's overrides, unpack an instance (`ug object create --prefab` instantiates).");
+        Argument<string> listed = Required("object", "Prefab instance in a loaded scene (its root).");
+        prefabs.Subcommands.Add(Ops("overrides", "prefab overrides", "List every override on an instance with its value, read-only: what apply or revert would take (bridge 0.9.0).", [listed], r =>
+            new OpRequest(Query("/prefab/overrides", ("object", r.GetValue(listed)))) { Full = true }));
         Argument<string> prefabSource = Required("object", "Scene object to save: " + Address);
         Argument<string> prefabPath = Required("path", "Where to save it, like Assets/Prefabs/Crate.prefab. Refused when it exists.");
         prefabs.Subcommands.Add(Ops("create", "prefab create", "Save a scene object as a prefab asset and keep it linked (writes the asset now; the scene stays unsaved).", [prefabSource, prefabPath], r =>
@@ -543,12 +565,30 @@ internal static partial class EditorCommands
 
         Argument<string> apiType = Required("type", "Type or Type.member: Transform, Physics.Raycast, UnityEngine.Rigidbody.");
         Argument<string?> apiMember = Optional("member", "A member of the type: its signatures, overloads and defaults.");
-        yield return Ops("api", "api", "A Unity or .NET type from the loaded assemblies: members, or one member's signatures.", [apiType, apiMember], r =>
-            new OpRequest(Query("/api", ("type", r.GetValue(apiType)), ("member", r.GetValue(apiMember)))));
+        Option<bool> apiAll = Flag("--all", "Every member name, constructor, overload, enum value and ambiguous candidate, no budget (bridge 0.9.0).");
+        yield return Ops("api", "api", "A Unity or .NET type from the loaded assemblies: members, or one member's signatures.", [apiType, apiMember, apiAll], r =>
+        {
+            bool all = r.GetValue(apiAll);
+            return new OpRequest(Query("/api", ("type", r.GetValue(apiType)), ("member", r.GetValue(apiMember)), ("all", True(all)))) { Full = all, Option = all ? "--all" : null };
+        });
 
         Argument<string> docsPage = Required("page", "Manual/Prefabs, ScriptReference/Physics.Raycast, or a package page like com.unity.cinemachine/manual/index.");
-        yield return Ops("docs", "docs", "A Unity documentation page as trimmed text: local copy, then the cache, then docs.unity3d.com (docs.online in .claude/unitygraph.json).", [docsPage], r =>
-            new OpRequest(Query("/api", ("page", r.GetValue(docsPage)))) { Timeout = TimeSpan.FromSeconds(20) });
+        var docsBudget = new Option<int?>("--budget") { Description = "Tokens of page text, 200 to 8000. Default: answerBudget in .claude/unitygraph.json." };
+        Command docs = Ops("docs", "docs", "A Unity documentation page as trimmed text: local copy, then the cache, then docs.unity3d.com (docs.online in .claude/unitygraph.json).", [docsPage, docsBudget], r =>
+            new OpRequest(Query("/api", ("page", r.GetValue(docsPage))))
+            {
+                Timeout = TimeSpan.FromSeconds(20),
+                Budget = r.GetValue(docsBudget),
+                Again = "ug docs " + r.GetValue(docsPage),
+            });
+        docs.Validators.Add(result =>
+        {
+            if (result.GetValue(docsBudget) is < UnityGraphConfig.MinAnswerBudget or > UnityGraphConfig.MaxAnswerBudget)
+            {
+                result.AddError("--budget must be 200 to 8000");
+            }
+        });
+        yield return docs;
 
         yield return PerfCommand();
 
@@ -557,8 +597,13 @@ internal static partial class EditorCommands
 
         Argument<string?> selected = Optional("object", Address + " Default: list the selection.");
         Option<bool> clear = Flag("--clear", "Clear the selection.");
-        yield return Ops("select", "select", "Show, set or clear the editor's selection.", [selected, clear], r =>
-            new OpRequest(Query("/select", ("object", r.GetValue(selected)), ("clear", True(r.GetValue(clear))))));
+        Option<bool> selectAll = Flag("--all", "List every selected object, not the first 20 (bridge 0.9.0).");
+        yield return Ops("select", "select", "Show, set or clear the editor's selection.", [selected, clear, selectAll], r =>
+            new OpRequest(Query("/select", ("object", r.GetValue(selected)), ("clear", True(r.GetValue(clear))), ("all", True(r.GetValue(selectAll)))))
+            {
+                Full = r.GetValue(selectAll),
+                Option = r.GetValue(selectAll) ? "--all" : null,
+            });
 
         Argument<string?> runTarget = Optional("target", "Namespace.Type.Method or Type.Method: any static method of the project's code; or a menu path like Tools/Build. With --list: a filter.");
         var runArgs = new Argument<string[]>("args")
@@ -569,8 +614,17 @@ internal static partial class EditorCommands
         Option<bool> runList = Flag("--list", "List what can be run: types with static methods; a filter like Tools. or Spawn lists signatures.");
         Option<bool> runMenu = Flag("--menu", "With --list: menu items instead of methods.");
         var runTimeout = new Option<int>("--timeout") { Description = "Seconds to wait for a returned Task or IEnumerator. Default: 60.", DefaultValueFactory = _ => 60 };
-        yield return Ops("run", "run", "Run a static method of the project's code with arguments, or a menu item, in the open editor; prints its result, logs and what it modified.", [runTarget, runArgs, runList, runMenu, runTimeout], r =>
-            RunRequest(r.GetValue(runTarget), r.GetValue(runArgs) ?? [], r.GetValue(runList), r.GetValue(runMenu), r.GetValue(runTimeout)));
+        Option<bool> runAll = Flag("--all", "With --list: every line, not the first 40 (bridge 0.9.0).");
+        Command run = Ops("run", "run", "Run a static method of the project's code with arguments, or a menu item, in the open editor; prints its result, logs and what it modified.", [runTarget, runArgs, runList, runMenu, runTimeout, runAll], r =>
+            RunRequest(r.GetValue(runTarget), r.GetValue(runArgs) ?? [], r.GetValue(runList), r.GetValue(runMenu), r.GetValue(runTimeout), r.GetValue(runAll)));
+        run.Validators.Add(result =>
+        {
+            if (result.GetValue(runAll) && !result.GetValue(runList))
+            {
+                result.AddError("--all goes with --list");
+            }
+        });
+        yield return run;
 
         yield return EvalCommand();
 
@@ -593,7 +647,7 @@ internal static partial class EditorCommands
     }
 
     /// <summary>`/run`: the target and each argument as `a0`, `a1`, ...; or the list request. Waits the bridge's deadline plus 5 s.</summary>
-    public static OpRequest RunRequest(string? target, string[] args, bool list, bool menu, int timeout)
+    public static OpRequest RunRequest(string? target, string[] args, bool list, bool menu, int timeout, bool all = false)
     {
         int seconds = Math.Max(1, timeout);
         var parameters = new List<(string, string?)>();
@@ -601,6 +655,7 @@ internal static partial class EditorCommands
         {
             parameters.Add(("list", target ?? ""));
             parameters.Add(("menu", menu ? "true" : null));
+            parameters.Add(("all", all ? "true" : null));
         }
         else
         {
@@ -614,6 +669,8 @@ internal static partial class EditorCommands
         {
             Timeout = TimeSpan.FromSeconds(seconds + 5),
             Code = true,
+            Full = all,
+            Option = all ? "--all" : null,
             NoAnswer = "the code may still be running in the editor, and nothing stops it from outside",
         };
     }

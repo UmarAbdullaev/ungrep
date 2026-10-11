@@ -42,6 +42,7 @@ namespace UnityGraph.Bridge
             public Vector2 Center;
             public Vector2 Size;
             public string State;
+            public bool LabelCut;
         }
 
         public bool HasSelection => EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null;
@@ -70,6 +71,7 @@ namespace UnityGraph.Bridge
                     Center = new Vector2(element.Center.x, height - element.Center.y),
                     Size = element.Size,
                     State = element.State,
+                    LabelCut = element.LabelCut,
                 });
             }
         }
@@ -107,6 +109,7 @@ namespace UnityGraph.Bridge
             }
 
             string kind = selectable == null ? "clickable" : KindOf(selectable);
+            int cuts = UiItem.Cuts;
             string label = LabelOf(go);
             var element = new Element
             {
@@ -118,6 +121,7 @@ namespace UnityGraph.Bridge
                 Center = center,
                 Size = size,
             };
+            element.LabelCut = UiItem.Cuts > cuts;
 
             if (selectable != null && !selectable.IsInteractable())
             {

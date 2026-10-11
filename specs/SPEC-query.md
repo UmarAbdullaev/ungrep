@@ -356,6 +356,48 @@ A token is estimated as 4 UTF-8 bytes. Lines are added whole until the next one 
 budget; then the answer ends with `  more  <the same command> --budget <2 × budget, max 8000>`.
 The header line always fits. Deterministic: same graph and command, same bytes.
 
+## Nothing out of reach (C1)
+
+User rule (2026-10-10): full capability; answers stay compact and say how to get the rest.
+Defaults keep their size. Every query command gains two flags:
+
+- **`--from <n>`** pages a text answer: lines 1 to `n` are skipped (the answer's own numbering,
+  header included), the rest is cut to the budget as usual. A cut answer at the largest budget,
+  which used to end `more  (cut at the largest budget; ask a narrower question)`, ends
+  `  more  <the same command> --budget 8000 --from <next line>`. Below the largest budget the
+  `more` line still names the doubled budget. Lines are deterministic, so pages join up.
+  `--json` answers are cut at the budget and say `"cut": true`; the text answer pages, and
+  `--from` with `--json` is refused (`--from pages text answers; --json answers are cut at the
+  budget`), as is `--from` on `ug find --live` (SPEC-editor-ops: it answers whole with `--all`).
+  `--from` past the end answers `(nothing past line 900: the answer has 9 lines)`.
+- **`--all`** lifts the list caps:
+  - `ug find`: every match, not 50 (the line is now `50+ found, narrow the text or add --kind;
+    all: ug find <text> --all`);
+  - `ug refs`: every edge, past the 2,000 read per query (`1999+ references: ug refs <symbol>
+    --all`; the count is the rows the 2,000 edges gave). A default `refs` cut at the largest
+    budget pages to that line;
+  - `ug explain`: every list item, not 8 (`(+N)`); a cut list's answer ends
+    `  more  ug explain <symbol> --all | ug refs <symbol>`. `ug refs` lists incoming edges only;
+    the outgoing lists (`calls`, `overrides`, `uses`, `scripts`, `components`, `references`, ...)
+    are whole only here;
+  - `ug impact`: every row of every group (was 10, then `+N more  ug refs`, which did not list
+    `held via`, `overridden in` or `field data`; the line is now `+N more  ug impact <symbol>
+    --all`); the holders of a field past 500, type closures past 200 types, and `held via` past
+    3 levels (cycles are still stopped by the seen set);
+  - an ambiguous symbol: every candidate, not 20 (past 20: `  +2 more candidates: ug refs Clash
+    --all`), and the resolver reads every node of the name, not the first 500;
+  - `ug outline`: every component of a game object, not 6, and every other file of a partial
+    type, not 3 (found in the C1 re-check).
+- **Silent cuts are said.** When a default answer hits the 500 holders, the 200-type closure, the
+  3-level `held via` walk, the 2,000 edges read per symbol in `explain` or `impact`, the 50,000
+  edges read per file (`explain` of an asset, `outline`), or an outline's 6 components or 3
+  partial files, a `note` line says which (`note  cut: holders past 500, held via past 3 levels:
+  ug impact <symbol> --all`). `explain` with a list cut to 8 items ends `  more  ug explain
+  <symbol> --all | ug refs <symbol>`. `--json` answers carry the note as `"capped"`.
+- The 2,000 and 50,000 edge reads stay as the default's time bound; with `--all` only the graph's
+  size bounds a query. The outline's 100-level hierarchy walk stays: a cycle guard, as deep as no
+  real scene goes.
+
 ## Performance targets
 
 | Operation | Target |

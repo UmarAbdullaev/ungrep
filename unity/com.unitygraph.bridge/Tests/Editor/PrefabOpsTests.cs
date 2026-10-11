@@ -98,6 +98,48 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void Overrides_lists_every_override_with_its_value_and_changes_nothing()
+        {
+            Ask("/object/create", "prefab", PrefabPath);
+            Assert.AreEqual(Lines("Turret  instance of " + PrefabPath + "  no overrides"), Ask("/prefab/overrides", "object", "Turret"));
+
+            Ask("/set", "object", "Turret/Barrel", "field", "position", "value", "0,1,0");
+            Ask("/component/add", "object", "Turret", "type", "Rigidbody");
+            Ask("/object/create", "name", "Sight", "parent", "Turret/Barrel");
+
+            string answer = Ask("/prefab/overrides", "object", "Turret");
+            TestContext.WriteLine(answer);
+            StringAssert.StartsWith("{\"lines\":[\"Turret  instance of " + PrefabPath + "  3 overrides\"", answer);
+            StringAssert.Contains("\"  Turret/Barrel  Transform.m_LocalPosition.y = 1\"", answer);
+            StringAssert.Contains("\"  Turret  added Rigidbody\"", answer);
+            StringAssert.Contains("\"  Turret/Barrel/Sight  added object\"", answer);
+            Assert.IsTrue(PrefabUtility.HasPrefabInstanceAnyOverrides(Find("Turret"), false), "a read changes nothing");
+            Assert.IsNull(AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath).GetComponent<Rigidbody>());
+
+            Assert.AreEqual(Err("Level/Player is not a prefab instance: ug prefab create Level/Player <path> makes a prefab from it"), Ask("/prefab/overrides", "object", "Level/Player"));
+            Assert.AreEqual(Err("Turret/Barrel is part of the prefab instance Turret: give Turret"), Ask("/prefab/overrides", "object", "Turret/Barrel"));
+            Assert.AreEqual(Err("no object given"), Ask("/prefab/overrides"));
+        }
+
+        [Test]
+        public void Past_forty_objects_revert_names_overrides_which_lists_them_all()
+        {
+            Ask("/object/create", "prefab", PrefabPath);
+            for (int i = 0; i < 41; i++)
+            {
+                Ask("/object/create", "name", "Part" + i, "parent", "Turret");
+            }
+
+            string listed = Ask("/prefab/overrides", "object", "Turret");
+            StringAssert.StartsWith("{\"lines\":[\"Turret  instance of " + PrefabPath + "  41 overrides\"", listed);
+            StringAssert.Contains("\"  Turret/Part40  added object\"", listed);
+
+            string reverted = Ask("/prefab/revert", "object", "Turret");
+            StringAssert.EndsWith("\"... 1 more object (ug prefab overrides Turret lists every override before an apply or revert)\"]}", reverted);
+            Assert.IsNull(GameObject.Find("Turret/Part40"));
+        }
+
+        [Test]
         public void Apply_is_one_undo_group()
         {
             Ask("/object/create", "prefab", PrefabPath);

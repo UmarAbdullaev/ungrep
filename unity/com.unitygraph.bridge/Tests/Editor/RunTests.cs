@@ -82,6 +82,24 @@ namespace UnityGraph.Bridge.Tests
             Console.Add("warning", "second", null);
         }
 
+        public static void LogLong()
+        {
+            Console.Add("log", new string('a', 200), null);
+        }
+
+        public static void LogLines()
+        {
+            Console.Add("log", "first line\nsecond line", null);
+        }
+
+        public static void LogLongMany()
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                Console.Add("log", "line " + i + " " + new string('b', 200), null);
+            }
+        }
+
         public static int[] Many() => Enumerable.Range(1, 25).ToArray();
 
         public static GameObject Spawn(string name)
@@ -301,13 +319,18 @@ namespace UnityGraph.Bridge.Tests
             return Text(reply);
         }
 
-        private static string List(string filter, bool menu = false)
+        private static string List(string filter, bool menu = false, bool all = false)
         {
             var request = new Request { Path = "/run" };
             request.Query["list"] = filter;
             if (menu)
             {
                 request.Query["menu"] = "true";
+            }
+
+            if (all)
+            {
+                request.Query["all"] = "true";
             }
 
             return Text(MethodRunner.Run(request, null)());
@@ -397,6 +420,11 @@ namespace UnityGraph.Bridge.Tests
             string answer = Run("RunTargets.Boom");
             StringAssert.StartsWith("error: UnityGraph.Bridge.Tests.RunTargets.Boom() threw after N ms: InvalidOperationException: boom", answer);
             StringAssert.DoesNotContain("second line", answer);
+            StringAssert.EndsWith("\n  whole exception: Library/unitygraph/exception.txt", answer);
+
+            string whole = System.IO.File.ReadAllText(System.IO.Path.Combine(Bridge.ProjectRoot, CodeRun.ExceptionFile));
+            StringAssert.StartsWith("System.InvalidOperationException: boom\nsecond line", whole);
+            StringAssert.Contains("RunTargets.Boom", whole);
         }
 
         [Test]
@@ -414,6 +442,24 @@ namespace UnityGraph.Bridge.Tests
             Run("RunTargets.Hello");
             Assert.AreEqual("undid spawn", Text(EditOps.UndoLast(false)));
             Assert.IsNull(GameObject.Find("Crate"));
+        }
+
+        [Test]
+        public void A_log_cut_at_160_characters_or_its_first_line_names_console_whole()
+        {
+            long id = RunTargets.Console.LastId;
+            Assert.AreEqual("  (whole text: ug console --after " + id + " --whole)", Last(Run("RunTargets.LogLong")));
+
+            id = RunTargets.Console.LastId;
+            string lines = Run("RunTargets.LogLines");
+            StringAssert.Contains("\n  log: first line\n", lines);
+            Assert.AreEqual("  (whole text: ug console --after " + id + " --whole)", Last(lines));
+
+            id = RunTargets.Console.LastId;
+            Assert.AreEqual("  (+1 more: ug console --after " + id + " --whole)", Last(Run("RunTargets.LogLongMany")));
+
+            RunTargets.Console.Add("log", "before", null);
+            StringAssert.EndsWith("  warning: second", Run("RunTargets.Log"));
         }
 
         [Test]
@@ -488,6 +534,17 @@ namespace UnityGraph.Bridge.Tests
             StringAssert.Contains("  static int Sum(int a, int b = 10)", methods);
             Assert.AreEqual("no static method in the project's assemblies matches Nowhere (ug find searches the graph)", List("Nowhere"));
             StringAssert.DoesNotContain("File/Quit", List("File/", menu: true));
+        }
+
+        [Test]
+        public void A_cut_list_names_all_which_lists_every_line()
+        {
+            string cut = List("", menu: true);
+            string all = List("", menu: true, all: true);
+
+            StringAssert.IsMatch(@"\n\(\+\d+ more: give a longer filter, or ug run --list --menu --all\)$", cut);
+            StringAssert.DoesNotContain("more: give a longer filter", all);
+            Assert.Greater(all.Split('\n').Length, cut.Split('\n').Length);
         }
 
         [Test]

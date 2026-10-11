@@ -131,6 +131,58 @@ reload that entering play mode causes.
 and drops entries with an id above `until`. A repeat of an older entry gets a new id, so one
 logged before the session and repeated in it counts as in it.
 
+## Nothing out of reach (C1, bridge 0.9.0)
+
+User rule (2026-10-10): answers stay compact, and whatever they leave out has a command that
+shows it. Defaults do not change; a cut answer names the command that shows the rest.
+
+- **Console entries are kept whole.** The bridge keeps each entry's message up to 8,000 characters
+  (was 2,000) and Unity's whole stack trace up to 8,000 characters (was: only the first own frame),
+  for every entry of the 2,000-entry ring. The ring and the two per-entry bounds are memory bounds
+  (the ring is saved in `SessionState` across domain reloads) and stay; a text longer than its
+  bound ends with `... (cut at 8000 characters)`. The saved format gains the stack as a sixth
+  field; a buffer saved by an older bridge restores with no stacks.
+- **`ug console --id <ID>`** prints one entry whole: `#4101 error x12`, the full message (every
+  line), then `stack:` and the stack lines. An id the ring no longer holds: `no console entry #ID
+  (the bridge keeps the newest 2000)`. It takes no other flag but `--budget`.
+- **`ug console --whole`**: the same folded rows, each with the id of its newest occurrence
+  (`#4101`), the full message and the whole stack under it, indented. `--level`, `--count`,
+  `--after`, `--before` and `--budget` apply as usual.
+- **`ug console --before <ID>`** looks at the newest `--count` entries older than the id, so
+  older entries page back. With `--after` too, the window is between the two.
+- **The default answer says what it left out.** One last line, only when something applies:
+  `  more  whole: ug console --whole; older: ug console --before 3920` (the `--level`, `--count`
+  and `--after` given are repeated). `whole` appears when a shown row was cut (a message past its
+  first line or 160 characters) or has a stack beyond its frame; `older` when the ring holds
+  entries before the oldest one looked at (and after `--after`). The budget's own `more` line
+  stays as it is.
+- **`ug log --whole`** and **`ug play --for <s> --whole`** print the session's rows that way. The
+  session is read 500 entries at a time; past that the digest's last line names
+  `ug console --after <after> --before <first id read> --level log` for the rest, and the counts
+  line says `500+ logs` as before.
+- **`ug test --failures`** lists every failure of the last run (no new run): the same row format,
+  no 20-line cap, within `--budget` (default `answerBudget`), with the budget's `more` line.
+  **`ug test --failure <name>`** prints one failure of the last run whole: the full test name, the
+  whole message (NUnit's `Expected:` and `But was:` lines included) and the whole stack. `<name>` is
+  the full name or a unique part of it; several matches list them; none: `no failure matching
+  <name> in the last run`. No run since the editor opened: `no test run since the editor opened`.
+  The bridge keeps every failure (was: the first 50), each with its message and stack up to 8,000
+  characters (memory bounds, stated in the answer when hit). The red answer's cap of 20 rows
+  stays; past it the answer says `(+N more failures: ug test --failures)`, and a row whose message
+  was cut keeps its 160-character first line; when a shown row cut its message or stack the
+  answer ends `  more  whole: ug test --failure <name>`. `ug test --failure` reads the last run with
+  `--budget` too.
+- **Compile gate.** The Stop hook's reason stays at 20 error lines; its last line names
+  `ug compile --all` (SPEC-editor-link, `ug compile`).
+- `--id`, `--whole`, `--before`, `--failures` and `--failure` need bridge 0.9.0; on an older bridge
+  they are refused by name: `bridge 0.8.0 is too old for ug console --whole: run ug bridge install
+  again`. The plain commands work on any bridge as before.
+
+Requests (all `GET`, JSON as before): `/console?id=<ID>` answers `{"last": n, "oldest": n,
+"entries": [one entry]}` or no entries; `/console?...&before=<ID>`; every entry gains `"stack"`
+(null when Unity gave none) and the page gains `"oldest"`, the oldest id the ring holds.
+`/tests/result?id=` (empty id) answers the last run; each failure gains `"stack"`.
+
 ## Compile gate
 
 Two handlers of the module `unity-loop` on the hooks already wired in `hooks/hooks.json`; silent

@@ -246,6 +246,15 @@ namespace UnityGraph.Bridge.Tests
 
             yield return Await(answer, "/camera/noise", "camera", "Cam");
             StringAssert.StartsWith("{\"lines\":[\"Cam  noise none\",\"profiles: 6D Shake, ", answer[0].Body);
+            int profiles = AssetDatabase.FindAssets("t:NoiseSettings", new[] { "Assets", "Packages" }).Distinct().Select(g => AssetDatabase.LoadAssetAtPath<NoiseSettings>(AssetDatabase.GUIDToAssetPath(g))).Where(p => p != null).Select(p => p.name).Distinct().Count();
+            if (profiles > 12)
+            {
+                StringAssert.EndsWith(" ... " + (profiles - 12) + " more: ug camera noise Cam --all (or any NoiseSettings asset path)\"]}", answer[0].Body);
+            }
+
+            yield return Await(answer, "/camera/noise", "camera", "Cam", "all", "true");
+            StringAssert.DoesNotContain(" more", answer[0].Body);
+            Assert.AreEqual(profiles, answer[0].Body.Split(new[] { ", " }, StringSplitOptions.None).Length, answer[0].Body);
 
             yield return Await(answer, "/camera/noise", "camera", "Cam", "profile", "6d_shake", "amplitude", "2");
             Assert.AreEqual(Lines("Cam  noise none -> 6D Shake  amplitude 2  frequency 1" + Unsaved, "live: Cam (brain Main Camera)"), answer[0].Body);

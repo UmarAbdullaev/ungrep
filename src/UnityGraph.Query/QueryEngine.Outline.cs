@@ -18,8 +18,8 @@ public sealed partial class QueryEngine
     /// </summary>
     public string Outline(string text, bool json, int budget)
     {
-        string command = "ug outline " + Names.Quote(text) + (json ? " --json" : "");
-        var answer = new Answer(budget);
+        string command = "ug outline " + Names.Quote(text) + (json ? " --json" : "") + AllFlag;
+        Answer answer = Start(budget, json);
         string? path = ProjectPath(text, answer);
         OutlineModel? model = null;
         if (path is not null)
@@ -32,7 +32,7 @@ public sealed partial class QueryEngine
             return json ? JsonAnswer.Error(answer.Finish(command)) : answer.Finish(command);
         }
 
-        return json ? OutlineJson(model, budget) : OutlineText(model, command, budget);
+        return json ? OutlineJson(model, command, budget) : OutlineText(model, command, budget);
     }
 
     // The text as a project path, or null (with the reason in answer) when it points outside the project.
@@ -117,7 +117,7 @@ public sealed partial class QueryEngine
 
         var owned = nodes.Select(n => n.Key).ToHashSet(StringComparer.Ordinal);
         var parentOf = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (EdgeHit hit in _store.EdgesInFile(path, EdgeKindSet.Of(EdgeKind.Contains), FileEdgeLimit).Items)
+        foreach (EdgeHit hit in FileEdges(path, EdgeKindSet.Of(EdgeKind.Contains)))
         {
             parentOf[hit.Edge.Dst] = hit.Edge.Src;
         }
@@ -231,7 +231,7 @@ public sealed partial class QueryEngine
         string[] otherFiles = [.. outgoing.Where(e => e.Kind == EdgeKind.Contains).Select(e => e.File).Where(f => f != path).Distinct().Order(StringComparer.Ordinal)];
         if (otherFiles.Length > 0)
         {
-            parts.Add("partial, also in " + Names.Join(otherFiles, 3));
+            parts.Add("partial, also in " + Join(otherFiles, 3, "partial files past 3"));
         }
 
         return string.Join("  ", parts);
@@ -253,7 +253,7 @@ public sealed partial class QueryEngine
         string counts = string.Join(", ", nodes.GroupBy(n => n.Kind).OrderBy(g => g.Key).Select(g => Count(g.Count(), KindNames.Of(g.Key).Replace('_', ' '))));
         var byKey = objects.ToDictionary(n => n.Key, StringComparer.Ordinal);
         var parentOf = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (EdgeHit hit in _store.EdgesInFile(path, EdgeKindSet.Of(EdgeKind.ChildOf), FileEdgeLimit).Items)
+        foreach (EdgeHit hit in FileEdges(path, EdgeKindSet.Of(EdgeKind.ChildOf)))
         {
             if (byKey.ContainsKey(hit.Edge.Dst))
             {
@@ -262,7 +262,7 @@ public sealed partial class QueryEngine
         }
 
         var components = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        foreach (EdgeHit hit in _store.EdgesInFile(path, EdgeKindSet.Of(EdgeKind.Contains), FileEdgeLimit).Items)
+        foreach (EdgeHit hit in FileEdges(path, EdgeKindSet.Of(EdgeKind.Contains)))
         {
             if (byKey.TryGetValue(hit.Edge.Src, out Node? owner) && owner.Kind == NodeKind.GameObject && Node(hit.Edge.Dst) is { Kind: NodeKind.Component } component)
             {
@@ -289,7 +289,7 @@ public sealed partial class QueryEngine
         {
             string detail = node.Kind switch
             {
-                NodeKind.GameObject => components.TryGetValue(node.Key, out List<string>? names) ? Names.Join(names, ComponentNames) : "(no components)",
+                NodeKind.GameObject => components.TryGetValue(node.Key, out List<string>? names) ? Join(names, ComponentNames, "component lists past 6") : "(no components)",
                 NodeKind.PrefabInstance => Names.Prop(node, "source") is { } source ? "of " + Label(NodeKeys.Asset(source)) : "",
                 _ => Names.Prop(node, "class") ?? "",
             };
@@ -312,9 +312,9 @@ public sealed partial class QueryEngine
     private static string Lines(int start, int end) =>
         end > start ? $"{start.ToString(CultureInfo.InvariantCulture)}-{end.ToString(CultureInfo.InvariantCulture)}" : start.ToString(CultureInfo.InvariantCulture);
 
-    private static string OutlineText(OutlineModel model, string command, int budget)
+    private string OutlineText(OutlineModel model, string command, int budget)
     {
-        var answer = new Answer(budget);
+        var answer = new Answer(budget, From);
         answer.Add($"{model.Path}  {model.Kind}{(model.Counts.Length > 0 ? "  " + model.Counts : "")}  [exact]");
         if (model.Note is not null)
         {
@@ -324,10 +324,11 @@ public sealed partial class QueryEngine
         }
 
         answer.AddRange(Answer.Table([.. model.Rows.Select(r => new[] { new string(' ', r.Depth * 2) + r.Name, r.Kind, Lines(r.Start, r.End), r.Detail })], "  "));
+        AddCutNote(answer, command, "  ");
         return answer.Finish(command, countDropped: true);
     }
 
-    private static string OutlineJson(OutlineModel model, int budget) =>
+    private string OutlineJson(OutlineModel model, string command, int budget) =>
         JsonAnswer.Fit(model.Rows.Count, budget, (w, keep) =>
         {
             w.WriteStartObject();
@@ -337,6 +338,11 @@ public sealed partial class QueryEngine
             if (model.Note is not null)
             {
                 w.WriteString("note", model.Note);
+            }
+
+            if (_cuts.Count > 0)
+            {
+                w.WriteString("capped", $"{string.Join(", ", _cuts)}: {command} --all");
             }
 
             w.WriteStartArray("rows");

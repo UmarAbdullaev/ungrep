@@ -63,7 +63,8 @@ namespace UnityGraph.Bridge
                 return Answer.Error("not a type or member name: " + name + (member.Length > 0 ? "." + member : ""));
             }
 
-            Type type = Resolve(name, out string ambiguous);
+            bool all = request.Get("all") == "true";
+            Type type = Resolve(name, out string ambiguous, all);
             if (ambiguous != null)
             {
                 return Answer.Error(ambiguous);
@@ -72,7 +73,7 @@ namespace UnityGraph.Bridge
             int dot = name.LastIndexOf('.');
             if (type == null && member.Length == 0 && dot > 0)
             {
-                type = Resolve(name.Substring(0, dot), out ambiguous);
+                type = Resolve(name.Substring(0, dot), out ambiguous, all);
                 if (ambiguous != null)
                 {
                     return Answer.Error(ambiguous);
@@ -91,7 +92,7 @@ namespace UnityGraph.Bridge
 
             try
             {
-                return member.Length == 0 ? TypeView(type) : MemberView(type, member);
+                return member.Length == 0 ? TypeView(type, all) : MemberView(type, member, all);
             }
             catch (Exception e) when (e is TypeLoadException || e is FileNotFoundException || e is NotSupportedException)
             {
@@ -101,7 +102,8 @@ namespace UnityGraph.Bridge
 
         // ---- finding the type ----
 
-        internal static Type Resolve(string name, out string ambiguous)
+        // `all` lists every candidate of an ambiguous name; otherwise the first 8 and `ug api <name> --all`.
+        internal static Type Resolve(string name, out string ambiguous, bool all = false)
         {
             ambiguous = null;
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -132,8 +134,10 @@ namespace UnityGraph.Bridge
 
             if (found.Count > 1)
             {
+                int shown = all ? found.Count : MaxCandidates;
                 ambiguous = "ambiguous: " + name + " (" + found.Count + " types): "
-                    + string.Join(", ", found.Take(MaxCandidates).Select(t => t.FullName)) + (found.Count > MaxCandidates ? ", ..." : "") + "; use the full name";
+                    + string.Join(", ", found.Take(shown).Select(t => t.FullName))
+                    + (found.Count > shown ? ", ... " + (found.Count - shown) + " more: ug api " + name + " --all" : "") + "; use the full name";
             }
 
             return found.Count == 1 ? found[0] : null;
@@ -209,16 +213,23 @@ namespace UnityGraph.Bridge
 
         // ---- the answers ----
 
-        private static Reply TypeView(Type type)
+        // Name lines within their budgets, unless `all`; a cut view ends naming `ug api <Type> --all`.
+        private static Reply TypeView(Type type, bool all)
         {
             var lines = new List<string>
             {
                 Kind(type) + " " + type.FullName + Base(type) + "  (" + type.Assembly.GetName().Name + ")",
             };
 
+            string rest = "ug api " + Simple(type) + " --all";
             if (type.IsEnum)
             {
-                lines.Add(Names("values", Enum.GetNames(type), 400));
+                lines.Add(Names("values", Enum.GetNames(type), all ? int.MaxValue : 400, out int left));
+                if (left > 0)
+                {
+                    lines.Add("every value: " + rest);
+                }
+
                 return Answer.Lines(lines);
             }
 
@@ -252,22 +263,24 @@ namespace UnityGraph.Bridge
             }
 
             ConstructorInfo[] constructors = type.GetConstructors().Where(c => !Hidden(c)).ToArray();
+            int constructorsShown = all ? constructors.Length : MaxConstructors;
+            bool cut = constructors.Length > constructorsShown;
             if (constructors.Length > 0)
             {
-                string shown = string.Join("  ", constructors.Take(MaxConstructors).Select(c => "(" + Parameters(c.GetParameters()) + ")"));
-                lines.Add("new  " + shown + (constructors.Length > MaxConstructors ? "  +" + (constructors.Length - MaxConstructors) + " more" : ""));
+                string shown = string.Join("  ", constructors.Take(constructorsShown).Select(c => "(" + Parameters(c.GetParameters()) + ")"));
+                lines.Add("new  " + shown + (cut ? "  +" + (constructors.Length - constructorsShown) + " more" : ""));
             }
 
-            int spill = 0;
-            AddNames(lines, "props", props, 0, ref spill);
-            AddNames(lines, "methods", methods, 1, ref spill);
-            AddNames(lines, "static", statics, 2, ref spill);
-            AddNames(lines, "events", events, 3, ref spill);
-            lines.Add("ug api " + Simple(type) + ".<member> for signatures (inherited members too)");
+            int spill = all ? int.MaxValue / 2 : 0;
+            cut |= AddNames(lines, "props", props, 0, ref spill);
+            cut |= AddNames(lines, "methods", methods, 1, ref spill);
+            cut |= AddNames(lines, "static", statics, 2, ref spill);
+            cut |= AddNames(lines, "events", events, 3, ref spill);
+            lines.Add("ug api " + Simple(type) + ".<member> for signatures (inherited members too)" + (cut ? "; the rest: " + rest : ""));
             return Answer.Lines(lines);
         }
 
-        private static Reply MemberView(Type type, string name)
+        private static Reply MemberView(Type type, string name, bool all)
         {
             const BindingFlags Flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy;
             List<MemberInfo> members = type.GetMember(name, Flags).Where(m => !Hidden(m) || Obsolete(m)).ToList();
@@ -284,20 +297,21 @@ namespace UnityGraph.Bridge
 
             if (members.Count == 0)
             {
-                IEnumerable<string> all = type.GetMembers(Flags).Where(m => !Hidden(m)).Select(m => m.Name);
-                return Answer.Error("no member " + name + " on " + type.FullName + Addresses.Near(name, all));
+                IEnumerable<string> names = type.GetMembers(Flags).Where(m => !Hidden(m)).Select(m => m.Name);
+                return Answer.Error("no member " + name + " on " + type.FullName + Addresses.Near(name, names));
             }
 
             var lines = new List<string> { type.FullName + "." + members[0].Name };
-            foreach (MemberInfo member in members.Take(MaxSignatures))
+            int signatures = all ? members.Count : MaxSignatures;
+            foreach (MemberInfo member in members.Take(signatures))
             {
                 lines.Add("  " + Signature(member) + (member.DeclaringType != type && member.DeclaringType != null ? "  (from " + Simple(member.DeclaringType) + ")" : "")
                     + (Obsolete(member) ? "  (obsolete)" : ""));
             }
 
-            if (members.Count > MaxSignatures)
+            if (members.Count > signatures)
             {
-                lines.Add("  +" + (members.Count - MaxSignatures) + " more");
+                lines.Add("  +" + (members.Count - signatures) + " more: ug api " + Simple(type) + "." + members[0].Name + " --all");
             }
 
             return Answer.Lines(lines);
@@ -326,20 +340,20 @@ namespace UnityGraph.Bridge
         private static string Base(Type type) =>
             type.BaseType == null || type.BaseType == typeof(object) || type.IsEnum || type.IsValueType ? "" : " : " + TypeName(type.BaseType);
 
-        private static void AddNames(List<string> lines, string label, List<string> names, int kind, ref int spill)
+        // True when the line was cut.
+        private static bool AddNames(List<string> lines, string label, List<string> names, int kind, ref int spill)
         {
             if (names.Count == 0)
             {
                 spill += _nameBudgets[kind];
-                return;
+                return false;
             }
 
-            string line = Names(label, names.Distinct().ToList(), _nameBudgets[kind] + spill);
+            string line = Names(label, names.Distinct().ToList(), _nameBudgets[kind] + spill, out int left);
             spill = Math.Max(0, _nameBudgets[kind] + spill - (line.Length - label.Length - 2));
             lines.Add(line);
+            return left > 0;
         }
-
-        private static string Names(string label, IList<string> names, int budget) => Names(label, names, budget, out _);
 
         // `label  a, b, c` cut when the names use up the budget; the rest is counted.
         private static string Names(string label, IList<string> names, int budget, out int left)

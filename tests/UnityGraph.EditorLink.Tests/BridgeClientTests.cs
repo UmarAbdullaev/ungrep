@@ -375,6 +375,20 @@ public sealed class BridgeClientTests : IDisposable
         Assert.Equal(hasUi, client.HasUiToolkit);
     }
 
+    [Theory]
+    [InlineData("0.8.0", false)]
+    [InlineData("0.9.0", true)]
+    [InlineData("0.10.1", true)]
+    public void The_c1_escapes_need_bridge_0_9_0(string version, bool hasFull)
+    {
+        FakeBridge bridge = Bridge();
+        bridge.Handle = _ => (200, FakeBridge.Status("idle", 0));
+        bridge.Publish(_root, bridge: version);
+        using BridgeClient client = BridgeClient.Connect(_root, _ => true).Client!;
+
+        Assert.Equal(hasFull, client.HasFull);
+    }
+
     [Fact]
     public void An_op_waits_as_long_as_its_own_timeout_not_the_default_two_seconds()
     {

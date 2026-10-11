@@ -13,6 +13,7 @@ namespace UnityGraph.Cli;
 internal static class IndexCommand
 {
     private const int MaxWarnings = 10;
+    private const string WarningsFile = "index-warnings.txt";
 
     public static Command Create()
     {
@@ -101,11 +102,28 @@ internal static class IndexCommand
             return 1;
         }
 
-        text = Render(summary, rebuilt);
+        text = Render(summary, rebuilt, Warnings(unity.Root, graphDirectory, summary.Problems));
         return 0;
     }
 
-    internal static string Render(IndexSummary summary, bool rebuilt)
+    // Every warning of this index, one per line, in the graph directory; null when it cannot be written.
+    private static string? Warnings(string root, string? graphDirectory, IReadOnlyList<string> problems)
+    {
+        string file = Path.Combine(GraphStore.GraphDirectory(root, graphDirectory), WarningsFile);
+        try
+        {
+            File.WriteAllText(file, string.Concat(problems.Select(p => p + "\n")));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+
+        string relative = Path.GetRelativePath(root, file);
+        return relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative) ? file : relative.Replace('\\', '/');
+    }
+
+    internal static string Render(IndexSummary summary, bool rebuilt, string? warnings = "Library/unitygraph/" + WarningsFile)
     {
         var text = new System.Text.StringBuilder();
         string seconds = summary.Elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -130,7 +148,7 @@ internal static class IndexCommand
 
         if (summary.Problems.Count > MaxWarnings)
         {
-            text.Append(CultureInfo.InvariantCulture, $"  ... and {summary.Problems.Count - MaxWarnings} more warnings\n");
+            text.Append(CultureInfo.InvariantCulture, $"  ... and {summary.Problems.Count - MaxWarnings} more warnings{(warnings is null ? "" : ": " + warnings)}\n");
         }
 
         return text.ToString();

@@ -56,9 +56,10 @@ namespace UnityGraph.Bridge
                     if (found.Count == 0)
                     {
                         IEnumerable<string> counterNames = all.Where(IsCounter).Select(d => d.Name).Distinct();
-                        List<string> containing = counterNames.Where(n => n.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).Take(10).ToList();
+                        List<string> containing = counterNames.Where(n => n.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
                         return Now(Answer.Error("no counter named " + name + (containing.Count > 0
-                            ? " (containing it: " + string.Join(", ", containing) + ")"
+                            ? " (containing it: " + string.Join(", ", containing.Take(10))
+                                + (containing.Count > 10 ? ", ... " + (containing.Count - 10) + " more: ug perf counters --category <c> lists a category's" : "") + ")"
                             : Addresses.Near(name, counterNames))));
                     }
 

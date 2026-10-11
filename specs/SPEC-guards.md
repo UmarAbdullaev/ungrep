@@ -73,7 +73,9 @@ Shared rules:
    nothing references, a copy outside the project: no output.
 4. **At most five lines**, plain ASCII, first line `unitygraph: ...`, project-relative paths with
    `/`, counts exact where the graph is exact and "up to N" / "may hold" where it is not (a
-   component saved before a field existed holds no value for it).
+   component saved before a field existed holds no value for it). The five-line bound stays under
+   C1 (no hard caps) as a bound on the hook's output: a note's `(+N more)` counts lines of the
+   edit or paths of the copy the agent itself just made, and case 2 names `ug impact <Type>`.
 5. **Once per session and subject.** A note is printed the first time and not again for the same
    case and subject (the file and members of case 1, the type of case 2, the paths of case 3, the
    folder of case 4, the file and lines of case 5) in the same session; the session's fired keys

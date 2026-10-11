@@ -99,7 +99,7 @@ namespace UnityGraph.Bridge
             {
                 List<string> names = Fields(serialized).Select(p => ShownName(p.name)).ToList();
                 error = "no field " + field + " on " + TargetName(serialized.targetObject)
-                    + (names.Count == 0 ? "" : " (fields: " + string.Join(", ", names.Take(20)) + (names.Count > 20 ? ", ..." : "") + ")");
+                    + (names.Count == 0 ? "" : " (fields: " + string.Join(", ", names) + ")");
             }
 
             return found;
@@ -164,7 +164,33 @@ namespace UnityGraph.Bridge
             }
         }
 
-        public static string Format(SerializedProperty p, int depth = 1)
+        /// <summary>A value as `ug inspect` lists it: 10 items of a list or curve, structs one level deep.</summary>
+        public static string Format(SerializedProperty p, int depth = 1) => Format(p, depth, MaxItems, new Cuts());
+
+        /// <summary>As <see cref="Format(SerializedProperty, int)"/>; <paramref name="cut"/> says whether it left anything out.</summary>
+        public static string Format(SerializedProperty p, out bool cut)
+        {
+            var cuts = new Cuts();
+            string text = Format(p, 1, MaxItems, cuts);
+            cut = cuts.Any;
+            return text;
+        }
+
+        /// <summary>
+        /// A value whole (`ug inspect --field`, SPEC-editor-ops C1): every item and key, structs to any
+        /// depth; a cycle of `SerializeReference` objects stops at <see cref="WholeDepth"/> levels.
+        /// </summary>
+        public static string Whole(SerializedProperty p) => Format(p, WholeDepth, int.MaxValue, new Cuts());
+
+        public const int WholeDepth = 32;
+
+        // Whether a Format call left items or levels out.
+        private sealed class Cuts
+        {
+            public bool Any;
+        }
+
+        private static string Format(SerializedProperty p, int depth, int maxItems, Cuts cuts)
         {
             if (p.isArray && p.propertyType != SerializedPropertyType.String)
             {
@@ -175,12 +201,13 @@ namespace UnityGraph.Bridge
                 }
 
                 var items = new List<string>();
-                for (int i = 0; i < Math.Min(size, MaxItems); i++)
+                for (int i = 0; i < Math.Min(size, maxItems); i++)
                 {
-                    items.Add(Format(p.GetArrayElementAtIndex(i), depth));
+                    items.Add(Format(p.GetArrayElementAtIndex(i), depth, maxItems, cuts));
                 }
 
-                return string.Join(", ", items) + (size > MaxItems ? ", ... " + (size - MaxItems).ToString(CultureInfo.InvariantCulture) + " more" : "");
+                cuts.Any |= size > maxItems;
+                return string.Join(", ", items) + (size > maxItems ? ", ... " + (size - maxItems).ToString(CultureInfo.InvariantCulture) + " more" : "");
             }
 
             switch (p.propertyType)
@@ -231,9 +258,13 @@ namespace UnityGraph.Bridge
                     return p.vector3IntValue.x.ToString(CultureInfo.InvariantCulture) + ", " + p.vector3IntValue.y.ToString(CultureInfo.InvariantCulture)
                         + ", " + p.vector3IntValue.z.ToString(CultureInfo.InvariantCulture);
                 case SerializedPropertyType.AnimationCurve:
-                    return FormatCurve(p.animationCurveValue);
+                    AnimationCurve curve = p.animationCurveValue;
+                    cuts.Any |= curve != null && curve.length > maxItems;
+                    return FormatCurve(curve, maxItems);
                 case SerializedPropertyType.Gradient:
-                    return FormatGradient(p.gradientValue);
+                    Gradient gradient = p.gradientValue;
+                    cuts.Any |= gradient != null && GradientTimes(gradient).Count > maxItems;
+                    return FormatGradient(gradient, maxItems);
                 case SerializedPropertyType.Hash128:
                     return p.hash128Value.ToString();
                 case SerializedPropertyType.ManagedReference:
@@ -243,7 +274,13 @@ namespace UnityGraph.Bridge
                         return "null";
                     }
 
-                    return depth <= 0 ? "{...}" : "{" + string.Join(", ", Children(p).Select(c => ShownName(c.name) + ": " + Format(c, depth - 1))) + "}";
+                    if (depth <= 0)
+                    {
+                        cuts.Any = true;
+                        return "{...}";
+                    }
+
+                    return "{" + string.Join(", ", Children(p).Select(c => ShownName(c.name) + ": " + Format(c, depth - 1, maxItems, cuts))) + "}";
                 default:
                     return p.propertyType.ToString();
             }

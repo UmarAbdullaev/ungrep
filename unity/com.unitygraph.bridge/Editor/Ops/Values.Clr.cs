@@ -219,7 +219,7 @@ namespace UnityGraph.Bridge
             string[] parts = text.Split(',', '|').Select(p => p.Trim()).Where(p => p.Length > 0).ToArray();
             if (parts.Length == 0 || (parts.Length > 1 && !type.IsDefined(typeof(FlagsAttribute), false)))
             {
-                return "not one of " + string.Join(", ", names.Take(20)) + ": " + text;
+                return "not one of " + string.Join(", ", names) + ": " + text;
             }
 
             long bits = 0;
@@ -228,7 +228,7 @@ namespace UnityGraph.Bridge
                 int index = EnumIndex(names, null, part);
                 if (index < 0)
                 {
-                    return "not one of " + string.Join(", ", names.Take(20)) + (names.Length > 20 ? ", ..." : "") + ": " + part;
+                    return "not one of " + string.Join(", ", names) + ": " + part;
                 }
 
                 bits |= Convert.ToInt64(Enum.Parse(type, names[index]), CultureInfo.InvariantCulture);

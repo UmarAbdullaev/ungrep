@@ -142,6 +142,19 @@ public sealed partial class EditorCommandTests : IDisposable
     }
 
     [Fact]
+    public void Run_list_all_asks_for_every_line()
+    {
+        _bridge.Publish(_root, bridge: "0.9.0");
+        _bridge.Handle = path => path.StartsWith("/run", StringComparison.Ordinal) ? (200, "{\"lines\":[\"Game.Tools  1 static method\"]}") : (200, FakeBridge.Status("idle", 1));
+
+        Run("run", "--list", "Tools.", "--all");
+        Run("run", "--list", "--menu", "--all");
+
+        Assert.Contains("/run?list=Tools.&all=true", _bridge.Requests);
+        Assert.Contains("/run?list=&menu=true&all=true", _bridge.Requests);
+    }
+
+    [Fact]
     public void Run_prints_an_exception_as_a_refusal()
     {
         _bridge.Publish(_root, bridge: "0.5.0");

@@ -262,7 +262,7 @@ internal static partial class AssetFileIndexer
             }
 
             var props = new Props();
-            props.Text("field", Cut(field, MaxPath));
+            props.Text("field", field);
             Edges.Add(new Edge(_asset, EdgeKind.References, NodeKeys.Asset(targetGuid), confidence, path, line, props.ToJson()));
         }
     }

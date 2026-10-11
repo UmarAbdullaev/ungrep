@@ -102,4 +102,94 @@ public sealed class ConsoleCommandTests : LoopFixture
         Bridge.Handle = _ => (200, ConsoleJson(1));
         Assert.Equal((1, "--level must be error, warning or log\n"), Run("console", "--level", "debug"));
     }
+
+    private const string NullStack = "Enemy:Update () (at Assets/Scripts/Enemy.cs:42)\nUnityEngine.Debug:LogException (System.Exception)";
+
+    private string FullPage(long first, int count) => FullConsoleJson(
+        4120,
+        3000,
+        (first, "error", "NullReferenceException: Object reference not set\n  at Enemy.Update", "Assets/Scripts/Enemy.cs:42", count, NullStack),
+        (4120, "warning", "Old shader", null, 1, null));
+
+    [Fact]
+    public void The_default_answer_names_the_whole_rows_and_the_older_entries()
+    {
+        Bridge.Publish(Root, "0.9.0");
+        Bridge.Handle = path => path.StartsWith("/status", StringComparison.Ordinal) ? (200, "{}") : (200, FullPage(4101, 1));
+
+        string output = Run("console", "--count", "2").Output;
+
+        Assert.Equal("""
+            console  1 error, 1 warning  (last #4120)
+              error  NullReferenceException: Object reference not set  Assets/Scripts/Enemy.cs:42
+              warning  Old shader
+              more  whole: ug console --whole --count 2; older: ug console --count 2 --before 4101
+
+            """.ReplaceLineEndings("\n"), output);
+    }
+
+    [Fact]
+    public void An_old_bridge_answers_as_before_and_refuses_the_new_flags_by_name()
+    {
+        Bridge.Publish(Root, "0.8.0");
+        Bridge.Handle = path => path.StartsWith("/status", StringComparison.Ordinal) ? (200, "{}") : (200, FullPage(4101, 1));
+
+        Assert.DoesNotContain("more", Run("console", "--count", "2").Output, StringComparison.Ordinal);
+        Assert.Equal("bridge 0.8.0 is too old for ug console --whole: run ug bridge install again\n", Run("console", "--whole").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug console --id: run ug bridge install again\n", Run("console", "--id", "4101").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug console --before: run ug bridge install again\n", Run("console", "--before", "4101").Output);
+    }
+
+    [Fact]
+    public void Whole_rows_carry_their_id_their_message_and_their_stack()
+    {
+        Bridge.Publish(Root, "0.9.0");
+        Bridge.Handle = path => path.StartsWith("/status", StringComparison.Ordinal) ? (200, "{}") : (200, FullPage(4101, 3));
+
+        string output = Run("console", "--whole", "--before", "4200").Output;
+
+        Assert.Equal("""
+            console  3 errors, 1 warning  (last #4120)
+              error x3  #4101  NullReferenceException: Object reference not set  Assets/Scripts/Enemy.cs:42
+                NullReferenceException: Object reference not set
+                  at Enemy.Update
+                stack:
+                  Enemy:Update () (at Assets/Scripts/Enemy.cs:42)
+                  UnityEngine.Debug:LogException (System.Exception)
+              warning  #4120  Old shader
+
+            """.ReplaceLineEndings("\n"), output);
+        Assert.Contains("/console?after=0&limit=200&types=error%2Cwarning&before=4200", Bridge.Requests);
+    }
+
+    [Fact]
+    public void Id_prints_one_entry_whole_or_says_the_ring_dropped_it()
+    {
+        Bridge.Publish(Root, "0.9.0");
+        Bridge.Handle = path => path.StartsWith("/status", StringComparison.Ordinal) ? (200, "{}")
+            : path == "/console?id=4101" ? (200, FullConsoleJson(4120, 3000, (4101, "error", "boom\nsecond line", "Assets/A.cs:3", 12, NullStack)))
+            : (200, FullConsoleJson(4120, 3000));
+
+        Assert.Equal("""
+            #4101 error x12
+            boom
+            second line
+            stack:
+            Enemy:Update () (at Assets/Scripts/Enemy.cs:42)
+            UnityEngine.Debug:LogException (System.Exception)
+
+            """.ReplaceLineEndings("\n"), Run("console", "--id", "4101").Output);
+        Assert.Equal("no console entry #17 (the bridge keeps the newest 2000)\n", Run("console", "--id", "17").Output);
+        Assert.Equal((1, "--id takes no other flag but --budget\n"), Run("console", "--id", "17", "--whole"));
+    }
+
+    [Fact]
+    public void A_clean_short_answer_has_no_more_line()
+    {
+        Bridge.Publish(Root, "0.9.0");
+        Bridge.Handle = path => path.StartsWith("/status", StringComparison.Ordinal) ? (200, "{}")
+            : (200, FullConsoleJson(4120, 4120, (4120, "warning", "Old shader", null, 1, "UnityEngine.Debug:LogWarning (object)")));
+
+        Assert.Equal("console  1 warning  (last #4120)\n  warning  Old shader\n", Run("console").Output);
+    }
 }

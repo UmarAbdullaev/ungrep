@@ -18,7 +18,6 @@ namespace UnityGraph.Bridge
     {
         private const int MaxListed = 40;
         private const int MaxOverloads = 10;
-        private const int MaxNames = 10;
 
         private static readonly Regex _named = new Regex(@"^([A-Za-z_]\w*)=(.*)$", RegexOptions.Singleline);
 
@@ -40,7 +39,8 @@ namespace UnityGraph.Bridge
             if (request.Get("list") != null)
             {
                 string filter = (request.Get("list") ?? "").Trim();
-                Reply listed = request.Get("menu") != null ? Menus(filter) : List(filter);
+                bool all = request.Get("all") == "true";
+                Reply listed = request.Get("menu") != null ? Menus(filter, all) : List(filter, all);
                 return () => listed;
             }
 
@@ -115,7 +115,7 @@ namespace UnityGraph.Bridge
             if (fits.Count > 1 && Score(fits[0]) == Score(fits[1]))
             {
                 var lines = new List<string> { "ambiguous call: these overloads fit equally; name the arguments (param=value) or write them more exactly" };
-                lines.AddRange(fits.Where(f => Score(f) == Score(fits[0])).Take(MaxOverloads).Select(f => "  " + ApiOps.Signature(f.Method)));
+                lines.AddRange(fits.Where(f => Score(f) == Score(fits[0])).Select(f => "  " + ApiOps.Signature(f.Method)));
                 return string.Join("\n", lines);
             }
 
@@ -359,7 +359,7 @@ namespace UnityGraph.Bridge
             return null;
         }
 
-        private static Reply Menus(string filter)
+        private static Reply Menus(string filter, bool all)
         {
             var items = new List<string>();
             foreach (MethodInfo method in TypeCache.GetMethodsWithAttribute<MenuItem>())
@@ -379,18 +379,19 @@ namespace UnityGraph.Bridge
                 return Answer.Line(filter.Length == 0 ? "no [MenuItem] methods" : "no menu item contains " + filter);
             }
 
-            return Answer.Lines(Capped(items, items.Count + " menu items" + (filter.Length == 0 ? "" : " with " + filter)));
+            return Answer.Lines(Capped(items, items.Count + " menu items" + (filter.Length == 0 ? "" : " with " + filter), all, "ug run --list --menu" + (filter.Length == 0 ? "" : " " + filter)));
         }
 
         // ---- listing what can be run ----
 
-        private static Reply List(string filter)
+        private static Reply List(string filter, bool all)
         {
+            string again = "ug run --list" + (filter.Length == 0 ? "" : " " + filter);
             List<Type> types = OwnTypes().Where(t => Runnable(t).Any()).OrderBy(DisplayName, StringComparer.Ordinal).ToList();
             if (filter.Length == 0)
             {
                 var counts = types.Select(t => DisplayName(t) + "  " + Answer.Count(Runnable(t).Count(), "static method", "static methods")).ToList();
-                return Answer.Lines(Capped(counts, Answer.Count(types.Count, "type", "types") + " with static methods; ug run --list <Type.> lists one"));
+                return Answer.Lines(Capped(counts, Answer.Count(types.Count, "type", "types") + " with static methods; ug run --list <Type.> lists one", all, again));
             }
 
             bool typeOnly = filter.EndsWith(".", StringComparison.Ordinal);
@@ -417,10 +418,11 @@ namespace UnityGraph.Bridge
                 return Answer.Line("no static method in the project's assemblies matches " + filter + " (ug find searches the graph)");
             }
 
-            return Answer.Lines(Capped(lines, null));
+            return Answer.Lines(Capped(lines, null, all, again));
         }
 
-        private static List<string> Capped(List<string> lines, string head)
+        // At most 40 lines unless `all`; the cut line names the longer filter or `--all`.
+        private static List<string> Capped(List<string> lines, string head, bool all, string again)
         {
             var kept = new List<string>();
             if (head != null)
@@ -428,10 +430,11 @@ namespace UnityGraph.Bridge
                 kept.Add(head);
             }
 
-            kept.AddRange(lines.Take(MaxListed));
-            if (lines.Count > MaxListed)
+            int shown = all ? int.MaxValue : MaxListed;
+            kept.AddRange(lines.Take(shown));
+            if (lines.Count > shown)
             {
-                kept.Add("(+" + (lines.Count - MaxListed).ToString(CultureInfo.InvariantCulture) + " more: give a longer filter)");
+                kept.Add("(+" + (lines.Count - shown).ToString(CultureInfo.InvariantCulture) + " more: give a longer filter, or " + again + " --all)");
             }
 
             return kept;
@@ -534,7 +537,7 @@ namespace UnityGraph.Bridge
 
             List<string> names = Runnable(type).Select(m => m.Name).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
             return "no static method " + methodName + " on " + name
-                + (names.Count == 0 ? "" : " (static methods: " + string.Join(", ", names.Take(MaxNames)) + (names.Count > MaxNames ? ", ..." : "") + ")");
+                + (names.Count == 0 ? "" : " (static methods: " + string.Join(", ", names) + ")");
         }
 
         // A type that is not the project's: say whose it is and how ug eval calls it.

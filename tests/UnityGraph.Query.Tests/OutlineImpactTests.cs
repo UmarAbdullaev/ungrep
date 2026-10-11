@@ -132,7 +132,7 @@ $", outline);
             string text = new QueryEngine(store, fixture.Root).Impact("Many.Target", json: false, Budget);
 
             Assert.Contains("  callers  13", text, StringComparison.Ordinal);
-            Assert.Contains("+3 more  ug refs", text, StringComparison.Ordinal);
+            Assert.Contains("    +3 more  ug impact Many.Target --all\n", text, StringComparison.Ordinal);
             Assert.Equal(10, text.Split('\n').Count(l => l.Contains("Game.Core.Many.Call", StringComparison.Ordinal)));
         }
         finally

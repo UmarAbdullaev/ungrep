@@ -90,7 +90,8 @@ namespace UnityGraph.Bridge
 
             error = matches.Count == 0
                 ? addressError + " (ug ui lists the elements)"
-                : "ambiguous: \"" + element + "\" (" + string.Join(", ", matches.Take(MaxNames).Select(e => e.Address)) + (matches.Count > MaxNames ? ", ..." : "") + ")";
+                : "ambiguous: \"" + element + "\" (" + string.Join(", ", matches.Take(MaxNames).Select(e => e.Address))
+                    + (matches.Count > MaxNames ? ", ... " + (matches.Count - MaxNames).ToString(CultureInfo.InvariantCulture) + " more: ug ui --all" : "") + ")";
             return null;
         }
 
@@ -248,7 +249,7 @@ namespace UnityGraph.Bridge
             int index = int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int number) ? number : options.FindIndex(o => string.Equals(o, value, StringComparison.OrdinalIgnoreCase));
             if (index < 0 || index >= options.Count)
             {
-                return Answer.Error("no option " + value + " (options: " + string.Join(", ", options.Take(MaxNames)) + (options.Count > MaxNames ? ", ..." : "") + ")");
+                return Answer.Error("no option " + value + " (options: " + string.Join(", ", options) + ")");
             }
 
             string before = DropdownText(dropdown);

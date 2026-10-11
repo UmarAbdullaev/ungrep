@@ -52,11 +52,14 @@ internal static partial class EditorCommands
         perf.Subcommands.Add(Ops("timing", "perf timing", "The last frame's FrameTimingManager timings: CPU, main and render thread, GPU, present and sync.", [], _ =>
             PerfRequest("/perf/timing", null, OpTimeout)));
 
-        var memoryTop = new Option<int?>("--top") { Description = "How many objects, 1 to 500. Default: 10." };
+        var memoryTop = new Option<int?>("--top") { Description = "How many objects and types, 1 to 500 (default 10 objects, 8 types); with --object how many sub-assets and used assets (default 20 and 5, bridge 0.9.0)." };
         Option<string?> type = Text("--type", "Only this type and its subclasses: Texture, Mesh, AudioClip, ...");
         Option<string?> memoryObject = Text("--object", "An object address (Player/Gun, Main:Enemy#2, Assets/X.prefab:Child) or an asset path: its size with components, children, sub-assets and the assets it uses.");
         perf.Subcommands.Add(Ops("memory", "perf memory", "Loaded objects by native size: the total, the largest types and the top objects; or one object.", [memoryTop, type, memoryObject], r =>
-            PerfRequest("/perf/memory", null, OpTimeout, ("top", PerfNumber(r.GetValue(memoryTop))), ("type", r.GetValue(type)), ("object", r.GetValue(memoryObject)))));
+        {
+            bool objectTop = r.GetValue(memoryObject) != null && r.GetValue(memoryTop) != null;
+            return PerfRequest("/perf/memory", objectTop ? "--object --top" : null, OpTimeout, ("top", PerfNumber(r.GetValue(memoryTop))), ("type", r.GetValue(type)), ("object", r.GetValue(memoryObject))) with { Full = objectTop };
+        }));
 
         perf.Subcommands.Add(SnapshotCommand());
         perf.Subcommands.Add(FrameDebuggerCommand());

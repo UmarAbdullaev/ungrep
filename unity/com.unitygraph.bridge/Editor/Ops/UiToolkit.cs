@@ -234,6 +234,7 @@ namespace UnityGraph.Bridge
             Rect bound = element.worldBound;
             Vector2 center = document.ToScreen(bound.center);
             Vector2 size = new Vector2(bound.width * document.Scale.x, bound.height * document.Scale.y);
+            int cuts = UiItem.Cuts;
             string label = LabelOf(element);
             var item = new UiItem
             {
@@ -247,6 +248,7 @@ namespace UnityGraph.Bridge
                 Size = size,
                 Toolkit = true,
             };
+            item.LabelCut = UiItem.Cuts > cuts;
 
             if (!element.enabledInHierarchy)
             {
@@ -596,7 +598,8 @@ namespace UnityGraph.Bridge
                 else if (matches.Count > 1)
                 {
                     error = "ambiguous: " + segment + " (" + matches.Count.ToString(CultureInfo.InvariantCulture) + " in " + where + "): "
-                        + string.Join(", ", matches.Take(MaxCandidates).Select(e => AddressOf(document, e)));
+                        + string.Join(", ", matches.Take(MaxCandidates).Select(e => AddressOf(document, e)))
+                        + (matches.Count > MaxCandidates ? ", ... " + (matches.Count - MaxCandidates).ToString(CultureInfo.InvariantCulture) + " more: ug tree --ui " + (scope == document.Root ? document.Address : AddressOf(document, scope)) : "");
                     return null;
                 }
                 else

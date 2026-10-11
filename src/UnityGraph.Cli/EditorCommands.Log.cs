@@ -8,7 +8,8 @@ namespace UnityGraph.Cli;
 
 /// <summary>
 /// `ug log` and `ug play --for` (SPEC-unity-loop, Commands): what the last play session did, in the
-/// shape of `ug console`: errors and warnings folded, logs only counted.
+/// shape of `ug console`: errors and warnings folded, logs only counted. `--whole` (bridge 0.9.0)
+/// prints the rows whole, as `ug console --whole` does.
 /// </summary>
 internal static partial class EditorCommands
 {
@@ -20,14 +21,15 @@ internal static partial class EditorCommands
     private static IEnumerable<Command> LogCommands()
     {
         Option<int?> budget = BudgetOption();
+        var whole = new Option<bool>("--whole") { Description = "Each row with its id, its whole message and its whole stack (bridge 0.9.0)." };
         yield return Command(
             "log",
             "What the last play session did: how long, pauses, and its errors and warnings folded, logs counted.",
-            [budget],
-            (root, config, result) => LogDigest(root, config, result.GetValue(budget)));
+            [budget, whole],
+            (root, config, result) => LogDigest(root, config, result.GetValue(budget), result.GetValue(whole)));
     }
 
-    public static (int ExitCode, string Text) LogDigest(string root, UnityGraphConfig config, int? budget)
+    public static (int ExitCode, string Text) LogDigest(string root, UnityGraphConfig config, int? budget, bool whole = false)
     {
         if (!config.IsEnabled("unity-loop"))
         {
@@ -46,6 +48,11 @@ internal static partial class EditorCommands
             return (0, "bridge " + client.Info.Bridge + " is too old for ug log: run ug bridge install again\n");
         }
 
+        if (whole && !client.HasFull)
+        {
+            return (0, "bridge " + client.Info.Bridge + " is too old for ug log --whole: run ug bridge install again\n");
+        }
+
         try
         {
             PlaySession? session = client.PlayLog().Session;
@@ -56,7 +63,7 @@ internal static partial class EditorCommands
 
             ConsolePage problems = client.Console(session.After, LogPage, "error,warning");
             ConsolePage logs = client.Console(session.After, LogPage, "log");
-            return (0, LogAnswer(session, problems, logs, BudgetOf(config, budget)));
+            return (0, LogAnswer(session, problems, logs, BudgetOf(config, budget), whole, client.HasFull));
         }
         catch (BridgeUnavailableException e)
         {
@@ -64,7 +71,7 @@ internal static partial class EditorCommands
         }
     }
 
-    private static string LogAnswer(PlaySession session, ConsolePage problems, ConsolePage logs, int budget)
+    private static string LogAnswer(PlaySession session, ConsolePage problems, ConsolePage logs, int budget, bool whole, bool full)
     {
         bool playing = session.End == null;
         string seconds = ((session.End ?? DateTimeOffset.UtcNow) - session.Start).TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -75,8 +82,31 @@ internal static partial class EditorCommands
 
         // An id above `until` belongs to what happened after the session ended.
         IEnumerable<ConsoleEntry> inSession(ConsolePage page) => page.Entries.Where(e => session.Until is not { } until || e.Id <= until);
-        (string counts, List<string> rows) = FoldConsole(inSession(problems), logRows: false);
+        (string counts, List<string> rows, bool rowCut) = FoldConsole(inSession(problems), logRows: false, whole);
         int logCount = inSession(logs).Sum(e => e.Count);
+
+        // A page of 500 entries is all the digest reads; the rest of the session is named by its console ids.
+        var more = new List<string>();
+        if (full && rowCut && !whole)
+        {
+            more.Add("whole: ug log --whole");
+        }
+
+        string after = session.After.ToString(CultureInfo.InvariantCulture);
+        if (full && problems.Entries.Count >= LogPage)
+        {
+            more.Add("earlier problems: ug console --after " + after + " --before " + problems.Entries.Min(e => e.Id).ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (full && logs.Entries.Count >= LogPage)
+        {
+            more.Add("earlier logs: ug console --after " + after + " --before " + logs.Entries.Min(e => e.Id).ToString(CultureInfo.InvariantCulture) + " --level log");
+        }
+
+        if (more.Count > 0)
+        {
+            answer.Footer("  more  " + string.Join("; ", more));
+        }
         List<string> parts = counts.Length == 0 ? [] : [counts];
         if (logCount > 0)
         {
@@ -86,12 +116,17 @@ internal static partial class EditorCommands
         long last = session.Until ?? problems.Last;
         answer.Add("  " + (parts.Count == 0 ? "nothing logged" : string.Join(", ", parts)) + "  (last #" + last.ToString(CultureInfo.InvariantCulture) + ")");
         answer.AddRange(rows);
-        return answer.Finish("ug log");
+        return answer.Finish(whole ? "ug log --whole" : "ug log");
     }
 
     // `ug play`; with --for the editor plays that many seconds, stops, and the log digest follows; with --step a paused editor advances frames.
-    private static (int ExitCode, string Text) Play(string root, UnityGraphConfig config, int timeout, int? seconds, int? step = null)
+    private static (int ExitCode, string Text) Play(string root, UnityGraphConfig config, int timeout, int? seconds, int? step = null, bool whole = false)
     {
+        if (whole && seconds == null)
+        {
+            return (1, "--whole goes with --for\n");
+        }
+
         if (step != null && seconds != null)
         {
             return (1, "--step and --for cannot be used together\n");
@@ -120,6 +155,6 @@ internal static partial class EditorCommands
 
         PlaySleep(TimeSpan.FromSeconds(playFor));
         (_, string stopped) = Op(root, config, "stop", new OpRequest("/stop") { WaitTimeout = TimeSpan.FromSeconds(Math.Max(1, timeout)) });
-        return (0, (_opFailed ? stopped : "") + LogDigest(root, config, null).Text);
+        return (0, (_opFailed ? stopped : "") + LogDigest(root, config, null, whole).Text);
     }
 }

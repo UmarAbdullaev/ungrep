@@ -20,11 +20,11 @@ public sealed record CompileMessage(string? Assembly, string? File, int Line, in
 /// <summary>`GET /compile` and `compile.json`: the last compile (counter 0 when none was seen).</summary>
 public sealed record CompileResult(int Compile, DateTimeOffset? Started, DateTimeOffset? Finished, IReadOnlyList<CompileMessage> Messages);
 
-/// <summary>One console entry; <see cref="Count"/> counts consecutive repeats.</summary>
-public sealed record ConsoleEntry(long Id, string Type, string Text, string? Frame, int Count);
+/// <summary>One console entry; <see cref="Count"/> counts consecutive repeats; <see cref="Stack"/> is Unity's whole stack trace (bridge 0.9.0).</summary>
+public sealed record ConsoleEntry(long Id, string Type, string Text, string? Frame, int Count, string? Stack = null);
 
-/// <summary>`GET /console`: entries after the asked id, and the newest id.</summary>
-public sealed record ConsolePage(long Last, IReadOnlyList<ConsoleEntry> Entries);
+/// <summary>`GET /console`: entries after the asked id, the newest id, and (bridge 0.9.0) the oldest id held.</summary>
+public sealed record ConsolePage(long Last, IReadOnlyList<ConsoleEntry> Entries, long Oldest = 0);
 
 /// <summary>A pause or resume in a play session, <see cref="At"/> seconds after it started.</summary>
 public sealed record PlayEvent(double At, string What);
@@ -35,8 +35,8 @@ public sealed record PlaySession(DateTimeOffset Start, DateTimeOffset? End, long
 /// <summary>`GET /playlog`: the last play session, or none since the editor opened.</summary>
 public sealed record PlayLogPage(PlaySession? Session);
 
-/// <summary>A failed test in a run's answer.</summary>
-public sealed record TestFailure(string Name, string? Message, string? Frame);
+/// <summary>A failed test in a run's answer; <see cref="Stack"/> is its whole stack trace (bridge 0.9.0).</summary>
+public sealed record TestFailure(string Name, string? Message, string? Frame, string? Stack = null);
 
 /// <summary>`GET /tests/result`: `running`, or the finished run's totals.</summary>
 public sealed record TestRunResult(string State, int Passed, int Failed, int Skipped, int Inconclusive, double Seconds, IReadOnlyList<TestFailure>? Failures)

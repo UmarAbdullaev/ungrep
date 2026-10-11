@@ -148,6 +148,42 @@ public sealed class AssetFileIndexerTests : IDisposable
     }
 
     [Fact]
+    public void Long_paths_values_and_every_label_are_stored_whole()
+    {
+        string path = string.Join(".", Enumerable.Range(0, 30).Select(i => "level" + i)) + ".value";
+        string value = string.Concat(Enumerable.Repeat("a long override value ", 6));
+        string labels = string.Concat(Enumerable.Range(0, 12).Select(i => "    - label" + i + "\n"));
+        Write("Assets/Long.prefab.meta", "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcdea\nPrefabImporter:\n");
+        Write("Assets/Long.prefab", $$"""
+            %YAML 1.1
+            %TAG !u! tag:unity3d.com,2011:
+            --- !u!1001 &300
+            PrefabInstance:
+              m_Modification:
+                m_Modifications:
+                - target: {fileID: 110, guid: b1000000000000000000000000000001, type: 3}
+                  propertyPath: {{path}}
+                  value: {{value.Trim()}}
+                  objectReference: {fileID: 0}
+              m_SourcePrefab: {fileID: 100100000, guid: b1000000000000000000000000000001, type: 3}
+
+            """);
+        Write("Assets/Group.asset.meta", "fileFormatVersion: 2\nguid: 0123456789abcdef0123456789abcde9\nNativeFormatImporter:\n  mainObjectFileID: 11400000\n");
+        Write("Assets/Group.asset", "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Name: Group\n  m_SerializeEntries:\n"
+            + "  - m_GUID: b1000000000000000000000000000001\n    m_Address: " + path + "\n    m_SerializedLabels:\n" + labels);
+
+        var problems = new List<string>();
+        Edge over = Assert.Single(AssetFileIndexer.Content(_root, "Assets/Long.prefab", problems).Edges, e => e.Kind == EdgeKind.OverridesValue);
+        Edge entry = Assert.Single(AssetFileIndexer.Content(_root, "Assets/Group.asset", problems).Edges, e => e.Kind == EdgeKind.Addressable);
+
+        Assert.Contains("\"path\":\"" + path + "\"", over.Props, StringComparison.Ordinal);
+        Assert.Contains("\"value\":\"" + value.Trim() + "\"", over.Props, StringComparison.Ordinal);
+        Assert.Contains("\"address\":\"" + path + "\"", entry.Props, StringComparison.Ordinal);
+        Assert.Contains("\"label11\"", entry.Props, StringComparison.Ordinal);
+        Assert.True(path.Length > 200 && value.Trim().Length > 80);
+    }
+
+    [Fact]
     public void Indexing_is_deterministic()
     {
         var problems = new List<string>();

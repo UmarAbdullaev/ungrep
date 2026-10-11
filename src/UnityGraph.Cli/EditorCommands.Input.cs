@@ -14,8 +14,22 @@ internal static partial class EditorCommands
     private static IEnumerable<Command> InputCommands()
     {
         var all = new Option<bool>("--all") { Description = "Also list disabled, blocked and off-screen elements (up to 150 lines)." };
-        yield return Command("ui", "The uGUI and UI Toolkit elements a player could use: address, kind, label or value, classes, screen place; edit mode too.", [all], (root, config, r) =>
-            Op(root, config, "ui", new OpRequest(Query("/ui", ("all", r.GetValue(all) ? "true" : null))) { PlayInput = true }));
+        var uiFrom = new Option<int?>("--from") { Description = "With --all: start at this element line, the next page past 150 (bridge 0.9.0)." };
+        yield return Command("ui", "The uGUI and UI Toolkit elements a player could use: address, kind, label or value, classes, screen place; edit mode too.", [all, uiFrom], (root, config, r) =>
+        {
+            int? from = r.GetValue(uiFrom);
+            if (from != null && !r.GetValue(all))
+            {
+                return (1, "--from pages ug ui --all\n");
+            }
+
+            return Op(root, config, "ui", new OpRequest(Query("/ui", ("all", r.GetValue(all) ? "true" : null), ("from", from is { } n ? Math.Max(0, n).ToString(CultureInfo.InvariantCulture) : null)))
+            {
+                PlayInput = true,
+                Full = from != null,
+                Option = from != null ? "--from" : null,
+            });
+        });
 
         var element = new Argument<string>("element") { Description = "An address from ug ui (Canvas/Menu/Play, a UI Toolkit element Menu/Play), a label (Play), or a screen point x,y." };
         var value = new Option<string?>("--value") { Description = "Set the element's value instead of clicking: a slider or scrollbar number, input text, dropdown or radio option, toggle on/off, foldout open/closed, a field's value." };

@@ -96,7 +96,7 @@ public sealed class EdgeRulesTests : IDisposable
     }
 
     [Fact]
-    public void Send_message_targets_are_capped()
+    public void Send_message_targets_are_all_kept()
     {
         var types = string.Join("\n", Enumerable.Range(0, 25).Select(i => $"public class M{i:00} : MonoBehaviour {{ void Ping() {{ }} }}"));
         List<Edge> edges = Index($$"""
@@ -108,10 +108,34 @@ public sealed class EdgeRulesTests : IDisposable
             }
             """).Edges.Where(e => e.Kind == EdgeKind.Dispatches).ToList();
 
-        Assert.Equal(20, edges.Count);
+        Assert.Equal(25, edges.Count);
         Assert.All(edges, e => Assert.Equal(Confidence.Heuristic, e.Confidence));
-        Assert.All(edges, e => Assert.Equal("{\"truncated\":true}", e.Props));
+        Assert.All(edges, e => Assert.Null(e.Props));
         Assert.Equal("cs:M:Game.Lab.M00.Ping", edges[0].Dst);
+    }
+
+    [Fact]
+    public void Long_signatures_and_type_names_are_stored_whole()
+    {
+        string parameters = string.Join(", ", Enumerable.Range(0, 12).Select(i => $"System.Collections.Generic.Dictionary<string, int> map{i}"));
+        string type = "System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<System.Collections.Generic.HashSet<string>>>>>>";
+        FileContribution file = Index($$"""
+            namespace Game.Lab
+            {
+                public class Wide
+                {
+                    public void Many({{parameters}}) { }
+                    public {{type}} table;
+                }
+            }
+            """);
+
+        string sig = "Many(" + string.Join(", ", Enumerable.Repeat("Dictionary<string, int>", 12)) + ")";
+        Assert.Contains("\"sig\":\"" + sig + "\"", file.Nodes.Single(n => n.Name == "Many").Props, StringComparison.Ordinal);
+        const string Shown = "Dictionary<string, List<KeyValuePair<int, Dictionary<string, List<HashSet<string>>>>>>";
+        Assert.Contains("\"type\":\"" + Shown + "\"", file.Nodes.Single(n => n.Name == "table").Props, StringComparison.Ordinal);
+        Assert.True(Shown.Length > 80);
+        Assert.True(sig.Length > 120);
     }
 
     [Fact]

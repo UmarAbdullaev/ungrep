@@ -37,6 +37,18 @@ public abstract class LoopFixture : IDisposable
         return text.Append("]}").ToString();
     }
 
+    /// <summary>A bridge 0.9.0 console answer: entries as (id, type, text, frame, count, stack), and the oldest id held.</summary>
+    protected static string FullConsoleJson(long last, long oldest, params (long Id, string Type, string Text, string? Frame, int Count, string? Stack)[] entries)
+    {
+        var text = new StringBuilder("{\"last\":").Append(last.ToString(CultureInfo.InvariantCulture))
+            .Append(",\"oldest\":").Append(oldest.ToString(CultureInfo.InvariantCulture)).Append(",\"entries\":[");
+        text.AppendJoin(',', entries.Select(e =>
+            "{\"id\":" + e.Id.ToString(CultureInfo.InvariantCulture) + ",\"type\":\"" + e.Type + "\",\"text\":" + System.Text.Json.JsonSerializer.Serialize(e.Text)
+            + ",\"frame\":" + (e.Frame == null ? "null" : "\"" + e.Frame + "\"") + ",\"stack\":" + (e.Stack == null ? "null" : System.Text.Json.JsonSerializer.Serialize(e.Stack))
+            + ",\"count\":" + e.Count.ToString(CultureInfo.InvariantCulture) + "}"));
+        return text.Append("]}").ToString();
+    }
+
     protected (int ExitCode, string Output) Run(params string[] args)
     {
         var output = new StringWriter();

@@ -33,8 +33,8 @@ public sealed partial class QueryEngine
     /// </summary>
     public string Impact(string text, bool json, int budget)
     {
-        string command = "ug impact " + Names.Quote(text) + (json ? " --json" : "");
-        var answer = new Answer(budget);
+        string command = "ug impact " + Names.Quote(text) + (json ? " --json" : "") + AllFlag;
+        Answer answer = Start(budget, json);
         if (!Resolved("impact", text, answer, out IReadOnlyList<Node> resolved))
         {
             return json ? JsonAnswer.Error(answer.Finish(command)) : answer.Finish(command);
@@ -70,7 +70,7 @@ public sealed partial class QueryEngine
         string? note = symbols.Any(s => s.Kind == NodeKind.Field)
             ? $"field reads and writes are not in the graph: grep {symbols.First(s => s.Kind == NodeKind.Field).Name} for code uses"
             : null;
-        return json ? ImpactJson(symbols, affects, groups, note, budget) : ImpactText(symbols, affects, groups, note, command, budget);
+        return json ? ImpactJson(symbols, affects, groups, note, command, budget) : ImpactText(symbols, affects, groups, note, command, budget);
     }
 
     private void AddImpact(Node symbol, string? overload, List<ImpactGroup> groups)
@@ -128,7 +128,7 @@ public sealed partial class QueryEngine
             AddHolders(Group(groups, "serialized", data: true), own, $"{Count(own.Count, "component")} of {Names.Qualified(type.Key)}");
         }
 
-        foreach ((string via, List<Holder> holders, bool heuristic) in ViaFields(type.Key, ViaDepth, [type.Key]))
+        foreach ((string via, List<Holder> holders, bool heuristic) in ViaFields(type.Key, All ? int.MaxValue : ViaDepth, [type.Key]))
         {
             ImpactGroup group = Group(groups, "held via " + via, data: true, heuristic: heuristic);
             AddHolders(group, holders, $"{Count(holders.Count, "component")}");
@@ -148,6 +148,12 @@ public sealed partial class QueryEngine
         var result = new List<(string, List<Holder>, bool)>();
         if (depth == 0)
         {
+            // The walk stops here; a serialized field of this type would have led further.
+            if (In(typeKey).Any(e => e.Kind == EdgeKind.UsesType && Node(e.Src) is { Kind: NodeKind.Field or NodeKind.Property } f && Names.Flag(f, "serialized")))
+            {
+                Cut("held via past 3 levels");
+            }
+
             return result;
         }
 
@@ -225,7 +231,12 @@ public sealed partial class QueryEngine
 
         var overrides = new List<ImpactRow>();
         var data = new List<ImpactRow>();
-        foreach (Holder holder in holders.Take(HolderLimit))
+        if (!All && holders.Count > HolderLimit)
+        {
+            Cut("holders past 500");
+        }
+
+        foreach (Holder holder in holders.Take(All ? int.MaxValue : HolderLimit))
         {
             foreach (Edge edge in In(holder.Key).Where(e => e.Kind == EdgeKind.OverridesValue))
             {
@@ -274,7 +285,12 @@ public sealed partial class QueryEngine
             name = name[(name.LastIndexOf('.') + 1)..];
             foreach (Edge define in In(typeKey).Where(e => e.Kind == EdgeKind.ScriptDefines))
             {
-                Page<EdgeHit> on = _store.EdgesTo(define.Src, EdgeKindSet.Of(EdgeKind.InstanceOf), EdgeLimit);
+                Page<EdgeHit> on = _store.EdgesTo(define.Src, EdgeKindSet.Of(EdgeKind.InstanceOf), EdgeCap);
+                if (on.More)
+                {
+                    Cut(EdgesCut);
+                }
+
                 foreach (Edge edge in on.Items.Select(h => h.Edge))
                 {
                     Node? source = Node(edge.Src);
@@ -305,7 +321,8 @@ public sealed partial class QueryEngine
     private List<string> TypeClosure(string typeKey)
     {
         var seen = new List<string> { typeKey };
-        for (int i = 0; i < seen.Count && seen.Count < ClosureLimit; i++)
+        int i = 0;
+        for (; i < seen.Count && seen.Count < ClosureCap; i++)
         {
             foreach (Edge edge in In(seen[i]).Where(e => e.Kind == EdgeKind.Inherits))
             {
@@ -316,14 +333,27 @@ public sealed partial class QueryEngine
             }
         }
 
+        ClosureCut(i, seen.Count);
         return seen;
+    }
+
+    private int ClosureCap => All ? int.MaxValue : ClosureLimit;
+
+    // A closure stopped at 200 types with types left to walk.
+    private void ClosureCut(int walked, int seen)
+    {
+        if (walked < seen)
+        {
+            Cut("type closures past 200 types");
+        }
     }
 
     // Base classes and interfaces of the type, transitively, without the type itself.
     private List<string> Ancestors(string typeKey)
     {
         var seen = new List<string> { typeKey };
-        for (int i = 0; i < seen.Count && seen.Count < ClosureLimit; i++)
+        int i = 0;
+        for (; i < seen.Count && seen.Count < ClosureCap; i++)
         {
             foreach (Edge edge in Out(seen[i]).Where(e => e.Kind is EdgeKind.Inherits or EdgeKind.Implements))
             {
@@ -334,6 +364,7 @@ public sealed partial class QueryEngine
             }
         }
 
+        ClosureCut(i, seen.Count);
         return [.. seen.Skip(1)];
     }
 
@@ -439,9 +470,10 @@ public sealed partial class QueryEngine
         _ => label,
     };
 
-    private static string ImpactText(List<Node> symbols, string affects, List<ImpactGroup> groups, string? note, string command, int budget)
+    private string ImpactText(List<Node> symbols, string affects, List<ImpactGroup> groups, string? note, string command, int budget)
     {
-        var answer = new Answer(budget);
+        int shown = All ? int.MaxValue : GroupRows;
+        var answer = new Answer(budget, From);
         foreach (Node symbol in symbols)
         {
             string access = Names.Flag(symbol, "serialized") ? "  serialized" : "";
@@ -454,16 +486,21 @@ public sealed partial class QueryEngine
         foreach (ImpactGroup group in groups)
         {
             answer.Add(Head(group.Label, group.Summary + (group.Heuristic ? "  [heuristic]" : "")));
-            answer.AddRange(Answer.Table([.. group.Rows.Take(GroupRows).Select(r => Row(r))], "    "));
-            if (group.Rows.Count > GroupRows)
+            answer.AddRange(Answer.Table([.. group.Rows.Take(shown).Select(r => Row(r))], "    "));
+            if (group.Rows.Count > shown)
             {
-                answer.Add($"    +{group.Rows.Count - GroupRows} more  ug refs {Names.Quote(Name(symbols[0]))}");
+                answer.Add($"    +{group.Rows.Count - shown} more  {command} --all");
             }
         }
 
         if (note is not null)
         {
             answer.Add(Head("note", note));
+        }
+
+        if (_cuts.Count > 0)
+        {
+            answer.Add(Head("note", $"cut: {string.Join(", ", _cuts)}: {command} --all"));
         }
 
         return answer.Finish(command, countDropped: true);
@@ -473,9 +510,11 @@ public sealed partial class QueryEngine
             : [row.Name, $"{row.File}:{row.Line}"];
     }
 
-    private static string ImpactJson(List<Node> symbols, string affects, List<ImpactGroup> groups, string? note, int budget)
+    private string ImpactJson(List<Node> symbols, string affects, List<ImpactGroup> groups, string? note, string command, int budget)
     {
-        int total = groups.Sum(g => Math.Min(g.Rows.Count, GroupRows));
+        int rows = All ? int.MaxValue : GroupRows;
+        string? capped = _cuts.Count > 0 ? $"{string.Join(", ", _cuts)}: {command} --all" : null;
+        int total = groups.Sum(g => Math.Min(g.Rows.Count, rows));
         return JsonAnswer.Fit(total, budget, (w, keep) =>
         {
             w.WriteStartObject();
@@ -495,7 +534,7 @@ public sealed partial class QueryEngine
             int left = keep;
             foreach (ImpactGroup group in groups)
             {
-                int shown = Math.Min(Math.Min(group.Rows.Count, GroupRows), left);
+                int shown = Math.Min(Math.Min(group.Rows.Count, rows), left);
                 left -= shown;
                 w.WriteStartObject();
                 w.WriteString("label", group.Label);
@@ -522,6 +561,11 @@ public sealed partial class QueryEngine
             if (note is not null)
             {
                 w.WriteString("note", note);
+            }
+
+            if (capped is not null)
+            {
+                w.WriteString("capped", capped);
             }
 
             w.WriteBoolean("cut", keep < total);

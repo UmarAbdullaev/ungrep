@@ -24,7 +24,7 @@ internal static class QueryCommands
         Command find = Command("find", "Find types, members, assets and game objects by name.", [text, kind, live, tag, layer, component], (result, engine, budget) =>
             engine.Find(result.GetValue(text)!, result.GetValue(kind) is { } k ? KindNames.ParseNode(k) : null, budget),
             (result, start) => result.GetValue(live)
-                ? EditorCommands.LiveFind(start, result.GetValue(text), result.GetValue(tag), result.GetValue(layer), result.GetValue(component))
+                ? EditorCommands.LiveFind(start, result.GetValue(text), result.GetValue(tag), result.GetValue(layer), result.GetValue(component), result.GetValue<bool>("--all"))
                 : null);
         find.Validators.Add(result =>
         {
@@ -33,6 +33,10 @@ internal static class QueryCommands
                 if (result.GetValue(kind) != null)
                 {
                     result.AddError("--kind is for the graph; --live finds game objects only");
+                }
+                else if (result.GetValue<int?>("--from") != null)
+                {
+                    result.AddError("--from pages graph answers; --live answers whole with --all");
                 }
             }
             else if (result.GetValue(tag) != null || result.GetValue(layer) != null || result.GetValue(component) != null)
@@ -56,12 +60,12 @@ internal static class QueryCommands
             engine.Explain(result.GetValue(explained)!, result.GetValue(members), budget));
 
         var file = new Argument<string>("file") { Description = "A .cs, scene, prefab or asset file: project-relative path, absolute path, or file name." };
-        var outlineJson = new Option<bool>("--json") { Description = "Answer as JSON." };
+        var outlineJson = new Option<bool>("--json") { Description = "Answer as JSON (cut at the budget, not paged)." };
         yield return Command("outline", "Members of a .cs file, or the object tree of a scene or prefab, with line numbers and no bodies.", [file, outlineJson], (result, engine, budget) =>
             engine.Outline(result.GetValue(file)!, result.GetValue(outlineJson), budget));
 
         var impacted = new Argument<string>("symbol") { Description = "Type or member: Name, Type.Member, Namespace.Type.Member(args), or a cs: key." };
-        var impactJson = new Option<bool>("--json") { Description = "Answer as JSON." };
+        var impactJson = new Option<bool>("--json") { Description = "Answer as JSON (cut at the budget, not paged)." };
         yield return Command("impact", "What breaks if a symbol changes: dependents by kind and the assets that hold its serialized data.", [impacted, impactJson], (result, engine, budget) =>
             engine.Impact(result.GetValue(impacted)!, result.GetValue(impactJson), budget));
     }
@@ -71,6 +75,8 @@ internal static class QueryCommands
     {
         var project = new Option<string>("--project") { Description = "Folder inside the Unity project. Default: current folder." };
         var budget = new Option<int?>("--budget") { Description = $"Answer budget in tokens, {Answer.MinBudget} to {Answer.MaxBudget}. Default: answerBudget in .claude/unitygraph.json." };
+        var all = new Option<bool>("--all") { Description = "No list caps: every match, edge, item, row and candidate; only the budget cuts (then page with --from)." };
+        var from = new Option<int?>("--from") { Description = "Skip the answer's first n lines: the next page of an answer cut at --budget 8000." };
         var graphDir = new Option<string>("--graph-dir") { Hidden = true };
         var command = new Command(name, description);
         foreach (Symbol symbol in symbols)
@@ -87,7 +93,20 @@ internal static class QueryCommands
 
         command.Options.Add(project);
         command.Options.Add(budget);
+        command.Options.Add(all);
+        command.Options.Add(from);
         command.Options.Add(graphDir);
+        command.Validators.Add(result =>
+        {
+            if (result.GetValue(from) is < 0)
+            {
+                result.AddError("--from must be 0 or more");
+            }
+            else if (result.GetValue(from) != null && command.Options.OfType<Option<bool>>().FirstOrDefault(o => o.Name == "--json") is { } json && result.GetValue(json))
+            {
+                result.AddError("--from pages text answers; --json answers are cut at the budget");
+            }
+        });
         command.SetAction(result =>
         {
             string start = result.GetValue(project) ?? Directory.GetCurrentDirectory();
@@ -97,14 +116,14 @@ internal static class QueryCommands
                 return code;
             }
 
-            int exitCode = Run(start, result.GetValue(budget), result.GetValue(graphDir), (engine, b) => ask(result, engine, b), out string text);
+            int exitCode = Run(start, result.GetValue(budget), result.GetValue(graphDir), (engine, b) => ask(result, engine, b), out string text, result.GetValue(all), result.GetValue(from) ?? 0);
             result.InvocationConfiguration.Output.Write(text.ReplaceLineEndings());
             return exitCode;
         });
         return command;
     }
 
-    public static int Run(string start, int? budget, string? graphDirectory, Func<QueryEngine, int, string> ask, out string text)
+    public static int Run(string start, int? budget, string? graphDirectory, Func<QueryEngine, int, string> ask, out string text, bool all = false, int from = 0)
     {
         UnityProject? unity = UnityProject.Find(start);
         if (unity is null)
@@ -152,7 +171,7 @@ internal static class QueryCommands
             string indexed = created
                 ? string.Create(CultureInfo.InvariantCulture, $"indexed {summary.Files:N0} files in {summary.Elapsed.TotalSeconds:0.0} s\n")
                 : "";
-            text = indexed + ask(new QueryEngine(store, unity.Root), tokens);
+            text = indexed + ask(new QueryEngine(store, unity.Root) { All = all, From = from }, tokens);
             return 0;
         }
         catch (GraphLockedException)
@@ -160,7 +179,7 @@ internal static class QueryCommands
             try
             {
                 using GraphStore store = GraphStore.Open(unity.Root, StoreMode.ReadOnly, graphDirectory: graphDirectory);
-                text = ask(new QueryEngine(store, unity.Root), tokens);
+                text = ask(new QueryEngine(store, unity.Root) { All = all, From = from }, tokens);
                 if (!text.StartsWith('{'))
                 {
                     text += "note: graph busy, edits from the last seconds may be missing\n";

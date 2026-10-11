@@ -283,8 +283,9 @@ namespace UnityGraph.Bridge
             {
                 var shown = new List<string> { address + "  noise " + NoiseText(perlin) };
                 List<string> names = profiles.Select(p => p.name).Distinct().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
-                shown.Add("profiles: " + string.Join(", ", names.Take(MaxProfiles))
-                    + (names.Count > MaxProfiles ? " ... " + (names.Count - MaxProfiles).ToString(CultureInfo.InvariantCulture) + " more (or any NoiseSettings asset path)" : ""));
+                int named = request.Get("all") == "true" ? names.Count : MaxProfiles;
+                shown.Add("profiles: " + string.Join(", ", names.Take(named))
+                    + (names.Count > named ? " ... " + (names.Count - named).ToString(CultureInfo.InvariantCulture) + " more: ug camera noise " + address + " --all (or any NoiseSettings asset path)" : ""));
                 return Answer.Lines(shown);
             }
 

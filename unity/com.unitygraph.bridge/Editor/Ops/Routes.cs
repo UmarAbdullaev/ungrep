@@ -51,6 +51,7 @@ namespace UnityGraph.Bridge
                 { "/prefab/apply", (r, c) => Checked(() => PrefabOps.Apply(r)) },
                 { "/prefab/revert", (r, c) => Checked(() => PrefabOps.Revert(r)) },
                 { "/prefab/unpack", (r, c) => Checked(() => PrefabOps.Unpack(r)) },
+                { "/prefab/overrides", (r, c) => Checked(() => PrefabOps.List(r)) },
 
                 // Assets.
                 { "/asset/folder", (r, c) => Checked(() => AssetOps.Folder(r)) },

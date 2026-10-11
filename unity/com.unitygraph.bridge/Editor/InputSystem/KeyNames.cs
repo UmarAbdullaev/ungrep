@@ -98,7 +98,7 @@ namespace UnityGraph.Bridge
             string prefix = "no key or button " + name;
             if (name.StartsWith("pad:", StringComparison.OrdinalIgnoreCase))
             {
-                return "no gamepad button " + name.Substring(4) + "; buttons: " + string.Join(", ", PadNames.Keys.Take(12));
+                return "no gamepad button " + name.Substring(4) + "; buttons: " + string.Join(", ", PadNames.Keys);
             }
 
             if (name.StartsWith("mouse:", StringComparison.OrdinalIgnoreCase))
@@ -117,7 +117,8 @@ namespace UnityGraph.Bridge
                 .ToList();
             return near.Count > 0
                 ? prefix + "; near: " + string.Join(", ", near)
-                : prefix + "; keys: " + string.Join(", ", Enum.GetNames(typeof(Key)).Where(n => n != nameof(Key.None)).Take(MaxNear)) + "; pad:south for a gamepad button, mouse:left for a mouse button";
+                : prefix + "; keys: " + string.Join(", ", Enum.GetNames(typeof(Key)).Where(n => n != nameof(Key.None)).Take(MaxNear))
+                    + ", ... (every key: ug api UnityEngine.InputSystem.Key --all); pad:south for a gamepad button, mouse:left for a mouse button";
         }
 
         // Edit distance, for near names.

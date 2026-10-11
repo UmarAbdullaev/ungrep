@@ -173,6 +173,53 @@ public sealed class DocsPagesTests : IDisposable
     }
 
     [Fact]
+    public void The_cache_keeps_the_whole_page_so_a_bigger_budget_shows_more_without_a_fetch()
+    {
+        const string Url = "https://docs.unity3d.com/6000.3/Documentation/Manual/Long.html";
+        string html = "<body>" + string.Concat(Enumerable.Range(1, 600).Select(i => "<p>Line number " + i + " of the page.</p>")) + "</body>";
+        var answer = new OpAnswer(null, "Manual/Long is not in the local documentation", null, Online: [Url]);
+        var cache = new DocsCache(_folder);
+        var fetches = new List<string>();
+
+        string cut = DocsPages.Text(answer, online: true, 200, cache, Fetch(fetches, html), out _, "ug docs Manual/Long");
+        string more = DocsPages.Text(answer, online: true, 400, cache, Fetch(fetches, html), out _, "ug docs Manual/Long");
+        string whole = DocsPages.Text(answer, online: true, 8000, cache, Fetch(fetches, html), out _, "ug docs Manual/Long");
+
+        Assert.EndsWith("... cut to 200 tokens: ug docs Manual/Long --budget 400; the whole page: " + Url + "\n", cut, StringComparison.Ordinal);
+        Assert.EndsWith("... cut to 400 tokens: ug docs Manual/Long --budget 800; the whole page: " + Url + "\n", more, StringComparison.Ordinal);
+        Assert.True(more.Length > cut.Length);
+        Assert.Contains("Line number 600 of the page.", whole, StringComparison.Ordinal);
+        Assert.DoesNotContain("cut to", whole, StringComparison.Ordinal);
+        Assert.Equal([Url], fetches);
+        Assert.DoesNotContain("cut to", cache.Get(Url), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_page_cut_at_the_largest_budget_names_only_the_whole_page()
+    {
+        string html = "<body>" + string.Concat(Enumerable.Range(1, 4000).Select(i => "<p>Line number " + i + " of the page.</p>")) + "</body>";
+
+        string text = DocsTrimmer.Trim(html, 8000, "https://docs.unity3d.com/x.html", "ug docs Manual/X");
+
+        Assert.EndsWith("... cut to 8000 tokens; the whole page: https://docs.unity3d.com/x.html\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_cache_entry_cut_before_C1_is_fetched_again()
+    {
+        const string Url = "https://docs.unity3d.com/6000.3/Documentation/Manual/Prefabs.html";
+        var cache = new DocsCache(_folder);
+        cache.Put(Url, "old text\n... cut to 1000 tokens; the whole page: " + Url + "\n");
+        var fetches = new List<string>();
+
+        string text = DocsPages.Text(new OpAnswer(null, "not local", null, Online: [Url]), online: true, 1000, cache, Fetch(fetches, Page), out bool found);
+
+        Assert.True(found);
+        Assert.StartsWith("# Prefabs\n", text, StringComparison.Ordinal);
+        Assert.Equal([Url], fetches);
+    }
+
+    [Fact]
     public void The_cache_answers_even_with_docs_online_off()
     {
         const string Url = "https://docs.unity3d.com/6000.3/Documentation/Manual/Prefabs.html";

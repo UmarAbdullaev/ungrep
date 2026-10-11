@@ -18,7 +18,7 @@ namespace UnityGraph.Bridge
     internal static partial class UiToolkit
     {
         private const int DefaultTreeDepth = 10;
-        private const int MaxInspect = 40;
+
 
         private static readonly PropertyInfo[] _styles = typeof(IStyle).GetProperties().Where(p => p.GetCustomAttribute<ObsoleteAttribute>() == null).OrderBy(p => p.Name, StringComparer.Ordinal).ToArray();
 
@@ -34,6 +34,7 @@ namespace UnityGraph.Bridge
 
             Document document = target.Document;
             var lines = new List<string>();
+            int cuts = UiItem.Cuts;
             if (target.Element == document.Root)
             {
                 UIDocument component = document.Component;
@@ -56,6 +57,11 @@ namespace UnityGraph.Bridge
             if (left > 0)
             {
                 lines.Add("... " + Answer.Count(left, "more element", "more elements") + ": ug tree --ui <element> or --depth to narrow");
+            }
+
+            if (UiItem.Cuts > cuts)
+            {
+                lines.Add(UiItem.CutNote);
             }
 
             return Answer.Lines(lines);
@@ -223,7 +229,7 @@ namespace UnityGraph.Bridge
             Document document = target.Document;
             var lines = new List<string>();
             string text = OwnText(element);
-            lines.Add(target.Address + "  " + element.GetType().FullName + (text == null ? "" : "  " + UiItem.Quote(text))
+            lines.Add(target.Address + "  " + element.GetType().FullName + (text == null ? "" : "  " + UiItem.Whole(text))
                 + "  (" + document.Address + ": " + Path(document.Component.visualTreeAsset) + ")");
             List<string> classes = element.GetClasses().ToList();
             if (classes.Count > 0)
@@ -245,10 +251,10 @@ namespace UnityGraph.Bridge
                 + (element.panel?.focusController?.focusedElement == element ? "  focused" : ""));
             if (!string.IsNullOrEmpty(element.tooltip))
             {
-                lines.Add("tooltip  " + UiItem.Quote(element.tooltip));
+                lines.Add("tooltip  " + UiItem.Whole(element.tooltip));
             }
 
-            string value = ValueText(element);
+            string value = ValueText(element, true);
             if (value.Length > 0)
             {
                 lines.Add("value  " + value + Choices(element));
@@ -302,13 +308,6 @@ namespace UnityGraph.Bridge
             if (image != "none")
             {
                 lines.Add("background-image  " + image);
-            }
-
-            if (lines.Count > MaxInspect)
-            {
-                int cut = lines.Count - MaxInspect + 1;
-                lines = lines.Take(MaxInspect - 1).ToList();
-                lines.Add("... " + Answer.Count(cut, "more line", "more lines"));
             }
 
             return Answer.Lines(lines);
@@ -764,7 +763,7 @@ namespace UnityGraph.Bridge
                     return Path(asset);
             }
 
-            return UiItem.Cut(Values.Show(shown, Values.Caps.Compact, out _));
+            return Values.Show(shown, Values.Caps.Full, out _);
         }
 
         private static string ColorText(Color color)

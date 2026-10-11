@@ -19,9 +19,7 @@ internal static partial class AssetFileIndexer
     private const int ClassMonoBehaviour = 114;
     private const int ClassRectTransform = 224;
     private const int ClassPrefabInstance = 1001;
-    private const int MaxPath = 200;
-    private const int MaxValue = 80;
-    private const int MaxLabels = 10;
+
 
     private static readonly HashSet<string> _structural = new(StringComparer.Ordinal)
     {
@@ -142,7 +140,6 @@ internal static partial class AssetFileIndexer
         return end < 0 ? path : path[..end];
     }
 
-    private static string Cut(string text, int max) => text.Length <= max ? text : text[..max];
 
     private static bool IsBuiltin(string guid) => guid.StartsWith("0000000000000000", StringComparison.Ordinal);
 
@@ -251,7 +248,7 @@ internal static partial class AssetFileIndexer
         {
             string key = ObjectKey(document.FileId);
             var props = new Props();
-            props.Text("path", Cut(PathOf(document.FileId) ?? "", MaxPath));
+            props.Text("path", PathOf(document.FileId) ?? "");
             props.Flag("active", false, Text(document, "m_IsActive") == "0");
             Nodes.Add(new Node(key, NodeKind.GameObject, NameOf(document), path, document.LineStart, document.LineEnd, props.ToJson()));
             Edge(_asset, EdgeKind.Contains, key, document.LineStart);
@@ -359,7 +356,7 @@ internal static partial class AssetFileIndexer
 
                 int line = row["target"].Line;
                 var props = new Props();
-                props.Text("path", Cut(property, MaxPath));
+                props.Text("path", property);
                 string? referenced = row.GetValueOrDefault("objectReference")?.Ref is { FileId: not 0 } r && Target(r) is { } dst ? dst : null;
                 if (referenced is not null)
                 {
@@ -367,7 +364,7 @@ internal static partial class AssetFileIndexer
                 }
                 else
                 {
-                    props.Text("value", Cut(row.GetValueOrDefault("value")?.Value ?? "", MaxValue));
+                    props.Text("value", row.GetValueOrDefault("value")?.Value ?? "");
                 }
 
                 Edge(instance, EdgeKind.OverridesValue, NodeKeys.Object(targetGuid, target.FileId), line, props.ToJson());
@@ -401,7 +398,7 @@ internal static partial class AssetFileIndexer
             }
 
             var props = new Props();
-            props.Text("field", Cut(field, MaxPath));
+            props.Text("field", field);
             if (dst.StartsWith("a:", StringComparison.Ordinal))
             {
                 props.Long("object", reference.FileId);
@@ -466,7 +463,7 @@ internal static partial class AssetFileIndexer
                 };
                 bool dynamic = call.GetValueOrDefault("m_Mode")?.Value is not ("1" or "2" or "3" or "4" or "5" or "6");
                 var props = new Props();
-                props.Text("event", Cut(eventPath, MaxPath));
+                props.Text("event", eventPath);
                 if (target is { FileId: not 0 } r && Target(r) is { } targetKey)
                 {
                     props.Text("target", targetKey);
@@ -510,8 +507,8 @@ internal static partial class AssetFileIndexer
                 if (entry.Guid is { } entryGuid && MetaFile.IsGuid(entryGuid))
                 {
                     var props = new Props();
-                    props.Text("address", Cut(entry.Address ?? "", MaxPath));
-                    props.List("labels", [.. entry.Labels.Take(MaxLabels).Select(l => Cut(l, MaxValue))]);
+                    props.Text("address", entry.Address ?? "");
+                    props.List("labels", [.. entry.Labels]);
                     Edge(NodeKeys.Asset(entryGuid), EdgeKind.Addressable, _asset, entry.Line, props.ToJson());
                 }
             }

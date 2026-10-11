@@ -155,7 +155,7 @@ public sealed class GraphStore : IDisposable
 
     // `Library/unitygraph/` unless the caller keeps the graph elsewhere (measuring a project
     // without writing into it).
-    private static string GraphDirectory(string root, string? graphDirectory) =>
+    public static string GraphDirectory(string root, string? graphDirectory) =>
         graphDirectory is null ? Path.Combine(root, "Library", "unitygraph") : Path.GetFullPath(graphDirectory);
 
     private static WriteLock Lock(string directory, TimeSpan? lockTimeout)

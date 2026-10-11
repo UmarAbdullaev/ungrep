@@ -8,13 +8,15 @@ namespace UnityGraph.Bridge
 {
     /// <summary>
     /// The console entries seen since the editor started, newest last, at most
-    /// <see cref="Capacity"/>. A repeat of the newest entry bumps its count and gives it a new id,
-    /// so a reader polling `after` sees it again. Thread-safe: Unity logs from any thread.
+    /// <see cref="Capacity"/>, each with its whole message and stack up to <see cref="MaxText"/>
+    /// characters (memory bounds, SPEC-unity-loop, Nothing out of reach). A repeat of the newest
+    /// entry bumps its count and gives it a new id, so a reader polling `after` sees it again.
+    /// Thread-safe: Unity logs from any thread.
     /// </summary>
     internal sealed class ConsoleBuffer
     {
         public const int Capacity = 2000;
-        private const int MaxText = 2000;
+        public const int MaxText = 8000;
 
         private readonly object _lock = new object();
         private readonly LinkedList<Entry> _entries = new LinkedList<Entry>();
@@ -26,6 +28,7 @@ namespace UnityGraph.Bridge
             public string Type;
             public string Text;
             public string Frame;
+            public string Stack;
             public int Count;
         }
 
@@ -50,14 +53,26 @@ namespace UnityGraph.Bridge
             }
         }
 
-        public void Add(string type, string text, string frame)
+        /// <summary>The id of the oldest entry held, 0 when none.</summary>
+        public long OldestId
         {
-            text = text ?? "";
-            if (text.Length > MaxText)
+            get
             {
-                text = text.Substring(0, MaxText);
+                lock (_lock)
+                {
+                    return _entries.First?.Value.Id ?? 0;
+                }
             }
+        }
 
+        /// <summary><paramref name="text"/> cut to <see cref="MaxText"/>, saying so.</summary>
+        public static string Bound(string text) =>
+            text.Length > MaxText ? text.Substring(0, MaxText) + "... (cut at " + MaxText.ToString(CultureInfo.InvariantCulture) + " characters)" : text;
+
+        public void Add(string type, string text, string frame, string stack = null)
+        {
+            text = Bound(text ?? "");
+            stack = string.IsNullOrEmpty(stack) ? null : Bound(stack.TrimEnd());
             lock (_lock)
             {
                 Entry last = _entries.Last?.Value;
@@ -68,7 +83,7 @@ namespace UnityGraph.Bridge
                     return;
                 }
 
-                _entries.AddLast(new Entry { Id = ++_lastId, Type = type, Text = text, Frame = frame, Count = 1 });
+                _entries.AddLast(new Entry { Id = ++_lastId, Type = type, Text = text, Frame = frame, Stack = stack, Count = 1 });
                 if (_entries.Count > Capacity)
                 {
                     _entries.RemoveFirst();
@@ -76,15 +91,18 @@ namespace UnityGraph.Bridge
             }
         }
 
-        /// <summary>Entries newer than <paramref name="after"/> of the given types, oldest first, at most <paramref name="limit"/> (the newest ones).</summary>
-        public List<Entry> Query(long after, int limit, ICollection<string> types)
+        /// <summary>
+        /// Entries newer than <paramref name="after"/> and older than <paramref name="before"/> (0: no
+        /// bound) of the given types, oldest first, at most <paramref name="limit"/> (the newest ones).
+        /// </summary>
+        public List<Entry> Query(long after, int limit, ICollection<string> types, long before = 0)
         {
             var found = new List<Entry>();
             lock (_lock)
             {
-                for (LinkedListNode<Entry> node = _entries.Last; node != null && node.Value.Id > after; node = node.Previous)
+                for (LinkedListNode<Entry> node = _entries.Last; node != null && node.Value.Id > after && found.Count < limit; node = node.Previous)
                 {
-                    if (types == null || types.Contains(node.Value.Type))
+                    if ((before <= 0 || node.Value.Id < before) && (types == null || types.Contains(node.Value.Type)))
                     {
                         found.Add(Copy(node.Value));
                     }
@@ -92,7 +110,24 @@ namespace UnityGraph.Bridge
             }
 
             found.Sort((a, b) => a.Id.CompareTo(b.Id));
-            return found.Count > limit ? found.GetRange(found.Count - limit, limit) : found;
+            return found;
+        }
+
+        /// <summary>The entry with this id, or null when the buffer no longer holds it.</summary>
+        public Entry Find(long id)
+        {
+            lock (_lock)
+            {
+                for (LinkedListNode<Entry> node = _entries.Last; node != null && node.Value.Id >= id; node = node.Previous)
+                {
+                    if (node.Value.Id == id)
+                    {
+                        return Copy(node.Value);
+                    }
+                }
+            }
+
+            return null;
         }
 
         public static void Write(Json json, Entry entry)
@@ -102,6 +137,7 @@ namespace UnityGraph.Bridge
                 .Field("type", entry.Type)
                 .Field("text", entry.Text)
                 .Field("frame", entry.Frame)
+                .Field("stack", entry.Stack)
                 .Field("count", entry.Count)
                 .EndObject();
         }
@@ -119,14 +155,18 @@ namespace UnityGraph.Bridge
                         .Append(Encode(entry.Type)).Append('\t')
                         .Append(Encode(entry.Text)).Append('\t')
                         .Append(entry.Frame == null ? "-" : "+" + Encode(entry.Frame)).Append('\t')
-                        .Append(entry.Count.ToString(CultureInfo.InvariantCulture)).Append('\n');
+                        .Append(entry.Count.ToString(CultureInfo.InvariantCulture)).Append('\t')
+                        .Append(entry.Stack == null ? "-" : "+" + Encode(entry.Stack)).Append('\n');
                 }
             }
 
             return text.ToString();
         }
 
-        /// <summary>Restores what <see cref="Save"/> wrote; unreadable text leaves the buffer empty.</summary>
+        /// <summary>
+        /// Restores what <see cref="Save"/> wrote; unreadable text leaves the buffer empty. A buffer
+        /// saved by a bridge before 0.9.0 has five fields and restores with no stacks.
+        /// </summary>
         public void Restore(string saved)
         {
             if (string.IsNullOrEmpty(saved))
@@ -144,7 +184,7 @@ namespace UnityGraph.Bridge
             for (int i = 1; i < lines.Length; i++)
             {
                 string[] fields = lines[i].Split('\t');
-                if (fields.Length != 5
+                if ((fields.Length != 5 && fields.Length != 6)
                     || !long.TryParse(fields[0], NumberStyles.None, CultureInfo.InvariantCulture, out long id)
                     || !int.TryParse(fields[4], NumberStyles.None, CultureInfo.InvariantCulture, out int count))
                 {
@@ -152,7 +192,8 @@ namespace UnityGraph.Bridge
                 }
 
                 string frame = fields[3].StartsWith("+", StringComparison.Ordinal) ? Decode(fields[3].Substring(1)) : null;
-                entries.Add(new Entry { Id = id, Type = Decode(fields[1]), Text = Decode(fields[2]), Frame = frame, Count = count });
+                string stack = fields.Length == 6 && fields[5].StartsWith("+", StringComparison.Ordinal) ? Decode(fields[5].Substring(1)) : null;
+                entries.Add(new Entry { Id = id, Type = Decode(fields[1]), Text = Decode(fields[2]), Frame = frame, Stack = stack, Count = count });
             }
 
             lock (_lock)
@@ -167,7 +208,7 @@ namespace UnityGraph.Bridge
             }
         }
 
-        private static Entry Copy(Entry e) => new Entry { Id = e.Id, Type = e.Type, Text = e.Text, Frame = e.Frame, Count = e.Count };
+        private static Entry Copy(Entry e) => new Entry { Id = e.Id, Type = e.Type, Text = e.Text, Frame = e.Frame, Stack = e.Stack, Count = e.Count };
 
         private static string Encode(string value) => value.Replace("\\", "\\\\").Replace("\t", "\\t").Replace("\n", "\\n").Replace("\r", "\\r");
 

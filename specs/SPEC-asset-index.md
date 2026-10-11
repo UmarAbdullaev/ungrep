@@ -114,7 +114,7 @@ Unity writes a small, regular YAML subset; a line reader handles it (no YAML pac
 
 | Document | Node | `name` | `props` |
 | --- | --- | --- | --- |
-| GameObject (1), not stripped | `game_object` | `m_Name` | `path`: hierarchy path inside the file (`HubStation/LabStage/Turntable`, ≤ 200 chars); `active: false` when `m_IsActive: 0` |
+| GameObject (1), not stripped | `game_object` | `m_Name` | `path`: hierarchy path inside the file (`HubStation/LabStage/Turntable`, whole); `active: false` when `m_IsActive: 0` |
 | a component (has `m_GameObject`), not stripped, not Transform (4) or RectTransform (224) | `component` | class name; for MonoBehaviour (114) the type after `::` in `m_EditorClassIdentifier`, else `MonoBehaviour` | `class_id`; `class`: full type name from `m_EditorClassIdentifier` when present; `script`: script GUID; `enabled: false` when `m_Enabled: 0` |
 | PrefabInstance (1001) | `prefab_instance` | the value of the one `m_Name` modification; the source's GUID prefix `prefab <8 hex>` when there are none or several | `source`: source prefab GUID |
 | MonoBehaviour (114) without a GameObject, not the main object (see below) | `sub_asset` | `m_Name` | `class`, `script` as for components |
@@ -146,13 +146,16 @@ per file, at the first line it occurs.
 | `instance_of` | MonoBehaviour component or sub-asset → `a:<script guid>`; main object MonoBehaviour: `a:G` → `a:<script guid>`; prefab instance → `a:<source guid>` | |
 | `places` | `a:G` → prefab instance | |
 | `variant_of` | `a:G` → `a:<source guid>`, for a `.prefab` whose root is a prefab instance (`m_TransformParent: {fileID: 0}`) | |
-| `overrides_value` | prefab instance → `o:<source guid>:<target fileID>` | `path` (the modification's `propertyPath`), `value` (≤ 80 chars) or `ref` (the reference key) |
-| `references` | the object whose leaf holds a non-null object reference → `a:<guid>` (another file) or the local object's key | `field` (leaf path, ≤ 200 chars); `object`: target fileID for a reference into another file |
+| `overrides_value` | prefab instance → `o:<source guid>:<target fileID>` | `path` (the modification's `propertyPath`), `value` (whole) or `ref` (the reference key) |
+| `references` | the object whose leaf holds a non-null object reference → `a:<guid>` (another file) or the local object's key | `field` (leaf path, whole); `object`: target fileID for a reference into another file |
 | `event_calls` | component or sub-asset holding a UnityEvent → the method's key | `event` (field path before `.m_PersistentCalls`), `target` (the target object's key) |
-| `addressable` | `a:<entry guid>` → `a:G` (the group asset), from `m_SerializeEntries` | `address`; `labels` when any |
+| `addressable` | `a:<entry guid>` → `a:G` (the group asset), from `m_SerializeEntries` | `address`; `labels` when any (all of them) |
 
 Details:
 
+- Values are stored whole (C1): paths, field and event paths, override values, addresses and
+  every label (the old caps were 200 / 80 chars and 10 labels). Props are a JSON column, so no
+  schema bump: a graph built before keeps the cut values until `ug index --full`.
 - `instance_of` points at the script **asset**, not the type: code-index's `script_defines`
   links `a:<script guid>` to the type, so a class rename needs no asset reindex. (This refines
   the `instance_of` row in SPEC-graph-core; the key form is the same.)

@@ -5,27 +5,28 @@ namespace UnityGraph.EditorLink;
 
 /// <summary>
 /// The `ug compile` answer: a count line, then errors (and warnings when asked) sorted by file,
-/// line and column, each once even when several assemblies report it, at most <see cref="MaxLines"/>.
+/// line and column, each once even when several assemblies report it, at most <see cref="MaxLines"/>
+/// unless all are asked for (`ug compile --all`, SPEC-editor-link C1); a cut list names `--all`.
 /// </summary>
 public static class CompileText
 {
     public const int MaxLines = 20;
 
     /// <summary>The answer for a compile the bridge waited for; <see cref="CompileOutcome.Problem"/> must be null.</summary>
-    public static string Format(CompileOutcome outcome, bool warnings)
+    public static string Format(CompileOutcome outcome, bool warnings, bool all = false)
     {
         IReadOnlyList<CompileMessage> messages = outcome.Result?.Messages ?? [];
         string head = outcome.Changed
             ? "compiled in " + outcome.Elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s: "
             : "no script changes: ";
-        return head + Counts(messages) + "\n" + Lines(messages, warnings);
+        return head + Counts(messages) + "\n" + Lines(messages, warnings, all);
     }
 
     /// <summary>
     /// The answer when no bridge answers: the newer of `compile.json` and the project's Editor.log,
     /// headed by the reason and the file's time so an old answer is never taken for a fresh compile.
     /// </summary>
-    public static string Fallback(string projectRoot, string reason, string? editorLogPath, bool warnings)
+    public static string Fallback(string projectRoot, string reason, string? editorLogPath, bool warnings, bool all = false)
     {
         string head = "Unity not reachable (" + reason + ")";
         string compileJson = Path.Combine(projectRoot, "Library", "unitygraph", "compile.json");
@@ -46,7 +47,7 @@ public static class CompileText
 
             if (result != null)
             {
-                return head + "; from compile.json of " + Time(jsonTime.Value) + ": " + Counts(result.Messages) + "\n" + Lines(result.Messages, warnings);
+                return head + "; from compile.json of " + Time(jsonTime.Value) + ": " + Counts(result.Messages) + "\n" + Lines(result.Messages, warnings, all);
             }
         }
 
@@ -72,7 +73,7 @@ public static class CompileText
             return head + "; Editor.log of " + Time(logTime.Value) + " shows no finished compile\n";
         }
 
-        return head + "; from Editor.log of " + Time(logTime.Value) + ": " + Counts(log.LastCompile.Messages) + "\n" + Lines(log.LastCompile.Messages, warnings);
+        return head + "; from Editor.log of " + Time(logTime.Value) + ": " + Counts(log.LastCompile.Messages) + "\n" + Lines(log.LastCompile.Messages, warnings, all);
     }
 
     /// <summary>`2 errors, 1 warning`: each message once, warnings only when there are some.</summary>
@@ -85,7 +86,7 @@ public static class CompileText
         return warnings > 0 ? text + ", " + Plural(warnings, "warning") : text;
     }
 
-    public static string Lines(IReadOnlyList<CompileMessage> messages, bool warnings)
+    public static string Lines(IReadOnlyList<CompileMessage> messages, bool warnings, bool all = false)
     {
         List<CompileMessage> shown = Distinct(messages)
             .Where(m => warnings || m.IsError)
@@ -95,7 +96,7 @@ public static class CompileText
             .ThenBy(m => m.Code, StringComparer.Ordinal)
             .ToList();
         var text = new StringBuilder();
-        foreach (CompileMessage m in shown.Take(MaxLines))
+        foreach (CompileMessage m in all ? shown : shown.Take(MaxLines))
         {
             text.Append("  ")
                 .Append(m.File == null ? "(no file)" : m.File + ":" + m.Line.ToString(CultureInfo.InvariantCulture) + ":" + m.Column.ToString(CultureInfo.InvariantCulture))
@@ -107,10 +108,11 @@ public static class CompileText
                 .Append('\n');
         }
 
-        if (shown.Count > MaxLines)
+        if (!all && shown.Count > MaxLines)
         {
             string what = warnings ? "messages" : "errors";
-            text.Append("  (+").Append((shown.Count - MaxLines).ToString(CultureInfo.InvariantCulture)).Append(" more ").Append(what).Append(")\n");
+            text.Append("  (+").Append((shown.Count - MaxLines).ToString(CultureInfo.InvariantCulture)).Append(" more ").Append(what)
+                .Append(warnings ? ": ug compile --warnings --all)\n" : ": ug compile --all)\n");
         }
 
         return text.ToString();

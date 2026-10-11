@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -16,6 +17,7 @@ namespace UnityGraph.Bridge
     internal sealed class Digest
     {
         public const int ObjectCap = 20000;
+        public const string ChangesFile = "Library/unitygraph/digest.txt";
         private const int NamedMax = 3;
         private const int ErrorRows = 2;
         private const int TextLimit = 160;
@@ -98,6 +100,7 @@ namespace UnityGraph.Bridge
             }
 
             var errors = new Dictionary<(string Text, string Frame), (int Count, long Last)>();
+            var cutTexts = new HashSet<(string Text, string Frame)>();
             int errorCount = 0;
             int warningCount = 0;
             foreach (ConsoleBuffer.Entry entry in _console.Query(_consoleId, 500, null))
@@ -117,14 +120,32 @@ namespace UnityGraph.Bridge
                 {
                     errorCount += count;
                     (string, string) key = (FirstLine(entry.Text), entry.Frame);
+                    if (key.Item1 != (entry.Text ?? "").Trim())
+                    {
+                        cutTexts.Add(key);
+                    }
+
                     errors.TryGetValue(key, out (int Count, long Last) seen);
                     errors[key] = (seen.Count + count, Math.Max(seen.Last, entry.Id));
                 }
             }
 
+            bool cut = false;
             foreach (KeyValuePair<(string Text, string Frame), (int Count, long Last)> error in errors.OrderByDescending(e => e.Value.Last).Take(ErrorRows))
             {
                 rows.Add("  error" + (error.Value.Count > 1 ? " x" + error.Value.Count.ToString(CultureInfo.InvariantCulture) : "") + "  " + error.Key.Text + (error.Key.Frame == null ? "" : "  " + error.Key.Frame));
+                cut |= cutTexts.Contains(error.Key);
+            }
+
+            // A row cut at 160 characters or at its first line adds --whole to the line that names the console.
+            string again = "ug console --after " + _consoleId.ToString(CultureInfo.InvariantCulture) + (cut ? " --whole" : "");
+            if (errors.Count > ErrorRows)
+            {
+                rows.Add("  +" + (errors.Count - ErrorRows).ToString(CultureInfo.InvariantCulture) + " more errors: " + again);
+            }
+            else if (cut)
+            {
+                rows.Add("  (whole text: " + again + ")");
             }
 
             var parts = new List<string>();
@@ -164,22 +185,22 @@ namespace UnityGraph.Bridge
             return parts.Count == 0 ? "" : "scene " + string.Join(" ", parts);
         }
 
-        // `changed Player (moved), Door (inactive), Bullet#3 (new), 2 gone`.
-        private string Objects()
+        // `changed Player (moved), Door (inactive), Bullet#3 (new), 2 gone`. Internal for the tests (Compare reads it only in play mode).
+        internal string Objects()
         {
             var now = new Dictionary<int, Item>();
             if (_over || !Scan(now))
             {
-                return "objects not compared (over " + ObjectCap.ToString(CultureInfo.InvariantCulture) + ")";
+                return "objects not compared (over " + ObjectCap.ToString(CultureInfo.InvariantCulture) + ", a bound on the snapshot's cost: ug find --live and ug tree read objects)";
             }
 
             var changes = new List<(int Id, GameObject Object, string What)>();
-            int gone = 0;
+            var gone = new List<string>();
             foreach (KeyValuePair<int, Item> before in _items)
             {
                 if (!now.TryGetValue(before.Key, out Item after))
                 {
-                    gone++;
+                    gone.Add(before.Value.Name);
                     continue;
                 }
 
@@ -221,15 +242,31 @@ namespace UnityGraph.Bridge
 
             if (changes.Count > NamedMax)
             {
-                parts.Add("+" + (changes.Count - NamedMax).ToString(CultureInfo.InvariantCulture) + " more");
+                parts.Add("+" + (changes.Count - NamedMax).ToString(CultureInfo.InvariantCulture) + " more (" + WriteChanges(changes, gone) + ")");
             }
 
-            if (gone > 0)
+            if (gone.Count > 0)
             {
-                parts.Add(gone.ToString(CultureInfo.InvariantCulture) + " gone");
+                parts.Add(gone.Count.ToString(CultureInfo.InvariantCulture) + " gone");
             }
 
             return parts.Count == 0 ? "" : "changed " + string.Join(", ", parts);
+        }
+
+        // Every change, one per line (`Level/Door (inactive)`, `Bullet (gone)`), in the changes file; its path, or why not.
+        private static string WriteChanges(List<(int Id, GameObject Object, string What)> changes, List<string> gone)
+        {
+            try
+            {
+                string path = Path.Combine(Bridge.ProjectRoot, ChangesFile);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, string.Concat(changes.Select(c => Addresses.Of(c.Object) + " (" + c.What + ")\n").Concat(gone.Select(g => g + " (gone)\n"))));
+                return ChangesFile;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                return "digest file not written: " + e.Message;
+            }
         }
 
         private static List<string> LoadedScenes(out string active)

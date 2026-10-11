@@ -13,6 +13,9 @@ public sealed partial class QueryEngine
     private const int EdgeLimit = 2000;
     private const int FileEdgeLimit = 50_000;
 
+    // `--all`: no cap but the graph's size (one less than int.MaxValue: the store reads one more to say `more`).
+    private const int NoLimit = int.MaxValue - 1;
+
     private static readonly NodeKindSet _findKinds = NodeKindSet.Of(
         NodeKind.Type, NodeKind.Method, NodeKind.Field, NodeKind.Property, NodeKind.Event,
         NodeKind.Asset, NodeKind.GameObject, NodeKind.PrefabInstance);
@@ -20,6 +23,12 @@ public sealed partial class QueryEngine
     private readonly GraphStore _store;
     private readonly string? _projectRoot;
     private readonly Dictionary<string, Node?> _nodes = new(StringComparer.Ordinal);
+
+    // What the current answer's capped reads left out (`edges past 2000`), for its `note  cut:` line.
+    private readonly List<string> _cuts = [];
+
+    // Whether the current answer cut a list to 8 items (`(+N)`).
+    private bool _listCut;
 
     /// <param name="store">The open graph.</param>
     /// <param name="projectRoot">The Unity project folder, to turn an absolute path into a project path (`outline`).</param>
@@ -29,11 +38,22 @@ public sealed partial class QueryEngine
         _projectRoot = projectRoot;
     }
 
+    /// <summary>`--all` (SPEC-query, Nothing out of reach): no list, edge-read or walk caps.</summary>
+    public bool All { get; init; }
+
+    /// <summary>`--from`: a text answer skips its first lines (0: none); JSON answers do not page.</summary>
+    public int From { get; init; }
+
+    // ` --all` when asked, for the commands a cut answer names.
+    private string AllFlag => All ? " --all" : "";
+
+    private int EdgeCap => All ? NoLimit : EdgeLimit;
+
     public string Find(string text, NodeKind? kind, int budget)
     {
-        string command = "ug find " + Names.Quote(text) + (kind is { } k ? " --kind " + KindNames.Of(k) : "");
-        var answer = new Answer(budget);
-        Page<Node> page = _store.FindByName(text, kind is { } only ? NodeKindSet.Of(only) : _findKinds, FindLimit);
+        string command = "ug find " + Names.Quote(text) + (kind is { } k ? " --kind " + KindNames.Of(k) : "") + AllFlag;
+        Answer answer = Start(budget);
+        Page<Node> page = _store.FindByName(text, kind is { } only ? NodeKindSet.Of(only) : _findKinds, All ? NoLimit : FindLimit);
         if (page.Items.Count == 0)
         {
             answer.Add("nothing found: " + text);
@@ -41,14 +61,14 @@ public sealed partial class QueryEngine
         }
 
         answer.AddRange(Answer.Table([.. page.Items.Select(FindRow)]));
-        answer.Add(page.More ? $"{FindLimit}+ found, narrow the text" + (kind is null ? " or add --kind" : "") : $"{page.Items.Count} found");
+        answer.Add(page.More ? $"{FindLimit}+ found, narrow the text" + (kind is null ? " or add --kind" : "") + $"; all: {command} --all" : $"{page.Items.Count} found");
         return answer.Finish(command);
     }
 
     public string Refs(string text, int budget)
     {
-        string command = "ug refs " + Names.Quote(text);
-        var answer = new Answer(budget);
+        string command = "ug refs " + Names.Quote(text) + AllFlag;
+        Answer answer = Start(budget);
         if (!Resolved("refs", text, answer, out IReadOnlyList<Node> nodes))
         {
             return answer.Finish(command);
@@ -85,14 +105,14 @@ public sealed partial class QueryEngine
         rows.Sort((a, b) => (a.Order, a.Label, a.Source, a.Line, string.Join(' ', a.Row))
             .CompareTo((b.Order, b.Label, b.Source, b.Line, string.Join(' ', b.Row))));
         answer.AddRange(Answer.Table([.. rows.Select(r => r.Row)], "  "));
-        answer.Add(more ? $"{rows.Count}+ references" : rows.Count == 1 ? "1 reference" : $"{rows.Count} references");
+        answer.Add(more ? $"{rows.Count}+ references: {command} --all" : rows.Count == 1 ? "1 reference" : $"{rows.Count} references");
         return answer.Finish(command);
     }
 
     public string Explain(string text, bool members, int budget)
     {
-        string command = "ug explain " + Names.Quote(text) + (members ? " --members" : "");
-        var answer = new Answer(budget);
+        string command = "ug explain " + Names.Quote(text) + (members ? " --members" : "") + AllFlag;
+        Answer answer = Start(budget);
         if (!Resolved("explain", text, answer, out IReadOnlyList<Node> nodes))
         {
             return answer.Finish(command);
@@ -102,23 +122,28 @@ public sealed partial class QueryEngine
         switch (node.Kind)
         {
             case NodeKind.Type:
-                ExplainType(node, members, text, answer);
+                ExplainType(node, members, answer);
                 break;
             case NodeKind.Method or NodeKind.Field or NodeKind.Property or NodeKind.Event:
                 ExplainMember(node, nodes.Count, text, answer);
                 break;
             case NodeKind.Asset:
-                ExplainAsset(node, text, answer);
+                ExplainAsset(node, answer);
                 break;
             default:
-                ExplainObject(node, text, answer);
+                ExplainObject(node, answer);
                 break;
         }
 
+        // A cut list or edge read names `--all`; `ug refs` lists the incoming edges whole.
+        string refs = "ug refs " + Names.Quote(text);
+        string more = node.Kind == NodeKind.Type && !members ? $"ug explain {Names.Quote(text)} --members | {refs}" : refs;
+        AddCutNote(answer, command, "  ");
+        answer.Add("  more  " + (_listCut ? command + " --all | " : "") + more);
         return answer.Finish(command);
     }
 
-    private void ExplainType(Node type, bool members, string text, Answer answer)
+    private void ExplainType(Node type, bool members, Answer answer)
     {
         List<Edge> outgoing = Out(type.Key);
         List<Edge> incoming = In(type.Key);
@@ -131,7 +156,7 @@ public sealed partial class QueryEngine
         string[] otherFiles = [.. contains.Select(e => e.File).Where(f => f != type.File).Distinct().Order(StringComparer.Ordinal)];
         if (otherFiles.Length > 0)
         {
-            lines.Add(["also in", Names.Join(otherFiles)]);
+            lines.Add(["also in", Join(otherFiles)]);
         }
 
         string? guid = incoming.Where(e => e.Kind == EdgeKind.ScriptDefines).Select(e => e.Src["a:".Length..]).FirstOrDefault();
@@ -158,7 +183,7 @@ public sealed partial class QueryEngine
             lines.Add(["members", string.Join(", ", memberNodes.GroupBy(n => n.Kind).OrderBy(g => g.Key).Select(g => Count(g.Count(), KindNames.Of(g.Key))))]);
         }
 
-        lines.Add(["used by", Names.Join(Sources(incoming, EdgeKind.UsesType))]);
+        lines.Add(["used by", Join(Sources(incoming, EdgeKind.UsesType))]);
         bool isInterface = Names.Prop(type, "subkind") == "interface";
         AddIfAny(lines, isInterface ? "extended by" : "subclasses", Sources(incoming, EdgeKind.Inherits));
         AddIfAny(lines, "implemented by", Sources(incoming, EdgeKind.Implements));
@@ -168,11 +193,6 @@ public sealed partial class QueryEngine
         if (members)
         {
             answer.AddRange(Answer.Table([.. memberNodes.Select(MemberRow)], "    "));
-            answer.Add("  more  ug refs " + Names.Quote(text));
-        }
-        else
-        {
-            answer.Add($"  more  ug explain {Names.Quote(text)} --members | ug refs {Names.Quote(text)}");
         }
     }
 
@@ -208,7 +228,7 @@ public sealed partial class QueryEngine
         AddIfAny(lines, "overrides", [.. outgoing.Where(e => e.Kind == EdgeKind.Overrides).Select(e => Names.Qualified(e.Dst)).Distinct().Order(StringComparer.Ordinal)]);
         if (member.Kind != NodeKind.Field)
         {
-            lines.Add(["called from", Names.Join(Counted(incoming, EdgeKind.Calls))]);
+            lines.Add(["called from", Join(Counted(incoming, EdgeKind.Calls))]);
         }
 
         AddIfAny(lines, "dispatched from", [.. Counted(incoming, EdgeKind.Dispatches).Select(s => s + " [heuristic]")]);
@@ -222,16 +242,15 @@ public sealed partial class QueryEngine
         AddIfAny(lines, InInterface(member) ? "implemented by" : "overridden by", Sources(incoming, EdgeKind.Overrides));
         if (member.Kind is NodeKind.Method or NodeKind.Property or NodeKind.Event)
         {
-            lines.Add(["calls", Names.Join([.. outgoing.Where(e => e.Kind is EdgeKind.Calls or EdgeKind.Dispatches)
+            lines.Add(["calls", Join([.. outgoing.Where(e => e.Kind is EdgeKind.Calls or EdgeKind.Dispatches)
                 .Select(e => Names.Qualified(e.Dst)).Distinct().Order(StringComparer.Ordinal)])]);
         }
 
         AddIfAny(lines, "flags", [.. Flags(member).Where(f => f != "serialized" && f != Names.Prop(member, "access"))]);
         answer.AddRange(Answer.Table(lines, "  "));
-        answer.Add("  more  ug refs " + Names.Quote(text));
     }
 
-    private void ExplainAsset(Node asset, string text, Answer answer)
+    private void ExplainAsset(Node asset, Answer answer)
     {
         string path = Names.AssetPath(asset);
         answer.Add(Header(asset));
@@ -245,7 +264,7 @@ public sealed partial class QueryEngine
             lines.Add(["objects", string.Join(", ", objects.GroupBy(n => n.Kind).OrderBy(g => g.Key).Select(g => Count(g.Count(), KindNames.Of(g.Key).Replace('_', ' '))))]);
         }
 
-        List<Edge> inFile = [.. _store.EdgesInFile(path, EdgeKindSet.All, FileEdgeLimit).Items.Select(h => h.Edge)];
+        List<Edge> inFile = [.. FileEdges(path, EdgeKindSet.All).Select(h => h.Edge)];
         string guid = asset.Key["a:".Length..];
         AddIfAny(lines, "scripts", [.. inFile.Where(e => e.Kind == EdgeKind.InstanceOf && Node(e.Src)?.Kind != NodeKind.PrefabInstance)
             .Select(ScriptName).Distinct().Order(StringComparer.Ordinal)]);
@@ -258,9 +277,14 @@ public sealed partial class QueryEngine
         AddIfAny(lines, "unity events", [.. inFile.Where(e => e.Kind == EdgeKind.EventCalls)
             .Select(e => Names.Qualified(e.Dst) + (e.Confidence == Confidence.Exact ? "" : " [heuristic]")).Distinct().Order(StringComparer.Ordinal)]);
 
-        var ignored = false;
-        List<Edge> incoming = [.. Incoming(asset, ref ignored)];
-        lines.Add(["used by", Names.Join([.. incoming.Where(e => e.Kind != EdgeKind.InstanceOf || !IsScript(asset))
+        var edgesCut = false;
+        List<Edge> incoming = [.. Incoming(asset, ref edgesCut)];
+        if (edgesCut)
+        {
+            Cut(EdgesCut);
+        }
+
+        lines.Add(["used by", Join([.. incoming.Where(e => e.Kind != EdgeKind.InstanceOf || !IsScript(asset))
             .Select(e => e.File).Distinct().Order(StringComparer.Ordinal)])]);
         foreach (Edge entry in outgoing.Where(e => e.Kind == EdgeKind.Addressable))
         {
@@ -274,10 +298,9 @@ public sealed partial class QueryEngine
         }
 
         answer.AddRange(Answer.Table(lines, "  "));
-        answer.Add("  more  ug refs " + Names.Quote(text));
     }
 
-    private void ExplainObject(Node node, string text, Answer answer)
+    private void ExplainObject(Node node, Answer answer)
     {
         answer.Add(Header(node));
         var lines = new List<string[]>();
@@ -299,7 +322,6 @@ public sealed partial class QueryEngine
         AddIfAny(lines, "unity events", [.. outgoing.Where(e => e.Kind == EdgeKind.EventCalls)
             .Select(e => $"{Names.Prop(e, "event")} -> {Names.Qualified(e.Dst)}" + (e.Confidence == Confidence.Exact ? "" : " [heuristic]"))]);
         answer.AddRange(Answer.Table(lines, "  "));
-        answer.Add("  more  ug refs " + Names.Quote(text));
     }
 
     // Every edge into the symbol that `refs` lists: for an asset, edges into it or its objects
@@ -311,13 +333,13 @@ public sealed partial class QueryEngine
         if (node.Kind == NodeKind.Asset)
         {
             string content = Names.AssetPath(node);
-            Page<EdgeHit> page = _store.EdgesIntoAsset(node.Key["a:".Length..], EdgeKindSet.All, EdgeLimit);
+            Page<EdgeHit> page = _store.EdgesIntoAsset(node.Key["a:".Length..], EdgeKindSet.All, EdgeCap);
             more |= page.More;
             edges.AddRange(page.Items.Select(h => h.Edge).Where(e => e.File != content && e.File != node.File));
         }
         else
         {
-            Page<EdgeHit> page = _store.EdgesTo(node.Key, EdgeKindSet.All, EdgeLimit);
+            Page<EdgeHit> page = _store.EdgesTo(node.Key, EdgeKindSet.All, EdgeCap);
             more |= page.More;
             edges.AddRange(page.Items.Select(h => h.Edge));
             if (node.Kind == NodeKind.Method)
@@ -329,7 +351,7 @@ public sealed partial class QueryEngine
             {
                 foreach (string script in edges.Where(e => e.Kind == EdgeKind.ScriptDefines).Select(e => e.Src).ToList())
                 {
-                    Page<EdgeHit> on = _store.EdgesTo(script, EdgeKindSet.Of(EdgeKind.InstanceOf), EdgeLimit);
+                    Page<EdgeHit> on = _store.EdgesTo(script, EdgeKindSet.Of(EdgeKind.InstanceOf), EdgeCap);
                     more |= on.More;
                     edges.AddRange(on.Items.Select(h => h.Edge));
                 }
@@ -348,7 +370,7 @@ public sealed partial class QueryEngine
 
     private bool Resolved(string verb, string text, Answer answer, out IReadOnlyList<Node> nodes)
     {
-        Resolution resolution = SymbolResolver.Resolve(_store, text);
+        Resolution resolution = SymbolResolver.Resolve(_store, text, All);
         nodes = resolution.Nodes;
         if (resolution.Found)
         {
@@ -358,7 +380,12 @@ public sealed partial class QueryEngine
         if (resolution.Ambiguous)
         {
             answer.Add("ambiguous: " + text);
-            answer.AddRange(Answer.Table([.. nodes.Take(AmbiguousLimit).Select(FindRow)], "  "));
+            answer.AddRange(Answer.Table([.. nodes.Take(All ? NoLimit : AmbiguousLimit).Select(FindRow)], "  "));
+            if (!All && nodes.Count > AmbiguousLimit)
+            {
+                answer.Add($"  +{nodes.Count - AmbiguousLimit} more candidates: ug {verb} {Names.Quote(text)} --all");
+            }
+
             answer.Add($"  more  ug {verb} {Names.Quote(Name(nodes[0]))}");
             return false;
         }
@@ -554,11 +581,11 @@ public sealed partial class QueryEngine
     private static string Count(int count, string noun) =>
         count == 1 ? $"1 {noun}" : noun.EndsWith('y') ? $"{count} {noun[..^1]}ies" : $"{count} {noun}s";
 
-    private static void AddIfAny(List<string[]> lines, string label, IReadOnlyList<string> items)
+    private void AddIfAny(List<string[]> lines, string label, IReadOnlyList<string> items)
     {
         if (items.Count > 0)
         {
-            lines.Add([label, Names.Join(items)]);
+            lines.Add([label, Join(items)]);
         }
     }
 
@@ -570,9 +597,76 @@ public sealed partial class QueryEngine
         [.. edges.Where(e => e.Kind == kind).GroupBy(e => Names.Qualified(e.Src)).OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => g.Count() > 1 ? $"{g.Key} ({g.Count()})" : g.Key)];
 
-    private List<Edge> In(string key) => [.. _store.EdgesTo(key, EdgeKindSet.All, EdgeLimit).Items.Select(h => h.Edge)];
+    private List<Edge> In(string key) => Edges(_store.EdgesTo(key, EdgeKindSet.All, EdgeCap));
 
-    private List<Edge> Out(string key) => [.. _store.EdgesFrom(key, EdgeKindSet.All, EdgeLimit).Items.Select(h => h.Edge)];
+    private List<Edge> Out(string key) => Edges(_store.EdgesFrom(key, EdgeKindSet.All, EdgeCap));
+
+    private const string EdgesCut = "edges past 2000";
+
+    private List<Edge> Edges(Page<EdgeHit> page)
+    {
+        if (page.More)
+        {
+            Cut(EdgesCut);
+        }
+
+        return [.. page.Items.Select(h => h.Edge)];
+    }
+
+    // The edges a file owns: at most 50,000 unless --all.
+    private IReadOnlyList<EdgeHit> FileEdges(string path, EdgeKindSet kinds)
+    {
+        Page<EdgeHit> page = _store.EdgesInFile(path, kinds, All ? NoLimit : FileEdgeLimit);
+        if (page.More)
+        {
+            Cut("file edges past 50000");
+        }
+
+        return page.Items;
+    }
+
+    // A new answer for a query: what the last one cut is forgotten; JSON answers do not page.
+    private Answer Start(int budget, bool json = false)
+    {
+        _cuts.Clear();
+        _listCut = false;
+        return new Answer(budget, json ? null : From);
+    }
+
+    private void Cut(string what)
+    {
+        if (!_cuts.Contains(what))
+        {
+            _cuts.Add(what);
+        }
+    }
+
+    // `  note  cut: holders past 500, edges past 2000: ug impact X --all` when a capped read left something out.
+    private void AddCutNote(Answer answer, string command, string indent)
+    {
+        if (_cuts.Count > 0)
+        {
+            answer.Add($"{indent}note  cut: {string.Join(", ", _cuts)}: {command} --all");
+        }
+    }
+
+    // A list of at most 8 items, then `(+N)`; every item with --all.
+    private string Join(IReadOnlyList<string> items)
+    {
+        _listCut |= !All && items.Count > 8;
+        return Names.Join(items, All ? int.MaxValue : 8);
+    }
+
+    // A list of at most <paramref name="max"/> items, then `(+N)`, named in the note line as <paramref name="cut"/>; every item with --all.
+    private string Join(IReadOnlyList<string> items, int max, string cut)
+    {
+        if (!All && items.Count > max)
+        {
+            Cut(cut);
+        }
+
+        return Names.Join(items, All ? int.MaxValue : max);
+    }
 
     private Node? Node(string key)
     {

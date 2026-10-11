@@ -192,6 +192,7 @@ namespace UnityGraph.Bridge.Tests
         {
             var console = new ConsoleBuffer();
             console.Add("error", "old problem", null);
+            long id = console.LastId;
             Digest before = Digest.Take(console);
 
             console.Add("error", "NullReferenceException: Object reference not set\nat Enemy.Update", "Assets/Scripts/Enemy.cs:42");
@@ -204,9 +205,30 @@ namespace UnityGraph.Bridge.Tests
             List<string> lines = before.Compare(false);
 
             Assert.AreEqual("  now: 5 errors, 1 warning; play stopped", lines[0]);
-            Assert.AreEqual(3, lines.Count, "the now line and two error rows");
+            Assert.AreEqual(4, lines.Count, "the now line, two error rows and the rest named");
             Assert.AreEqual("  error x3  second", lines[1], "the newest rows first, repeats folded");
             Assert.AreEqual("  error  third", lines[2]);
+            Assert.AreEqual("  +1 more errors: ug console --after " + id, lines[3]);
+        }
+
+        [Test]
+        public void A_cut_error_row_names_console_whole()
+        {
+            var console = new ConsoleBuffer();
+            long id = console.LastId;
+            Digest before = Digest.Take(console);
+            console.Add("error", "NullReferenceException: Object reference not set\nat Enemy.Update", "Assets/Scripts/Enemy.cs:42");
+            console.Add("error", new string('x', 200), null);
+            console.Add("error", "third", null);
+
+            List<string> cut = before.Compare(true);
+            Assert.AreEqual("  +1 more errors: ug console --after " + id + " --whole", cut[3]);
+
+            Digest again = Digest.Take(console);
+            console.Add("error", "first line\nsecond line", null);
+            CollectionAssert.AreEqual(
+                new[] { "  now: 1 error; play stopped", "  error  first line", "  (whole text: ug console --after " + (id + 3) + " --whole)" },
+                again.Compare(true));
         }
 
         [Test]

@@ -148,6 +148,55 @@ public sealed class EditorOpsCommandTests : IDisposable
     }
 
     [Theory]
+    [InlineData("/inspect?object=Level%2FSpawner&component=WaveSpawner&field=waves", "inspect", "Level/Spawner", "--component", "WaveSpawner", "--field", "waves")]
+    [InlineData("/inspect?object=Level%2FSpawner&field=waves%5B2%5D.count&from=200", "inspect", "Level/Spawner", "--field", "waves[2].count", "--from", "200")]
+    [InlineData("/inspect?object=Assets%2FMats%2FInk.mat&from=150", "inspect", "Assets/Mats/Ink.mat", "--from", "150")]
+    [InlineData("/inspect?object=Player&from=0", "inspect", "Player", "--from", "-3")]
+    [InlineData("/ui?all=true&from=150", "ui", "--all", "--from", "150")]
+    [InlineData("/prefab/overrides?object=Level%2FCrate", "prefab", "overrides", "Level/Crate")]
+    [InlineData("/select?all=true", "select", "--all")]
+    [InlineData("/find?name=Enemy&all=true", "find", "Enemy", "--live", "--all")]
+    [InlineData("/api?type=Transform&all=true", "api", "Transform", "--all")]
+    [InlineData("/api?type=Physics&member=Raycast&all=true", "api", "Physics", "Raycast", "--all")]
+    [InlineData("/perf/memory?top=60&object=Assets%2FHero.fbx", "perf", "memory", "--object", "Assets/Hero.fbx", "--top", "60")]
+    [InlineData("/camera/noise?camera=FollowCam&all=true", "camera", "noise", "FollowCam", "--all")]
+    public void The_c1_escapes_carry_their_options(string request, params string[] args)
+    {
+        _bridge.Publish(_root, bridge: "0.9.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"whole\"]}");
+
+        var (exitCode, output) = Run(args);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("whole\n", output);
+        Assert.Equal(["/status", request], _bridge.Requests);
+    }
+
+    [Fact]
+    public void A_bridge_before_c1_refuses_the_escapes_by_name_and_keeps_the_defaults()
+    {
+        _bridge.Publish(_root, bridge: "0.8.0");
+        _bridge.Handle = path => path == "/status" ? (200, FakeBridge.Status("idle", 3)) : (200, "{\"lines\":[\"ok\"]}");
+
+        Assert.Equal("bridge 0.8.0 is too old for ug inspect --field: run ug bridge install again\n", Run("inspect", "Player", "--field", "speed").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug inspect --from: run ug bridge install again\n", Run("inspect", "Player", "--from", "150").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug ui --from: run ug bridge install again\n", Run("ui", "--all", "--from", "150").Output);
+        Assert.Equal("--from pages ug ui --all\n", Run("ui", "--from", "150").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug prefab overrides: run ug bridge install again\n", Run("prefab", "overrides", "Crate").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug select --all: run ug bridge install again\n", Run("select", "--all").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug run --all: run ug bridge install again\n", Run("run", "--list", "--all").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug api --all: run ug bridge install again\n", Run("api", "Transform", "--all").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug perf memory --object --top: run ug bridge install again\n", Run("perf", "memory", "--object", "Player", "--top", "30").Output);
+        Assert.Equal("bridge 0.8.0 is too old for ug camera noise --all: run ug bridge install again\n", Run("camera", "noise", "FollowCam", "--all").Output);
+        var refused = new StringWriter();
+        Assert.Equal(1, CliApp.Run(["run", "Tools.Spawn", "--all", "--project", _root], new StringWriter(), refused));
+        Assert.StartsWith("--all goes with --list", refused.ToString(), StringComparison.Ordinal);
+        Assert.Equal("ok\n", Run("perf", "memory", "--top", "30").Output);
+        Assert.Equal("ok\n", Run("inspect", "Player").Output);
+        Assert.Equal("/inspect?object=Player", _bridge.Requests.Last());
+    }
+
+    [Theory]
     [InlineData("/shot?from=0%2C10%2C-10&look=Enemy", "shot", "--from", "0,10,-10", "--look", "Enemy")]
     [InlineData("/shot?view=Main%20Camera&rotation=30%2C45%2C0&fov=40.5", "shot", "Main Camera", "--rotation", "30,45,0", "--fov", "40.5")]
     [InlineData("/shot?look=1%2C0%2C2&camera=Rig%2FCam", "shot", "--look", "1,0,2", "--camera", "Rig/Cam")]

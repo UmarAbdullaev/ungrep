@@ -38,6 +38,9 @@ public sealed class BridgeClient : IDisposable
     /// <summary>The oldest bridge with the profiler requests: `/perf/...` (SPEC-editor-ops, Profiler).</summary>
     public const string MinimumProfilerBridge = "0.8.0";
 
+    /// <summary>The oldest bridge with the C1 escapes: whole console and test failures, `--field`/`--from`, `--all`, prefab overrides (SPEC-editor-link, Bridge 0.9.0).</summary>
+    public const string MinimumFullBridge = "0.9.0";
+
     public static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
 
     // The bridge's listener thread accepts at once even while the editor is busy, but Windows
@@ -82,6 +85,9 @@ public sealed class BridgeClient : IDisposable
 
     /// <summary>Whether the bridge records and reads profiler frames, counters, memory and the Frame Debugger.</summary>
     public bool HasProfiler => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumProfilerBridge);
+
+    /// <summary>Whether the bridge answers the C1 escapes (nothing out of reach).</summary>
+    public bool HasFull => Version.TryParse(_info.Bridge, out Version? version) && version >= Version.Parse(MinimumFullBridge);
 
     /// <summary>How long the compile and play-mode waits sleep between status polls.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
@@ -130,7 +136,8 @@ public sealed class BridgeClient : IDisposable
 
     public CompileResult LastCompile() => BridgeJson.Parse<CompileResult>(Get("/compile", RequestTimeout));
 
-    public ConsolePage Console(long after, int limit, string? types)
+    /// <summary>The newest <paramref name="limit"/> entries after <paramref name="after"/> and, from bridge 0.9.0, before <paramref name="before"/>.</summary>
+    public ConsolePage Console(long after, int limit, string? types, long? before = null)
     {
         string query = "/console?after=" + after.ToString(CultureInfo.InvariantCulture) + "&limit=" + limit.ToString(CultureInfo.InvariantCulture);
         if (!string.IsNullOrEmpty(types))
@@ -138,8 +145,17 @@ public sealed class BridgeClient : IDisposable
             query += "&types=" + Uri.EscapeDataString(types);
         }
 
+        if (before is { } id)
+        {
+            query += "&before=" + id.ToString(CultureInfo.InvariantCulture);
+        }
+
         return BridgeJson.Parse<ConsolePage>(Get(query, RequestTimeout));
     }
+
+    /// <summary>One console entry by id (bridge 0.9.0); its page has no entries when the bridge no longer holds it.</summary>
+    public ConsolePage ConsoleEntry(long id) =>
+        BridgeJson.Parse<ConsolePage>(Get("/console?id=" + id.ToString(CultureInfo.InvariantCulture), RequestTimeout));
 
     public PlayLogPage PlayLog() => BridgeJson.Parse<PlayLogPage>(Get("/playlog", RequestTimeout));
 

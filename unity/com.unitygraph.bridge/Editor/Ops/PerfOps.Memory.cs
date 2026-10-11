@@ -26,7 +26,7 @@ namespace UnityGraph.Bridge
             string address = request.Get("object");
             if (address != null)
             {
-                return MemoryOf(address);
+                return MemoryOf(address, given);
             }
 
             int top = given ?? 10;
@@ -54,25 +54,29 @@ namespace UnityGraph.Bridge
             var types = sized.GroupBy(s => s.Key.GetType().Name)
                 .Select(g => new { Name = g.Key, Size = g.Sum(s => s.Value), Count = g.Count() })
                 .OrderByDescending(g => g.Size).ToList();
-            lines.Add("by type  " + string.Join(", ", types.Take(8).Select(t => t.Name + " " + Bytes(t.Size) + " (" + Number(t.Count) + ")"))
-                + (types.Count > 8 ? ", +" + Answer.Count(types.Count - 8, "type", "types") + " (ug perf memory --type <T>)" : ""));
+            int typesShown = given ?? 8;
+            lines.Add("by type  " + string.Join(", ", types.Take(typesShown).Select(t => t.Name + " " + Bytes(t.Size) + " (" + Number(t.Count) + ")"))
+                + (types.Count > typesShown ? ", +" + Answer.Count(types.Count - typesShown, "type", "types") + " (ug perf memory --top " + Math.Min(500, typesShown * 3) + "; --type <T>)" : ""));
             lines.Add("top objects:");
             var largest = sized.OrderByDescending(s => s.Value).ToList();
             lines.AddRange(largest.Take(top).Select(s => "  " + Bytes(s.Value) + "  " + s.Key.GetType().Name + "  " + Name(s.Key) + "  " + Where(s.Key)));
             if (largest.Count > top)
             {
-                lines.Add("  ... " + Number(largest.Count - top) + " more: ug perf memory --top " + Math.Min(500, top * 3)
-                    + (typeName == null ? "" : " --type " + typeName));
+                lines.Add("  ... " + Number(largest.Count - top) + " more: " + (top >= 500
+                    ? "ug perf memory --type <T> narrows them (500 is --top's most)"
+                    : "ug perf memory --top " + Math.Min(500, top * 3) + (typeName == null ? "" : " --type " + typeName)));
             }
 
             return Answer.Lines(lines);
         }
 
         // One object: a game object with its components, children and the assets it uses; a
-        // component; or an asset path with its sub-assets.
-        private static Reply MemoryOf(string address)
+        // component; or an asset path with its sub-assets. `given` (--top) sets how many sub-assets
+        // (default 20) and used assets (default 5).
+        private static Reply MemoryOf(string address, int? given)
         {
             address = address.Trim();
+            string again = "ug perf memory --object " + Quote(address) + " --top ";
             if (Addresses.IsAssetPath(address) && address.IndexOf(Addresses.PrefabSeparator, StringComparison.Ordinal) < 0)
             {
                 Object[] parts = AssetDatabase.LoadAllAssetsAtPath(address).Where(o => o != null).ToArray();
@@ -84,14 +88,15 @@ namespace UnityGraph.Bridge
                 var sizes = parts.Select(o => new KeyValuePair<Object, long>(o, UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(o)))
                     .OrderByDescending(s => s.Value).ToList();
                 var lines = new List<string> { address + "  " + Bytes(sizes.Sum(s => s.Value)) + " in " + Answer.Count(sizes.Count, "object", "objects") + " (loaded to measure)" };
-                lines.AddRange(sizes.Take(20).Select(s => "  " + Bytes(s.Value) + "  " + s.Key.GetType().Name + "  " + Name(s.Key)
+                int shown = given ?? 20;
+                lines.AddRange(sizes.Take(shown).Select(s => "  " + Bytes(s.Value) + "  " + s.Key.GetType().Name + "  " + Name(s.Key)
                     + (AssetDatabase.IsMainAsset(s.Key) ? "  (main)" : "")));
-                if (sizes.Count > 20)
+                if (sizes.Count > shown)
                 {
-                    lines.Add("  ... " + Number(sizes.Count - 20) + " more sub-assets");
+                    lines.Add("  ... " + Number(sizes.Count - shown) + " more sub-assets: " + again + Math.Min(500, shown * 3));
                 }
 
-                lines.AddRange(Uses(parts, address));
+                lines.AddRange(Uses(parts, address, given ?? 5, again));
                 return Answer.Lines(lines);
             }
 
@@ -110,7 +115,7 @@ namespace UnityGraph.Bridge
             if (!(found is GameObject target))
             {
                 var lines = new List<string> { address + "  " + found.GetType().Name + "  " + Bytes(UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(found)) };
-                lines.AddRange(Uses(new[] { found }, AssetDatabase.GetAssetPath(found)));
+                lines.AddRange(Uses(new[] { found }, AssetDatabase.GetAssetPath(found), given ?? 5, again));
                 return Answer.Lines(lines);
             }
 
@@ -130,12 +135,12 @@ namespace UnityGraph.Bridge
                 result.Add("children  " + Answer.Count(below.Length, "object", "objects") + ", " + Bytes(children) + " with their components");
             }
 
-            result.AddRange(Uses(new Object[] { target }, EditorUtility.IsPersistent(target) ? AssetDatabase.GetAssetPath(target) : null));
+            result.AddRange(Uses(new Object[] { target }, EditorUtility.IsPersistent(target) ? AssetDatabase.GetAssetPath(target) : null, given ?? 5, again));
             return Answer.Lines(result);
         }
 
         // The assets an object uses (meshes, materials, textures, ...), largest first; not its own asset or scripts.
-        private static IEnumerable<string> Uses(Object[] roots, string own)
+        private static IEnumerable<string> Uses(Object[] roots, string own, int shown, string again)
         {
             var used = EditorUtility.CollectDependencies(roots)
                 .Where(o => o != null && EditorUtility.IsPersistent(o) && !(o is MonoScript) && !(o is GameObject) && !(o is Component)
@@ -149,8 +154,8 @@ namespace UnityGraph.Bridge
             }
 
             yield return "uses  " + Answer.Count(used.Count, "asset", "assets") + ", " + Bytes(used.Sum(s => s.Value)) + ": "
-                + string.Join(", ", used.Take(5).Select(s => s.Key.GetType().Name + " " + Name(s.Key) + " " + Bytes(s.Value) + " (" + AssetDatabase.GetAssetPath(s.Key) + ")"))
-                + (used.Count > 5 ? ", +" + Number(used.Count - 5) : "");
+                + string.Join(", ", used.Take(shown).Select(s => s.Key.GetType().Name + " " + Name(s.Key) + " " + Bytes(s.Value) + " (" + AssetDatabase.GetAssetPath(s.Key) + ")"))
+                + (used.Count > shown ? ", +" + Number(used.Count - shown) + ": " + again + Math.Min(500, shown * 3) : "");
         }
 
         private static Type ObjectType(string name)

@@ -86,4 +86,77 @@ public sealed class AnswerTests
         Assert.Equal("(none)", Names.Join([]));
         Assert.Equal("1, 2, 3, 4, 5, 6, 7, 8 (+2)", Names.Join([.. Enumerable.Range(1, 10).Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture))]));
     }
+
+    [Fact]
+    public void A_paged_answer_skips_its_first_lines_and_names_the_next_page_at_the_largest_budget()
+    {
+        string line = new('x', 999);
+        var first = new Answer(Answer.MaxBudget, from: 0);
+        for (int i = 0; i < 40; i++)
+        {
+            first.Add(i.ToString(System.Globalization.CultureInfo.InvariantCulture) + line);
+        }
+
+        string text = first.Finish("ug refs Foo");
+        Assert.EndsWith("  more  ug refs Foo --budget 8000 --from 31\n", text, StringComparison.Ordinal);
+
+        var second = new Answer(Answer.MaxBudget, from: 31);
+        for (int i = 0; i < 40; i++)
+        {
+            second.Add(i.ToString(System.Globalization.CultureInfo.InvariantCulture) + line);
+        }
+
+        string page = second.Finish("ug refs Foo");
+        Assert.StartsWith("31x", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("more", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_paged_answer_below_the_largest_budget_keeps_its_from_in_the_more_line()
+    {
+        var answer = new Answer(Answer.MinBudget, from: 2);
+        for (int i = 0; i < 40; i++)
+        {
+            answer.Add(new string('y', 60));
+        }
+
+        Assert.EndsWith("  more  ug find y --from 2 --budget 400\n", answer.Finish("ug find y"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_page_past_the_end_says_how_long_the_answer_is()
+    {
+        var answer = new Answer(1200, from: 5);
+        answer.AddRange(["a", "b"]);
+
+        Assert.Equal("(nothing past line 5: the answer has 2 lines)\n", answer.Finish("ug find a"));
+    }
+
+    [Fact]
+    public void An_unpaged_answer_cut_at_the_largest_budget_still_asks_a_narrower_question()
+    {
+        var answer = new Answer(Answer.MaxBudget);
+        for (int i = 0; i < 40; i++)
+        {
+            answer.Add(new string('z', 999));
+        }
+
+        Assert.EndsWith("  more  (cut at the largest budget; ask a narrower question)\n", answer.Finish("ug console"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_footer_comes_last_and_its_room_is_kept_from_the_budget()
+    {
+        var answer = new Answer(Answer.MinBudget);
+        string footer = "  more  whole: ug console --whole";
+        answer.Footer(footer);
+        for (int i = 0; i < 40; i++)
+        {
+            answer.Add(new string('w', 60));
+        }
+
+        string text = answer.Finish("ug console");
+        Assert.EndsWith("--budget 400\n" + footer + "\n", text, StringComparison.Ordinal);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(text) <= Answer.MinBudget * 4);
+    }
 }

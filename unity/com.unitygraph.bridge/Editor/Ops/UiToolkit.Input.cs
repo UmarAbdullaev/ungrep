@@ -15,7 +15,6 @@ namespace UnityGraph.Bridge
     /// </summary>
     internal static partial class UiToolkit
     {
-        private const int MaxOptions = 5;
 
         /// <summary>A click at the element's centre, refused when something else is on top there.</summary>
         public static Reply Click(Target target, string value)
@@ -312,11 +311,7 @@ namespace UnityGraph.Bridge
             return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int index) && index < choices.Count ? index : -1;
         }
 
-        private static string Options(IEnumerable<string> choices)
-        {
-            List<string> all = choices.ToList();
-            return string.Join(", ", all.Take(MaxOptions)) + (all.Count > MaxOptions ? ", ..." : "");
-        }
+        private static string Options(IEnumerable<string> choices) => string.Join(", ", choices);
 
         // The T of the BaseField<T> the type derives from, or null.
         private static Type FieldType(Type type)
@@ -332,9 +327,13 @@ namespace UnityGraph.Bridge
             return null;
         }
 
-        /// <summary>The value of a value control as `ug` prints it: `on`, `0.8`, `"High"`, `open`; empty for others.</summary>
-        public static string ValueText(VisualElement element)
+        /// <summary>
+        /// The value of a value control as `ug` prints it: `on`, `0.8`, `"High"`, `open`; empty for
+        /// others. Texts are cut at 30 characters unless <paramref name="whole"/> (`ug inspect`).
+        /// </summary>
+        public static string ValueText(VisualElement element, bool whole = false)
         {
+            Func<string, string> quote = whole ? (Func<string, string>)UiItem.Whole : UiItem.Quote;
             switch (element)
             {
                 case Foldout foldout:
@@ -342,7 +341,7 @@ namespace UnityGraph.Bridge
                 case RadioButtonGroup group:
                     {
                         List<string> choices = group.choices?.ToList() ?? new List<string>();
-                        return UiItem.Quote(group.value >= 0 && group.value < choices.Count ? choices[group.value] : "");
+                        return quote(group.value >= 0 && group.value < choices.Count ? choices[group.value] : "");
                     }
 
                 case BaseField<bool> toggle:
@@ -351,16 +350,16 @@ namespace UnityGraph.Bridge
                     return UiItem.Number(scroller.value, false);
                 case BaseSlider<float> slider:
                     return UiItem.Number(slider.value, false);
-                case BaseSlider<int> whole:
-                    return whole.value.ToString(CultureInfo.InvariantCulture);
+                case BaseSlider<int> integer:
+                    return integer.value.ToString(CultureInfo.InvariantCulture);
                 case MinMaxSlider range:
                     return UiItem.Number(range.minValue, false) + "," + UiItem.Number(range.maxValue, false);
                 case TextInputBaseField<string> input:
-                    return UiItem.Quote(input.value);
+                    return quote(input.value);
                 case BasePopupField<string, string> popup:
-                    return UiItem.Quote(popup.value);
+                    return quote(popup.value);
                 case EnumField choice:
-                    return UiItem.Quote(choice.value?.ToString() ?? "");
+                    return quote(choice.value?.ToString() ?? "");
             }
 
             if (FieldType(element.GetType()) == null)
@@ -369,7 +368,7 @@ namespace UnityGraph.Bridge
             }
 
             object value = element.GetType().GetProperty("value", BindingFlags.Public | BindingFlags.Instance)?.GetValue(element);
-            return UiItem.Cut(Values.Show(value, Values.Caps.Compact, out _));
+            return whole ? Values.Show(value, Values.Caps.Full, out _) : UiItem.Cut(Values.Show(value, Values.Caps.Compact, out _));
         }
 
         /// <summary>The focused element of the top panel that has one, or null.</summary>

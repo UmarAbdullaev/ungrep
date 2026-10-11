@@ -134,6 +134,60 @@ namespace UnityGraph.Bridge.Tests
 
             Assert.AreEqual(0, buffer.Query(0, 50, null).Count);
         }
+
+        [Test]
+        public void Entries_keep_their_whole_stack_and_save_it()
+        {
+            var buffer = new ConsoleBuffer();
+            buffer.Add("error", "boom", "Assets/A.cs:3", "A:Fire () (at Assets/A.cs:3)\nUnityEngine.Debug:LogError (object)\n");
+            buffer.Add("log", "plain", null, "");
+
+            var restored = new ConsoleBuffer();
+            restored.Restore(buffer.Save());
+
+            List<ConsoleBuffer.Entry> all = restored.Query(0, 50, null);
+            Assert.AreEqual("A:Fire () (at Assets/A.cs:3)\nUnityEngine.Debug:LogError (object)", all[0].Stack);
+            Assert.IsNull(all[1].Stack);
+        }
+
+        [Test]
+        public void Text_past_the_bound_is_cut_and_says_so()
+        {
+            var buffer = new ConsoleBuffer();
+            buffer.Add("log", new string('a', ConsoleBuffer.MaxText + 10), null, new string('s', ConsoleBuffer.MaxText + 1));
+
+            ConsoleBuffer.Entry entry = buffer.Query(0, 1, null).Single();
+            StringAssert.EndsWith("a... (cut at 8000 characters)", entry.Text);
+            Assert.AreEqual(ConsoleBuffer.MaxText + "... (cut at 8000 characters)".Length, entry.Stack.Length);
+        }
+
+        [Test]
+        public void Before_pages_back_and_find_reads_one_entry()
+        {
+            var buffer = new ConsoleBuffer();
+            for (int i = 1; i <= 10; i++)
+            {
+                buffer.Add("log", "m" + i, null);
+            }
+
+            CollectionAssert.AreEqual(new[] { "m5", "m6" }, buffer.Query(0, 2, null, before: 7).Select(e => e.Text).ToArray());
+            CollectionAssert.AreEqual(new[] { "m4", "m5", "m6" }, buffer.Query(3, 50, null, before: 7).Select(e => e.Text).ToArray());
+            Assert.AreEqual("m4", buffer.Find(4).Text);
+            Assert.IsNull(buffer.Find(11));
+            Assert.AreEqual(1, buffer.OldestId);
+        }
+
+        [Test]
+        public void A_buffer_saved_before_stacks_restores_without_them()
+        {
+            var buffer = new ConsoleBuffer();
+            buffer.Restore("2\n1\terror\told\t+Assets/A.cs:1\t1\n2\tlog\tplain\t-\t3\n");
+
+            List<ConsoleBuffer.Entry> all = buffer.Query(0, 50, null);
+            Assert.AreEqual(2, all.Count);
+            Assert.IsNull(all[0].Stack);
+            Assert.AreEqual(3, all[1].Count);
+        }
     }
 
     public class CompileLogTests

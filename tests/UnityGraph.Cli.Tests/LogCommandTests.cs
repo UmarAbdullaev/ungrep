@@ -65,6 +65,23 @@ public sealed class LogCommandTests : LoopFixture
     }
 
     [Fact]
+    public void A_full_page_names_the_console_ids_of_the_rest_and_whole_prints_stacks()
+    {
+        (long, string, string, string?, int)[] many = [.. Enumerable.Range(0, 500).Select(i => ((long)4100 + i, "log", "tick", (string?)null, 1))];
+        Serve(Finished, FullConsoleJson(4120, 1, (4110, "error", "boom\nmore", "Assets/A.cs:3", 1, "A:Fire () (at Assets/A.cs:3)\nUnityEngine.Debug:LogError (object)")), ConsoleJson(4120, many), bridge: "0.9.0");
+
+        string[] lines = Run("log").Output.Split('\n');
+        Assert.Equal("  more  whole: ug log --whole; earlier logs: ug console --after 4001 --before 4100 --level log", lines[^2]);
+
+        string whole = Run("log", "--whole").Output;
+        Assert.Contains("  error  #4110  boom  Assets/A.cs:3\n    boom\n    more\n    stack:\n      A:Fire () (at Assets/A.cs:3)\n", whole, StringComparison.Ordinal);
+
+        Serve(Finished, ConsoleJson(4120), ConsoleJson(4120));
+        Assert.Equal("bridge 0.3.0 is too old for ug log --whole: run ug bridge install again\n", Run("log", "--whole").Output);
+        Assert.Equal((1, "--whole goes with --for\n"), Run("play", "--whole"));
+    }
+
+    [Fact]
     public void A_running_session_says_so()
     {
         string start = DateTimeOffset.UtcNow.AddSeconds(-5).ToString(TimeFormat, CultureInfo.InvariantCulture);
@@ -190,9 +207,9 @@ public sealed class LogCommandTests : LoopFixture
     }
 
     // problems: the answer to the error,warning query; logs: to the log query; extra: other paths (null: not served).
-    private void Serve(string playlog, string problems, string logs, Func<string, (int, string)?>? extra = null)
+    private void Serve(string playlog, string problems, string logs, Func<string, (int, string)?>? extra = null, string bridge = "0.3.0")
     {
-        Bridge.Publish(Root, "0.3.0");
+        Bridge.Publish(Root, bridge);
         Bridge.Handle = path =>
         {
             if (extra?.Invoke(path) is { } answer)

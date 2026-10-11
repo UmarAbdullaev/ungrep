@@ -73,8 +73,10 @@ namespace UnityGraph.Bridge.Tests
         {
             StringAssert.StartsWith("no key or button Spase; near: Space", KeyNames.Unknown("Spase"));
             StringAssert.StartsWith("no key or button Zzzzzzzzzzzz; keys: ", KeyNames.Unknown("Zzzzzzzzzzzz"));
-            StringAssert.EndsWith("pad:south for a gamepad button, mouse:left for a mouse button", KeyNames.Unknown("Zzzzzzzzzzzz"));
+            StringAssert.EndsWith(", ... (every key: ug api UnityEngine.InputSystem.Key --all); pad:south for a gamepad button, mouse:left for a mouse button", KeyNames.Unknown("Zzzzzzzzzzzz"));
             StringAssert.StartsWith("no gamepad button zzz; buttons: south", KeyNames.Unknown("pad:zzz"));
+            StringAssert.Contains("select", KeyNames.Unknown("pad:zzz"));
+            StringAssert.EndsWith(", right", KeyNames.Unknown("pad:zzz"));
             StringAssert.StartsWith("no mouse button thumb; buttons: ", KeyNames.Unknown("mouse:thumb"));
         }
 

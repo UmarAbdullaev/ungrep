@@ -259,6 +259,55 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void A_cut_label_says_so_and_inspect_shows_texts_and_options_whole()
+        {
+            const string Long = "Start a new game from the very first level";
+            Element<Button>("Play").text = Long + "\nnow";
+            Element<Button>("Play").tooltip = "Begins again: " + Long;
+            Element<TextField>("Player").value = Long;
+            Element<DropdownField>("Quality").choices = new List<string> { "Low", "Medium", "High", "Ultra", "Epic", "Cinematic", "Custom" };
+
+            Assert.AreEqual(UiItem.CutNote, Split(Ask("/tree", "ui", "Menu")).Last());
+
+            List<string> inspect = UiToolkit.Inspect(Target("Menu/Play")).Lines.ToList();
+            StringAssert.StartsWith("Menu/Play  UnityEngine.UIElements.Button  \"" + Long + "\\nnow\"  (Menu: ", inspect[0]);
+            CollectionAssert.Contains(inspect, "tooltip  \"Begins again: " + Long + "\"");
+            Assert.LessOrEqual(inspect.Count, 16, string.Join("\n", inspect));
+            CollectionAssert.Contains(UiToolkit.Inspect(Target("Menu/Player")).Lines.ToList(), "value  \"" + Long + "\"");
+            CollectionAssert.Contains(UiToolkit.Inspect(Target("Menu/Quality")).Lines.ToList(), "value  \"High\"  options Low, Medium, High, Ultra, Epic, Cinematic, Custom");
+            Assert.AreEqual(Err("Menu/Quality has no option Nope (options: Low, Medium, High, Ultra, Epic, Cinematic, Custom)"), UiToolkit.Click(Target("Menu/Quality"), "Nope").Body);
+
+            VisualElement panel = _document.rootVisualElement.Q("Panel");
+            for (int i = 0; i < 12; i++)
+            {
+                panel.Add(new Label("x") { name = "Dup" });
+            }
+
+            StringAssert.EndsWith(", ... 2 more: ug tree --ui Menu/Panel", FindError("Menu/Panel/Dup"));
+
+            NeedScreen();
+            List<string> lines = PlayInput.List(false).Lines.ToList();
+            Assert.AreEqual("  " + UiItem.CutNote, lines.Last(), string.Join("\n", lines));
+            Element<Button>("Play").text = "Play";
+            Element<TextField>("Player").value = "Bob";
+            Assert.IsFalse(PlayInput.List(false).Lines.Contains("  " + UiItem.CutNote));
+        }
+
+        [Test]
+        public void All_from_pages_past_its_lines_and_says_where_the_list_ends()
+        {
+            NeedScreen();
+
+            List<string> all = PlayInput.List(true).Lines.ToList();
+            List<string> rest = PlayInput.List(true, 2).Lines.ToList();
+
+            Assert.AreEqual(all[0], rest[0], "the headline stays");
+            CollectionAssert.AreEqual(all.Skip(3).ToList(), rest.Skip(1).ToList());
+            int elements = all.Count - 1;
+            Assert.AreEqual("  (nothing from element 50: " + elements + " elements)", PlayInput.List(true, 50).Lines.Last());
+        }
+
+        [Test]
         public void Set_changes_the_live_element_and_says_it_is_not_kept()
         {
             const string Keep = "  (live element only: not saved, no undo; edit " + UxmlPath + " or .uss to keep it)";

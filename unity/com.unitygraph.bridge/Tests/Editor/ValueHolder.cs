@@ -29,6 +29,13 @@ namespace UnityGraph.Bridge.Tests
         public string name;
     }
 
+    [Serializable]
+    public struct Nest
+    {
+        public Pair inner;
+        public int level;
+    }
+
     /// <summary>Every kind of field `ug set` reads from text, for ValuesCompoundTests.</summary>
     public class ValueHolder : ScriptableObject
     {
@@ -42,5 +49,6 @@ namespace UnityGraph.Bridge.Tests
         public string[] names;
         public List<Pair> pairs;
         public int[] numbers;
+        public Nest nest;
     }
 }

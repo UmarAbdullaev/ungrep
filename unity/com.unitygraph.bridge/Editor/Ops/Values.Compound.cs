@@ -15,7 +15,7 @@ namespace UnityGraph.Bridge
     /// </summary>
     internal static partial class Values
     {
-        internal static string FormatCurve(AnimationCurve curve)
+        internal static string FormatCurve(AnimationCurve curve, int maxItems = MaxItems)
         {
             if (curve == null || curve.length == 0)
             {
@@ -23,21 +23,26 @@ namespace UnityGraph.Bridge
             }
 
             Keyframe[] keys = curve.keys;
-            return "curve " + string.Join(", ", keys.Take(MaxItems).Select(k => Number(k.time) + ":" + Number(k.value)))
-                + (keys.Length > MaxItems ? ", ... " + (keys.Length - MaxItems).ToString(CultureInfo.InvariantCulture) + " more" : "");
+            return "curve " + string.Join(", ", keys.Take(maxItems).Select(k => Number(k.time) + ":" + Number(k.value)))
+                + (keys.Length > maxItems ? ", ... " + (keys.Length - maxItems).ToString(CultureInfo.InvariantCulture) + " more" : "");
         }
 
-        internal static string FormatGradient(Gradient gradient)
+        internal static string FormatGradient(Gradient gradient, int maxItems = MaxItems)
         {
             if (gradient == null)
             {
                 return "gradient";
             }
 
-            var times = new SortedSet<float>(gradient.colorKeys.Select(k => k.time).Concat(gradient.alphaKeys.Select(k => k.time)));
+            SortedSet<float> times = GradientTimes(gradient);
             return "gradient " + (gradient.mode == GradientMode.Fixed ? "fixed " : "")
-                + string.Join(", ", times.Take(MaxItems).Select(t => "#" + ColorUtility.ToHtmlStringRGBA(GradientAt(gradient, t)).ToLowerInvariant() + "@" + Number(Mathf.Round(t * 10000f) / 10000f)));
+                + string.Join(", ", times.Take(maxItems).Select(t => "#" + ColorUtility.ToHtmlStringRGBA(GradientAt(gradient, t)).ToLowerInvariant() + "@" + Number(Mathf.Round(t * 10000f) / 10000f)))
+                + (times.Count > maxItems ? ", ... " + (times.Count - maxItems).ToString(CultureInfo.InvariantCulture) + " more" : "");
         }
+
+        // Every color and alpha key time, once each.
+        private static SortedSet<float> GradientTimes(Gradient gradient) =>
+            new SortedSet<float>(gradient.colorKeys.Select(k => k.time).Concat(gradient.alphaKeys.Select(k => k.time)));
 
         // The color at a key time; at an exact key its own color, so a fixed gradient reads back as written.
         private static Color GradientAt(Gradient gradient, float time)
@@ -165,7 +170,7 @@ namespace UnityGraph.Bridge
 
         private static string ManagedChoices(SerializedProperty p)
         {
-            string[] names = ManagedCandidates(p).Select(t => t.Name).Distinct().Take(MaxItems).ToArray();
+            string[] names = ManagedCandidates(p).Select(t => t.Name).Distinct().ToArray();
             return names.Length == 0 ? "" : "; one of " + string.Join(", ", names);
         }
 

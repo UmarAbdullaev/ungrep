@@ -14,6 +14,20 @@ namespace UnityGraph.Bridge.Tests
         }
     }
 
+    // Nine public types named ApiDupC1, one more than an ambiguous name lists.
+    public static class ApiDupHolders
+    {
+        public static class A { public class ApiDupC1 { } }
+        public static class B { public class ApiDupC1 { } }
+        public static class C { public class ApiDupC1 { } }
+        public static class D { public class ApiDupC1 { } }
+        public static class E { public class ApiDupC1 { } }
+        public static class F { public class ApiDupC1 { } }
+        public static class G { public class ApiDupC1 { } }
+        public static class H { public class ApiDupC1 { } }
+        public static class I { public class ApiDupC1 { } }
+    }
+
     /// <summary>`/api`: reflection answers for common types, small; and the pointers to documentation pages when reflection cannot answer.</summary>
     public class ApiOpsTests : OpsFixture
     {
@@ -47,7 +61,7 @@ namespace UnityGraph.Bridge.Tests
             StringAssert.Contains("\"props  position, localPosition, ", body);
             StringAssert.Contains("\"methods  ", body);
             StringAssert.Contains("Translate", body);
-            StringAssert.Contains("\"ug api Transform.<member> for signatures (inherited members too)\"]", body);
+            StringAssert.Contains("\"ug api Transform.<member> for signatures (inherited members too); the rest: ug api Transform --all\"]", body);
         }
 
         [TestCase("Transform")]
@@ -274,6 +288,57 @@ namespace UnityGraph.Bridge.Tests
             Assert.AreEqual(Err("give a type: ug api Transform, ug api Transform.position, ug api UnityEngine.Physics.Raycast"), Ask("/api"));
             Assert.AreEqual(Err("not a type or member name: a b"), Ask("/api", "type", "a b"));
             Assert.AreEqual(Err("not a type or member name: Transform.x y"), Ask("/api", "type", "Transform", "member", "x y"));
+        }
+
+        [Test]
+        public void A_cut_type_names_all_which_lists_every_name()
+        {
+            string cut = Ask("/api", "type", "Transform");
+            string all = Ask("/api", "type", "Transform", "all", "true");
+
+            StringAssert.Contains(" more\"", cut);
+            StringAssert.DoesNotContain("GetSiblingIndex", cut);
+            StringAssert.EndsWith("\"ug api Transform.<member> for signatures (inherited members too); the rest: ug api Transform --all\"]}", cut);
+            StringAssert.DoesNotContain(" more", all);
+            StringAssert.EndsWith("\"ug api Transform.<member> for signatures (inherited members too)\"]}", all);
+            foreach (string name in new[] { "DetachChildren", "SetSiblingIndex", "GetSiblingIndex", "IsChildOf", "SetAsLastSibling" })
+            {
+                StringAssert.Contains(name, all);
+            }
+        }
+
+        [Test]
+        public void A_cut_enum_says_which_command_lists_every_value()
+        {
+            string cut = Ask("/api", "type", "KeyCode");
+            string all = Ask("/api", "type", "KeyCode", "all", "true");
+
+            StringAssert.EndsWith(" more\",\"every value: ug api KeyCode --all\"]}", cut);
+            StringAssert.DoesNotContain(" more", all);
+            StringAssert.Contains("Joystick8Button19", all);
+        }
+
+        [Test]
+        public void Past_25_overloads_the_cut_line_names_all()
+        {
+            string cut = Ask("/api", "type", "System.Convert", "member", "ToString");
+            string all = Ask("/api", "type", "System.Convert", "member", "ToString", "all", "true");
+            int overloads = typeof(Convert).GetMethods().Count(m => m.Name == "ToString" && m.IsPublic);
+
+            StringAssert.EndsWith("\"  +" + (overloads - 25) + " more: ug api Convert.ToString --all\"]}", cut);
+            Assert.AreEqual(overloads + 1, all.Split(new[] { "\",\"" }, StringSplitOptions.None).Length, all);
+        }
+
+        [Test]
+        public void An_ambiguous_name_past_eight_types_names_all_which_lists_every_one()
+        {
+            string cut = Ask("/api", "type", "ApiDupC1");
+            string all = Ask("/api", "type", "ApiDupC1", "all", "true");
+
+            StringAssert.StartsWith("{\"error\":\"ambiguous: ApiDupC1 (9 types): ", cut);
+            StringAssert.EndsWith(", ... 1 more: ug api ApiDupC1 --all; use the full name\"}", cut);
+            StringAssert.Contains("ApiDupHolders+I+ApiDupC1", all);
+            StringAssert.EndsWith("ApiDupC1; use the full name\"}", all);
         }
 
         [Test]
