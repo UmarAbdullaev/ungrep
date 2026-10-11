@@ -384,16 +384,27 @@ namespace UnityGraph.Bridge
                 return SetImporter(address.Trim(), field, value);
             }
 
-            UnityEngine.Object target = Addresses.FindObject(address, out string error);
+            // With --component the address is the object's; without, it may name the component itself.
+            string component = request.Get("component");
+            string error;
+            UnityEngine.Object target = string.IsNullOrWhiteSpace(component)
+                ? Addresses.FindObjectOrComponent(address, out error)
+                : Addresses.FindObject(address, out error);
             if (target == null)
             {
                 UiToolkit.Target element = UiToolkit.Find(address, out string elementError);
                 return element != null ? UiToolkit.Set(element, field, value) : Answer.Error(elementError ?? error);
             }
 
+            if (target is Component)
+            {
+                Addresses.SplitComponent(address, out string owner, out string named);
+                return Edit("set", owner, go => SetOnObject(go, named, field, value));
+            }
+
             if (target is GameObject)
             {
-                return Edit("set", address, go => SetOnObject(go, request.Get("component"), field, value));
+                return Edit("set", address, go => SetOnObject(go, component, field, value));
             }
 
             if (target is Material material)

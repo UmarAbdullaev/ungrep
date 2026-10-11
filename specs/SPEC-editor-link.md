@@ -483,6 +483,16 @@ a viewpoint or sheet whose source camera's culling mask is Nothing draws every l
 (SPEC-editor-ops, Viewpoints), and `ug inspect` on a prefab instance root counts its overrides
 as `ug prefab overrides` lists them (SPEC-editor-ops, C1). An older bridge keeps the old answers.
 
+## Bridge 0.12.0 (component addresses)
+
+`ug inspect`, `ug set` and `ug event` take a component address as their object
+(`Boot:AudioSource`), and `X:Y` resolves by its two readings, object and component, everywhere a
+component address is taken, `ambiguous:` with one form per reading when both match; answers print
+addresses that read one way only (`Main:/Camera`, `Main:Main:AudioSource`,
+`Assets/X.prefab::Rigidbody`) (SPEC-editor-ops, Addressing objects). The W1 dry run lost calls to
+`ug set Boot:AudioSource ...` on purge-squad, whose scene `Boot` has a root object `Boot`. No new
+request or flag, so `ug` gates nothing on it; an older bridge answers `not found:` as before.
+
 ## Performance targets
 
 | Operation | Target |

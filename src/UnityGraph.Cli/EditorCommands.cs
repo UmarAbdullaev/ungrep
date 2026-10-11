@@ -356,6 +356,7 @@ internal static partial class EditorCommands
     private static IEnumerable<Command> OpsCommands()
     {
         const string Address = "Object address: Player/Gun, Enemy#2, Main:Player, Assets/X.prefab:Child, or an asset path.";
+        const string OrComponent = " Or a component in place of --component: Player:Rigidbody (bridge 0.12.0).";
 
         Command scene = Ops("scene", "scene", "Loaded scenes: active, modified, root count; and the play state.", [], _ => new OpRequest("/scene"));
         Argument<string> openPath = Required("path", "Scene asset path, like Assets/Scenes/Main.unity.");
@@ -395,7 +396,7 @@ internal static partial class EditorCommands
         yield return Ops("tree", "tree", "The live hierarchy under an object: names, components, active state; --ui for a UI Toolkit visual tree.", [treeObject, depth, treeUi], r =>
             new OpRequest(Query("/tree", ("object", r.GetValue(treeObject)), ("depth", Number(r.GetValue(depth))), ("ui", r.GetValue(treeUi)))) { UiToolkit = r.GetValue(treeUi) != null, Option = r.GetValue(treeUi) != null ? "--ui" : null });
 
-        Argument<string> inspected = Required("object", Address + " Or a UI Toolkit element: Menu/Play.");
+        Argument<string> inspected = Required("object", Address + OrComponent + " Or a UI Toolkit element: Menu/Play.");
         Option<string?> inspectComponent = Text("--component", "Show this component's fields: its type name, #n for the n-th.");
         Option<bool> inspectImporter = Flag("--importer", "Show an asset's import settings.");
         Option<string?> inspectField = Text("--field", "One field whole, as ug set names it (waves, waves[2].count): every element and level (bridge 0.9.0).");
@@ -456,7 +457,7 @@ internal static partial class EditorCommands
             new OpRequest(Query("/component/remove", ("object", r.GetValue(removeFrom)), ("component", r.GetValue(component))), r.GetValue(removeFrom))));
         yield return components;
 
-        Argument<string> target = Required("object", Address + " Or a UI Toolkit element (live only, no undo): Menu/Play.");
+        Argument<string> target = Required("object", Address + OrComponent + " Or a UI Toolkit element (live only, no undo): Menu/Play.");
         Argument<string> field = Required("field", "Serialized or display name: speed, m_LocalPosition, waves[2].count, list.size. An element: text, tooltip, name, enabled, display, visibility, class (+a -b ~c), value, style.<uss name>.");
         Argument<string> value = Required("value", "Number, true/false, text, enum name, 1,2,3, #ff8800, an object address, an asset path, or null.");
         Option<string?> setComponent = Text("--component", "The component with the field. Default: the object, then the one component that has it.");
@@ -467,12 +468,12 @@ internal static partial class EditorCommands
                 r.GetValue(target)));
 
         var events = new Command("event", "List, add and remove the persistent calls of a UnityEvent field, like Button.onClick (unsaved until ug save).");
-        Argument<string> eventsOf = Required("object", Address);
+        Argument<string> eventsOf = Required("object", Address + OrComponent);
         Argument<string?> listedEvent = Optional("event", "Only this event, like onClick. Default: every event that has calls.");
         Option<string?> listComponent = Text("--component", "The component with the event.");
         events.Subcommands.Add(Ops("list", "event list", "Show the calls of an object's events.", [eventsOf, listedEvent, listComponent], r =>
             new OpRequest(Query("/event/list", ("object", r.GetValue(eventsOf)), ("event", r.GetValue(listedEvent)), ("component", r.GetValue(listComponent))))));
-        Argument<string> eventHolder = Required("object", Address);
+        Argument<string> eventHolder = Required("object", Address + OrComponent);
         Argument<string> eventName = Required("event", "The event field: onClick, onValueChanged, ...");
         Argument<string> eventTarget = Required("target", "Whose method to call: Canvas:UiHandler (a component), or an object address when one component has the method.");
         Argument<string> eventMethod = Required("method", "A public void method, or a property to set (enabled, text).");
@@ -482,7 +483,7 @@ internal static partial class EditorCommands
             new OpRequest(
                 Query("/event/add", ("object", r.GetValue(eventHolder)), ("event", r.GetValue(eventName)), ("target", r.GetValue(eventTarget)), ("method", r.GetValue(eventMethod)), ("component", r.GetValue(eventComponent)), ("arg", r.GetValue(eventArg))),
                 r.GetValue(eventHolder))));
-        Argument<string> eventFrom = Required("object", Address);
+        Argument<string> eventFrom = Required("object", Address + OrComponent);
         Argument<string> eventRemoved = Required("event", "The event field: onClick, ...");
         Argument<string?> eventIndex = Optional("index", "Which call (ug event list); optional when the event has one.");
         Option<string?> removeComponent = Text("--component", "The component with the event.");

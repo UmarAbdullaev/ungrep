@@ -30,13 +30,17 @@ namespace UnityGraph.Bridge
 
         public static Reply List(Request request)
         {
-            GameObject target = Addresses.Find(request.Get("object"), out string error);
+            if (!Holder(request, out string address, out string componentName, out string error))
+            {
+                return Answer.Error(error);
+            }
+
+            GameObject target = Addresses.Find(address, out error);
             if (target == null)
             {
                 return Answer.Error(error);
             }
 
-            string componentName = request.Get("component");
             string eventName = request.Get("event");
             List<Component> components;
             if (string.IsNullOrWhiteSpace(componentName))
@@ -90,86 +94,125 @@ namespace UnityGraph.Bridge
             return Answer.Lines(lines);
         }
 
-        public static Reply Add(Request request) => EditOps.Edit("event add", request.Get("object"), go =>
+        public static Reply Add(Request request)
         {
-            string method = request.Get("method");
-            if (string.IsNullOrWhiteSpace(method))
+            if (!Holder(request, out string address, out string component, out string missing))
             {
-                return Answer.Error("no method given");
+                return Answer.Error(missing);
             }
 
-            if (!Locate(go, request.Get("component"), request.Get("event"), out Component owner, out SerializedObject serialized, out SerializedProperty field, out string error))
+            return EditOps.Edit("event add", address, go =>
             {
-                return Answer.Error(error);
-            }
-
-            UnityEngine.Object target = Target(go, request.Get("target"), method.Trim(), out error);
-            if (target == null)
-            {
-                return Answer.Error(error);
-            }
-
-            string argument = request.Get("arg");
-            MethodInfo chosen = Choose(target.GetType(), method.Trim(), EventArguments(field), argument != null, out int mode, out error);
-            if (chosen == null)
-            {
-                return Answer.Error(error);
-            }
-
-            SerializedProperty calls = field.FindPropertyRelative(Calls);
-            calls.arraySize++;
-            SerializedProperty call = calls.GetArrayElementAtIndex(calls.arraySize - 1);
-            Reset(call);
-            call.FindPropertyRelative("m_Target").objectReferenceValue = target;
-            call.FindPropertyRelative("m_TargetAssemblyTypeName").stringValue = TypeName(target.GetType());
-            call.FindPropertyRelative("m_MethodName").stringValue = chosen.Name;
-            call.FindPropertyRelative("m_Mode").enumValueIndex = mode;
-            call.FindPropertyRelative("m_CallState").enumValueIndex = RuntimeOnly;
-            if (mode != EventDefined && mode != Void)
-            {
-                string problem = SetArgument(call.FindPropertyRelative("m_Arguments"), mode, chosen.GetParameters()[0].ParameterType, argument);
-                if (problem != null)
+                string method = request.Get("method");
+                if (string.IsNullOrWhiteSpace(method))
                 {
-                    return Answer.Error(problem);
+                    return Answer.Error("no method given");
                 }
-            }
 
-            serialized.ApplyModifiedProperties();
-            serialized.Update();
-            return Answer.Line(Addresses.Of(go) + "  " + Addresses.ComponentName(owner) + "." + Values.ShownName(field.name)
-                + "  + " + Describe(field.FindPropertyRelative(Calls).GetArrayElementAtIndex(calls.arraySize - 1)) + Answer.Unsaved(go));
-        });
+                if (!Locate(go, component, request.Get("event"), out Component owner, out SerializedObject serialized, out SerializedProperty field, out string error))
+                {
+                    return Answer.Error(error);
+                }
 
-        public static Reply Remove(Request request) => EditOps.Edit("event remove", request.Get("object"), go =>
+                UnityEngine.Object target = Target(go, request.Get("target"), method.Trim(), out error);
+                if (target == null)
+                {
+                    return Answer.Error(error);
+                }
+
+                string argument = request.Get("arg");
+                MethodInfo chosen = Choose(target.GetType(), method.Trim(), EventArguments(field), argument != null, out int mode, out error);
+                if (chosen == null)
+                {
+                    return Answer.Error(error);
+                }
+
+                SerializedProperty calls = field.FindPropertyRelative(Calls);
+                calls.arraySize++;
+                SerializedProperty call = calls.GetArrayElementAtIndex(calls.arraySize - 1);
+                Reset(call);
+                call.FindPropertyRelative("m_Target").objectReferenceValue = target;
+                call.FindPropertyRelative("m_TargetAssemblyTypeName").stringValue = TypeName(target.GetType());
+                call.FindPropertyRelative("m_MethodName").stringValue = chosen.Name;
+                call.FindPropertyRelative("m_Mode").enumValueIndex = mode;
+                call.FindPropertyRelative("m_CallState").enumValueIndex = RuntimeOnly;
+                if (mode != EventDefined && mode != Void)
+                {
+                    string problem = SetArgument(call.FindPropertyRelative("m_Arguments"), mode, chosen.GetParameters()[0].ParameterType, argument);
+                    if (problem != null)
+                    {
+                        return Answer.Error(problem);
+                    }
+                }
+
+                serialized.ApplyModifiedProperties();
+                serialized.Update();
+                return Answer.Line(Addresses.Of(go) + "  " + Addresses.ComponentName(owner) + "." + Values.ShownName(field.name)
+                    + "  + " + Describe(field.FindPropertyRelative(Calls).GetArrayElementAtIndex(calls.arraySize - 1)) + Answer.Unsaved(go));
+            });
+        }
+
+        public static Reply Remove(Request request)
         {
-            if (!Locate(go, request.Get("component"), request.Get("event"), out Component owner, out SerializedObject serialized, out SerializedProperty field, out string error))
+            if (!Holder(request, out string address, out string component, out string missing))
             {
-                return Answer.Error(error);
+                return Answer.Error(missing);
             }
 
-            SerializedProperty calls = field.FindPropertyRelative(Calls);
-            string where = Addresses.Of(go) + "  " + Addresses.ComponentName(owner) + "." + Values.ShownName(field.name);
-            if (calls.arraySize == 0)
+            return EditOps.Edit("event remove", address, go =>
             {
-                return Answer.Error(where + " has no calls");
+                if (!Locate(go, component, request.Get("event"), out Component owner, out SerializedObject serialized, out SerializedProperty field, out string error))
+                {
+                    return Answer.Error(error);
+                }
+
+                SerializedProperty calls = field.FindPropertyRelative(Calls);
+                string where = Addresses.Of(go) + "  " + Addresses.ComponentName(owner) + "." + Values.ShownName(field.name);
+                if (calls.arraySize == 0)
+                {
+                    return Answer.Error(where + " has no calls");
+                }
+
+                string text = request.Get("index");
+                int index = 0;
+                bool bad = string.IsNullOrWhiteSpace(text)
+                    ? calls.arraySize > 1
+                    : !int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out index) || index >= calls.arraySize;
+                if (bad)
+                {
+                    return Answer.Error(where + " has " + Answer.Count(calls.arraySize, "call", "calls") + ": give an index from 0 to "
+                        + (calls.arraySize - 1).ToString(CultureInfo.InvariantCulture) + " (ug event list)");
+                }
+
+                string removed = Describe(calls.GetArrayElementAtIndex(index));
+                calls.DeleteArrayElementAtIndex(index);
+                serialized.ApplyModifiedProperties();
+                return Answer.Line(where + "  - " + removed + Answer.Unsaved(go));
+            });
+        }
+
+        // The object holding the event and its component: `Canvas:UiHandler` names both, as
+        // `Canvas --component UiHandler` does; read both ways, so an ambiguous address is refused.
+        // Any other miss is the object's to answer, as a package prefab's refusal.
+        private static bool Holder(Request request, out string address, out string component, out string error)
+        {
+            address = request.Get("object");
+            component = request.Get("component");
+            error = null;
+            if (!string.IsNullOrWhiteSpace(component))
+            {
+                return true;
             }
 
-            string text = request.Get("index");
-            int index = 0;
-            bool bad = string.IsNullOrWhiteSpace(text)
-                ? calls.arraySize > 1
-                : !int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out index) || index >= calls.arraySize;
-            if (bad)
+            UnityEngine.Object found = Addresses.FindObjectOrComponent(address, out error);
+            if (found is Component && Addresses.SplitComponent(address, out string owner, out string named))
             {
-                return Answer.Error(where + " has " + Answer.Count(calls.arraySize, "call", "calls") + ": give an index from 0 to "
-                    + (calls.arraySize - 1).ToString(CultureInfo.InvariantCulture) + " (ug event list)");
+                address = owner;
+                component = named;
             }
 
-            string removed = Describe(calls.GetArrayElementAtIndex(index));
-            calls.DeleteArrayElementAtIndex(index);
-            serialized.ApplyModifiedProperties();
-            return Answer.Line(where + "  - " + removed + Answer.Unsaved(go));
-        });
+            return found != null || !Addresses.IsAmbiguous(error);
+        }
 
         // The event fields (UnityEvent and its generic forms) among the top-level serialized fields.
         private static IEnumerable<SerializedProperty> Events(SerializedObject serialized) =>
@@ -255,20 +298,7 @@ namespace UnityGraph.Bridge
                 return null;
             }
 
-            UnityEngine.Object found = FindIn(from, text, out string notFound);
-            if (found == null)
-            {
-                int colon = text.LastIndexOf(':');
-                GameObject owner = colon > 0 ? FindIn(from, text.Substring(0, colon), out _) as GameObject : null;
-                found = owner == null ? null : Addresses.Component(owner, text.Substring(colon + 1), out error);
-                if (found == null)
-                {
-                    error = error ?? notFound;
-                }
-
-                return found;
-            }
-
+            UnityEngine.Object found = Addresses.FindObjectOrComponent(text, (string address, out string missing) => FindIn(from, address, out missing), out error);
             if (!(found is GameObject go))
             {
                 return found;
@@ -283,7 +313,7 @@ namespace UnityGraph.Bridge
             if (holders.Count > 1)
             {
                 error = "ambiguous: " + method + " is on " + string.Join(", ", holders.Select(Addresses.ComponentName))
-                    + ": name the component (" + Addresses.Of(go) + ":" + Addresses.ComponentName(holders[0]) + ")";
+                    + ": name the component (" + Addresses.Of(holders[0]) + ")";
                 return null;
             }
 
@@ -450,7 +480,7 @@ namespace UnityGraph.Bridge
         {
             UnityEngine.Object target = call.FindPropertyRelative("m_Target").objectReferenceValue;
             string owner = target == null ? "missing target"
-                : target is Component component ? Addresses.Of(component.gameObject) + ":" + Addresses.ComponentName(component)
+                : target is Component component ? Addresses.Of(component)
                 : target is GameObject go ? Addresses.Of(go)
                 : target.name;
             SerializedProperty arguments = call.FindPropertyRelative("m_Arguments");

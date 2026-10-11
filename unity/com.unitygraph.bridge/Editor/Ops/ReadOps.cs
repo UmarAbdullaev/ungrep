@@ -83,14 +83,18 @@ namespace UnityGraph.Bridge
 
         public static Reply Inspect(Request request)
         {
-            UnityEngine.Object target = Addresses.FindObject(request.Get("object"), out string error);
+            // With --component the address is the object's; without, it may name the component itself.
+            string component = request.Get("component");
+            string error;
+            UnityEngine.Object target = string.IsNullOrWhiteSpace(component)
+                ? Addresses.FindObjectOrComponent(request.Get("object"), out error)
+                : Addresses.FindObject(request.Get("object"), out error);
             if (target == null)
             {
                 UiToolkit.Target element = UiToolkit.Find(request.Get("object"), out string elementError);
                 return element != null ? UiToolkit.Inspect(element) : Answer.Error(elementError ?? error);
             }
 
-            string component = request.Get("component");
             string field = request.Get("field");
             int from = int.TryParse(request.Get("from"), NumberStyles.None, CultureInfo.InvariantCulture, out int f) ? f : 0;
             string again = "ug inspect " + request.Get("object") + (string.IsNullOrWhiteSpace(component) ? "" : " --component " + component);
@@ -107,10 +111,16 @@ namespace UnityGraph.Bridge
                 return field != null ? OneField(importer, field, head, from, again) : Answer.Lines(Fields(importer, head, from, again));
             }
 
-            if (target is GameObject go)
+            Component addressed = target as Component;
+            if (target is GameObject || addressed != null)
             {
+                GameObject go = addressed != null ? addressed.gameObject : (GameObject)target;
                 UnityEngine.Object owner;
-                if (!string.IsNullOrWhiteSpace(component))
+                if (addressed != null)
+                {
+                    owner = addressed;
+                }
+                else if (!string.IsNullOrWhiteSpace(component))
                 {
                     owner = Addresses.Component(go, component, out error);
                 }
@@ -131,7 +141,7 @@ namespace UnityGraph.Bridge
                 string head = Addresses.Of(go) + (owner is Component found ? "  " + Addresses.ComponentName(found) + Script(found) : "");
                 if (field != null)
                 {
-                    return OneField(owner, field, head, from, "ug inspect " + request.Get("object") + (owner is Component c ? " --component " + Addresses.ComponentName(c) : ""));
+                    return OneField(owner, field, head, from, "ug inspect " + request.Get("object") + (owner is Component c && addressed == null ? " --component " + Addresses.ComponentName(c) : ""));
                 }
 
                 return Answer.Lines(Fields(owner, head, from, again));

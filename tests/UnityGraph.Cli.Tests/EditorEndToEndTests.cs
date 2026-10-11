@@ -63,7 +63,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         WaitForIdle(TimeSpan.FromMinutes(5));
         Report("editor open to bridge idle", clock.Elapsed);
 
-        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.10.0\n", Ug(log, "status"), StringComparison.Ordinal);
+        Assert.StartsWith("Unity 6000.3.14f1  idle  bridge 0.12.0\n", Ug(log, "status"), StringComparison.Ordinal);
         clock.Restart();
         string unchanged = Ug(log, "compile");
         Report("compile with no script changes", clock.Elapsed);
@@ -186,6 +186,21 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Assert.Equal("Assets/Prefabs/Crate.prefab already exists: ug does not overwrite it\n", Ug(log, "prefab", "create", "Crate", "Assets/Prefabs/Crate.prefab"));
         Assert.Equal("Assets/Plugins/Crate.prefab is in the vendored folder Assets/Plugins/, which ug does not edit\n", Ug(log, "prefab", "create", "Crate", "Assets/Plugins/Crate.prefab"));
 
+        // Component addresses (bridge 0.12.0): an object named as its scene takes Main:AudioSource,
+        // and a root named as the component makes the address ambiguous, with a form for each reading.
+        Assert.StartsWith("created Main", Ug(log, "object", "create", "Main"), StringComparison.Ordinal);
+        Assert.Equal("added AudioSource to Main  (Main.unity modified, not saved)\n", Ug(log, "component", "add", "Main", "AudioSource"));
+        Assert.Equal("Main  AudioSource.volume  1 -> 0.25  (Main.unity modified, not saved)\n", Ug(log, "set", "Main:AudioSource", "volume", "0.25"));
+        Assert.Matches(@"^Main  AudioSource.*  volume  \S+\n  0\.25\n$", Ug(log, "inspect", "Main:AudioSource", "--field", "volume"));
+        Assert.StartsWith("created AudioSource", Ug(log, "object", "create", "AudioSource"), StringComparison.Ordinal);
+        Assert.Equal(
+            "ambiguous: Main:AudioSource is the object Main:/AudioSource or the component Main:Main:AudioSource\n",
+            Ug(log, "set", "Main:AudioSource", "volume", "0.5"));
+        Assert.Equal("Main  AudioSource.volume  0.25 -> 0.5  (Main.unity modified, not saved)\n", Ug(log, "set", "Main:Main:AudioSource", "volume", "0.5"));
+        Assert.Contains("AudioSource", Ug(log, "inspect", "Main:/AudioSource"), StringComparison.Ordinal);
+        Ug(log, "object", "delete", "Main:/AudioSource");
+        Ug(log, "object", "delete", "Main");
+
         // Duplicate, undo, redo and selection (O2-O4 endpoints without an end to end until now).
         Assert.Equal("duplicated Level/Spawn -> Level/Spawn2  (Main.unity modified, not saved)\n", Ug(log, "object", "duplicate", "Level/Spawn", "--name", "Spawn2"));
         Assert.Contains("  Spawn2", Ug(log, "tree", "Level"), StringComparison.Ordinal);
@@ -266,6 +281,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         Ug(log, "component", "add", "Bell", "Alarm");
         Assert.Equal("Bell  Alarm.raised  + Bell:Alarm.Ring()  (Main.unity modified, not saved)\n", Ug(log, "event", "add", "Bell", "raised", "Bell:Alarm", "Ring"));
         Assert.Equal("Bell  Alarm.raised\n  0  Bell:Alarm.Ring()\n", Ug(log, "event", "list", "Bell"));
+        Assert.Equal("Bell  Alarm.raised\n  0  Bell:Alarm.Ring()\n", Ug(log, "event", "list", "Bell:Alarm"));
         Assert.Equal("Bell  Alarm.raised  - Bell:Alarm.Ring()  (Main.unity modified, not saved)\n", Ug(log, "event", "remove", "Bell", "raised"));
         Assert.Equal("Level/Spawn  Turret.target  null -> Bell  (Main.unity modified, not saved)\n", Ug(log, "set", "Level/Spawn", "target", "Bell:Transform", "--component", "Turret"));
         Ug(log, "object", "delete", "Bell");
@@ -320,7 +336,7 @@ public sealed partial class EditorEndToEndTests : IDisposable
         string listed = Ug(log, "package", "list");
         Report("ug package list", clock.Elapsed);
         Assert.Contains("com.unity.test-framework  ", listed, StringComparison.Ordinal);
-        Assert.Contains("com.unitygraph.bridge  0.10.0  local", listed, StringComparison.Ordinal);
+        Assert.Contains("com.unitygraph.bridge  0.12.0  local", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("com.ug.e2e", listed, StringComparison.Ordinal);
 
         Assert.Equal(
