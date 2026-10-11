@@ -70,8 +70,8 @@ update moves it to a new folder and deletes the old one later. So:
 
 Windows, macOS and Linux (SPEC.md, 2026-10-11). Development and the Unity tests run on Windows.
 CI (`.github/workflows/ci.yml`) runs on `windows-latest`, `macos-latest` and `ubuntu-latest`:
-build, format, the .NET tests, then the launcher on the published build (`bin/ug --version`, the
-SessionStart hint, `ug refs Turntable.Rotated` on a copy of `fixtures/CodeProject`). The bridge
+build, format, the .NET tests, then the launcher on the published build (`bin/ug --version`,
+`ug doctor`, `ug refs Turntable.Rotated` on a copy of `fixtures/CodeProject`). The bridge
 and the Unity tests are not run on macOS or Linux; the README says so.
 
 ## Release checklist

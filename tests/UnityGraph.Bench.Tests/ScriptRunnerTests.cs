@@ -113,8 +113,7 @@ public sealed class ScriptRunnerTests : IDisposable
         Assert.Equal("mcp pipe 3 tools, 2 used", grep.Detail);
 
         IdleRow ug = run.Idle[2];
-        int hint = System.Text.Encoding.UTF8.GetByteCount(UnityGraph.Hooks.SessionHintHandler.Hint);
-        Assert.Equal(("- unitygraph:unity: Unity answers.\n".Length + hint, "Use ug.\n".Length, "skill unity; session hint"), (ug.AlwaysBytes, ug.OnUseBytes, ug.Detail));
+        Assert.Equal(("- unitygraph:unity: Unity answers.\n".Length, "Use ug.\n".Length, "skill unity"), (ug.AlwaysBytes, ug.OnUseBytes, ug.Detail));
     }
 
     [Fact]

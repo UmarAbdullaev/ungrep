@@ -16,7 +16,7 @@ The first public build.
   digest of what changed after each.
 - **Hooks:** guards for serialized-field renames and removals, `[SerializeReference]` moves,
   `.meta`-safe shell moves and deletes, vendored folders; a compile gate when Claude stops;
-  reindex on edit; a one-line note at session start.
+  reindex on edit.
 - **`ug stats`:** where a project's Claude Code context tokens went, by tool-call category.
 - **`ug view`:** an interactive HTML graph of a symbol's neighbourhood.
 - **`ug bench`:** the benchmark suites and the overhead budgets.
