@@ -87,6 +87,23 @@ namespace UnityEngine
     public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute { }
 }
 
+namespace UnityEngine.Events
+{
+    public delegate void UnityAction();
+
+    public abstract class UnityEventBase
+    {
+        public void RemoveAllListeners() { }
+    }
+
+    public class UnityEvent : UnityEventBase
+    {
+        public void AddListener(UnityAction call) { }
+        public void RemoveListener(UnityAction call) { }
+        public void Invoke() { }
+    }
+}
+
 namespace UnityEngine.Serialization
 {
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = true)]

@@ -34,10 +34,12 @@ Out: parsing (indexers), answer formatting and budgets (`query`), anything that 
   `.gitignore` and is safe to delete; deleting it only costs a cold index.
 - The database is a cache. Nothing in it is user data. Any doubt (version mismatch, corruption,
   failed migration) is resolved by deleting it and rebuilding.
-- A same-schema graph without `values = whole, declaration lines` in `meta` was built by older
-  index rules: before C1 it cut long values, before B1e a declaration started at its attributes.
-  The first write open marks every file changed (size -1) and sets the key, so the next update
-  indexes each file again; nothing is deleted. Read-only opens leave it as it is.
+- A same-schema graph without `values = whole, declaration lines, uses` in `meta` was built by
+  older index rules: before C1 it cut long values, before B1e a declaration started at its
+  attributes, before B1g `calls` edges had no `use` and fields none. The first write open
+  rebuilds it like a graph of another schema (B1g, 2026-10-11: marking every file changed made
+  the next update index purge-squad's 7,335 files one by one, 61-157 s; the bulk index takes
+  4 s). Read-only opens leave it as it is.
 - SQLite settings: `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`,
   `foreign_keys=ON`.
 
@@ -277,8 +279,8 @@ revisit first (keys are stored as text in `edges` and in both edge indexes).
   changed; new file → added; deleted file → removed.
 - Concurrency: a reader running during `ReplaceFile` sees old or new, never partial; two writers
   serialize; a killed writer releases the lock.
-- Version: a database with another `schema_version` is rebuilt, not read; one without
-  `values = whole, declaration lines` has every file indexed again once.
+- Version: a database with another `schema_version`, or without `values = whole, declaration
+  lines, uses`, is rebuilt, not read.
 - Performance: a generated graph at the sizes above, checked against the targets in CI (Release
   build, with a margin for slow CI machines).
 - Coverage: ≥ 80% lines.

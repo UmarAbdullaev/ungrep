@@ -198,8 +198,7 @@
           { "run": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity" }
         ],
         "unitygraph": [
-          { "run": "ug impact ProgressBar._value" },
-          { "run": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs" }
+          { "run": "ug impact ProgressBar._value" }
         ]
       }
     },

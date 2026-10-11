@@ -71,6 +71,9 @@ public sealed class OutlineImpactTests(QueryFixture fixture) : IClassFixture<Que
             "impact Turntable._speed --json",
             "impact Nothing --json",
             "impact IOpenable",
+            "impact Spectator.OnRotated",
+            "impact Spectator._cheered",
+            "impact LabStage.Count",
         ];
 
         var transcript = new StringBuilder();
@@ -112,7 +115,7 @@ public sealed class OutlineImpactTests(QueryFixture fixture) : IClassFixture<Que
     [Fact]
     public void A_small_budget_cuts_on_a_line_and_names_a_bigger_one()
     {
-        string text = Ask("impact Turntable._speed", budget: 200);
+        string text = Ask("impact LabStage.Count", budget: 200);
         Assert.DoesNotContain("more lines", text, StringComparison.Ordinal);
 
         string outline = Ask("outline LabStage.cs", budget: 200);
@@ -151,7 +154,7 @@ $", outline);
         JsonElement groups = impact.RootElement.GetProperty("groups");
 
         Assert.Equal("cs:T:Game.Lab.Turntable", impact.RootElement.GetProperty("symbol")[0].GetProperty("key").GetString());
-        Assert.Contains(groups.EnumerateArray(), g => g.GetProperty("label").GetString() == "type uses" && g.GetProperty("rows").GetArrayLength() == 5);
+        Assert.Contains(groups.EnumerateArray(), g => g.GetProperty("label").GetString() == "type uses" && g.GetProperty("rows").GetArrayLength() == 7);
         Assert.False(impact.RootElement.GetProperty("cut").GetBoolean());
 
         string cut = Ask("impact Turntable --json", budget: 200);

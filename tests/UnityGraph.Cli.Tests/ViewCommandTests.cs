@@ -46,14 +46,14 @@ public sealed partial class ViewCommandTests : IDisposable
         var (exitCode, first) = Run("view", "LabStage", "--depth", "1");
 
         Assert.Equal(0, exitCode);
-        Assert.Equal("indexed 28 files in <t> s\nLibrary/unitygraph/view.html  45 nodes (20 drawn), 32 edges  generated <time> from graph <revision>\n", first);
+        Assert.Equal("indexed 28 files in <t> s\nLibrary/unitygraph/view.html  48 nodes (20 drawn), 43 edges  generated <time> from graph <revision>\n", first);
         string page = File.ReadAllText(Page);
         Assert.Contains("<title>ug view LabStage</title>", page, StringComparison.Ordinal);
         Assert.Contains("\"depth\":1,\"baked\":2,\"layout\":\"dagre\"", page, StringComparison.Ordinal);
 
         // Up to date: no index line; the same graph, the same revision.
         string revision = Regex.Match(page, "\"revision\":\"([0-9a-f]{12})\"").Groups[1].Value;
-        Assert.Equal((0, "Library/unitygraph/view.html  45 nodes (20 drawn), 32 edges  generated <time> from graph <revision>\n"), Run("view", "LabStage", "--depth", "1"));
+        Assert.Equal((0, "Library/unitygraph/view.html  48 nodes (20 drawn), 43 edges  generated <time> from graph <revision>\n"), Run("view", "LabStage", "--depth", "1"));
         Assert.Contains($"\"revision\":\"{revision}\"", File.ReadAllText(Page), StringComparison.Ordinal);
     }
 
@@ -62,7 +62,7 @@ public sealed partial class ViewCommandTests : IDisposable
     {
         var (_, output) = Run("view", "LabStage", "--kind", "type,method");
 
-        Assert.Equal("indexed 28 files in <t> s\nLibrary/unitygraph/view.html  30 nodes (26 drawn), 29 edges  generated <time> from graph <revision>\n", output);
+        Assert.Equal("indexed 28 files in <t> s\nLibrary/unitygraph/view.html  34 nodes (28 drawn), 32 edges  generated <time> from graph <revision>\n", output);
         string page = File.ReadAllText(Page);
         Assert.Contains("\"depth\":2,\"baked\":3,\"layout\":\"dagre\",", page, StringComparison.Ordinal);
         Assert.Contains("\"kinds\":[\"method\",\"type\"]", page, StringComparison.Ordinal);
@@ -76,8 +76,8 @@ public sealed partial class ViewCommandTests : IDisposable
         string outside = Path.Combine(Path.GetTempPath(), "ug-view-out-" + Guid.NewGuid().ToString("N")[..8] + ".html");
         try
         {
-            Assert.StartsWith("Pages/lab.html  45 nodes", Run("view", "LabStage", "--depth", "1", "--out", inside).Output, StringComparison.Ordinal);
-            Assert.StartsWith(outside + "  45 nodes", Run("view", "LabStage", "--depth", "1", "--out", outside).Output, StringComparison.Ordinal);
+            Assert.StartsWith("Pages/lab.html  48 nodes", Run("view", "LabStage", "--depth", "1", "--out", inside).Output, StringComparison.Ordinal);
+            Assert.StartsWith(outside + "  48 nodes", Run("view", "LabStage", "--depth", "1", "--out", outside).Output, StringComparison.Ordinal);
             Assert.True(File.Exists(inside));
             Assert.True(File.Exists(outside));
             Assert.False(File.Exists(Page));

@@ -149,15 +149,17 @@ Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:11  [exact]
   in          Game.Lab.Turntable
   type        float
   serialized  yes, formerly _rpm, rpm
+  read by     Game.Lab.Turntable.Rotate
+  written by  Game.Lab.Turntable.Rotate, Game.Lab.Turntable.Stop
   more  ug refs Turntable._speed
 
 $ ug explain Turntable.Tint
 Game.Lab.Turntable.Tint  property  Assets/Scripts/Lab/Turntable.cs:13  public  [exact]
-  in           Game.Lab.Turntable
-  type         Color
-  serialized   yes
-  called from  (none)
-  calls        (none)
+  in          Game.Lab.Turntable
+  type        Color
+  serialized  yes
+  read by     Game.Lab.Spectator.OnRotated
+  calls       (none)
   more  ug refs Turntable.Tint
 
 $ ug explain labstage.resetstage
@@ -351,9 +353,11 @@ Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
   used by       Game.Lab.LabStage.Awake          Assets/Scripts/Lab/LabStage.cs:20
   used by       Game.Lab.LabStage.OnClosed       Assets/Scripts/Lab/LabStage.cs:49
   used by       Game.Lab.LabStage._turntable     Assets/Scripts/Lab/LabStage.cs:12
+  used by       Game.Lab.Spectator.Watch         Assets/Scripts/Lab/Turntable.cs:34
+  used by       Game.Lab.Spectator._deck         Assets/Scripts/Lab/Turntable.cs:30
   script asset  Assets/Scripts/Lab/Turntable.cs  Assets/Scripts/Lab/Turntable.cs:7
   on            Turntable > Turntable            Assets/Prefabs/Turntable.prefab:42
-7 references
+9 references
 
 $ ug find b1000000000000000000000000000001
 Assets/Prefabs/Turntable.prefab  prefab  guid b1000000000000000000000000000001
@@ -409,4 +413,74 @@ Game.Core.StageData  class  Assets/Scripts/Core/Stage.cs:20-25  [exact]
   members     3 fields
   used by     Game.Lab.LabStage._data
   more  ug explain StageData --members | ug refs StageData
+
+$ ug refs Turntable.Rotated
+Game.Lab.Turntable.Rotated  event  Assets/Scripts/Lab/Turntable.cs:15  [exact]
+  raised by        Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
+  subscribed by    Game.Lab.Spectator.Watch   Assets/Scripts/Lab/Turntable.cs:37  handler Game.Lab.Spectator.OnRotated
+  subscribed by    Game.Lab.Spectator.Watch   Assets/Scripts/Lab/Turntable.cs:38  handler lambda
+  unsubscribed by  Game.Lab.Spectator.Leave   Assets/Scripts/Lab/Turntable.cs:44  handler Game.Lab.Spectator.OnRotated
+4 references
+
+$ ug refs Spectator.OnRotated
+Game.Lab.Spectator.OnRotated(float)  method  Assets/Scripts/Lab/Turntable.cs:49-55  [exact]
+  subscribed by    Game.Lab.Spectator.Watch  Assets/Scripts/Lab/Turntable.cs:37  to Game.Lab.Turntable.Rotated
+  unsubscribed by  Game.Lab.Spectator.Leave  Assets/Scripts/Lab/Turntable.cs:44  from Game.Lab.Turntable.Rotated
+2 references
+
+$ ug refs Spectator._cheered
+Game.Lab.Spectator._cheered  field  Assets/Scripts/Lab/Turntable.cs:31  [exact]
+  raised by        Game.Lab.Spectator.OnRotated  Assets/Scripts/Lab/Turntable.cs:53
+  subscribed by    Game.Lab.Spectator.Watch      Assets/Scripts/Lab/Turntable.cs:39  handler Game.Lab.Spectator.OnCheered
+  unsubscribed by  Game.Lab.Spectator.Leave      Assets/Scripts/Lab/Turntable.cs:45  handler Game.Lab.Spectator.OnCheered
+3 references
+
+$ ug refs Turntable._speed
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:11  [exact]
+  read by     Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
+  written by  Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:19
+  written by  Game.Lab.Turntable.Stop    Assets/Scripts/Lab/Turntable.cs:23
+3 references
+
+$ ug refs LabStage.Count
+Game.Lab.LabStage.Count  field  Assets/Scripts/Lab/LabStage.cs:15  [exact]
+  written by  Game.Lab.LabStage.Awake  Assets/Scripts/Lab/LabStage.cs:21
+1 reference
+
+$ ug explain Turntable.Rotated
+Game.Lab.Turntable.Rotated  event  Assets/Scripts/Lab/Turntable.cs:15  public  [exact]
+  in               Game.Lab.Turntable
+  type             Action<float>
+  subscribed by    Game.Lab.Spectator.Watch (Game.Lab.Spectator.OnRotated), Game.Lab.Spectator.Watch (lambda)
+  unsubscribed by  Game.Lab.Spectator.Leave (Game.Lab.Spectator.OnRotated)
+  raised by        Game.Lab.Turntable.Rotate
+  calls            (none)
+  more  ug refs Turntable.Rotated
+
+$ ug explain Spectator.OnRotated
+Game.Lab.Spectator.OnRotated(float)  method  Assets/Scripts/Lab/Turntable.cs:49-55  [exact]
+  in                 Game.Lab.Spectator
+  called from        (none)
+  subscribed to      Game.Lab.Turntable.Rotated (Game.Lab.Spectator.Watch)
+  unsubscribed from  Game.Lab.Turntable.Rotated (Game.Lab.Spectator.Leave)
+  calls              Game.Lab.Turntable.Tint
+  more  ug refs Spectator.OnRotated
+
+$ ug explain Spectator._cheered
+Game.Lab.Spectator._cheered  field  Assets/Scripts/Lab/Turntable.cs:31  [exact]
+  in               Game.Lab.Spectator
+  type             UnityEvent
+  subscribed by    Game.Lab.Spectator.Watch (Game.Lab.Spectator.OnCheered)
+  unsubscribed by  Game.Lab.Spectator.Leave (Game.Lab.Spectator.OnCheered)
+  raised by        Game.Lab.Spectator.OnRotated
+  more  ug refs Spectator._cheered
+
+$ ug explain Spectator.Watched
+Game.Lab.Spectator.Watched  field  Assets/Scripts/Lab/Turntable.cs:32  public  [exact]
+  in             Game.Lab.Spectator
+  type           Action<float>
+  written by     Game.Lab.Spectator.Leave
+  subscribed by  (none)
+  raised by      Game.Lab.Spectator.Watch
+  more  ug refs Spectator.Watched
 

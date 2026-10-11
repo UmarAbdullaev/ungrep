@@ -1,5 +1,5 @@
 $ ug outline Turntable.cs
-Assets/Scripts/Lab/Turntable.cs  script  1 type, 6 members  [exact]
+Assets/Scripts/Lab/Turntable.cs  script  2 types, 13 members  [exact]
   Game.Lab.Turntable  class     7-26   : UnityEngine.MonoBehaviour  public MonoBehaviour
     _speed            field     11     float  serialized
     Tint              property  13     Color  public  serialized
@@ -7,6 +7,14 @@ Assets/Scripts/Lab/Turntable.cs  script  1 type, 6 members  [exact]
     Rotate            method    17-21  Rotate(float)  public
     Stop              method    23     Stop()  public
     OnOpened          method    25     OnOpened()
+  Game.Lab.Spectator  class     28-58  public
+    _deck             field     30     Turntable
+    _cheered          field     31     UnityEvent
+    Watched           field     32     Action<float>  public
+    Watch             method    34-40  Watch(Turntable)  public
+    Leave             method    42-47  Leave()  public
+    OnRotated         method    49-55  OnRotated(float)
+    OnCheered         method    57     OnCheered()
 
 $ ug outline Assets/Scripts/Lab/LabStage.cs
 Assets/Scripts/Lab/LabStage.cs  script  1 type, 12 members  [exact]
@@ -100,13 +108,15 @@ outside the project: ../Outside.cs
 
 $ ug impact Turntable
 Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
-  affects                                5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)
-  type uses                              5
+  affects                                7 places in 3 files: 7 type uses; 1 asset hold data (1 prefab)
+  type uses                              7
     Game.Broken.Run               Assets/Scripts/Broken.cs:8
     Game.Lab.LabStage             Assets/Scripts/Lab/LabStage.cs:7
     Game.Lab.LabStage.Awake       Assets/Scripts/Lab/LabStage.cs:20
     Game.Lab.LabStage.OnClosed    Assets/Scripts/Lab/LabStage.cs:49
     Game.Lab.LabStage._turntable  Assets/Scripts/Lab/LabStage.cs:12
+    Game.Lab.Spectator.Watch      Assets/Scripts/Lab/Turntable.cs:34
+    Game.Lab.Spectator._deck      Assets/Scripts/Lab/Turntable.cs:30
   serialized                             1 component of Game.Lab.Turntable in 1 asset
     1 Turntable  Assets/Prefabs/Turntable.prefab:33
   held via Game.Lab.LabStage._turntable  1 component in 1 asset
@@ -138,24 +148,34 @@ Game.Lab.Turntable.OnOpened()  method  Assets/Scripts/Lab/Turntable.cs:25  [exac
 
 $ ug impact Turntable._speed
 Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:11  serialized  [exact]
-  affects        1 asset may hold data (1 prefab); 2 overrides
+  affects        3 places in 1 file: 1 read, 2 writes; 1 asset may hold data (1 prefab); 2 overrides
+  readers        1
+    Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
+  writers        2
+    Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:19
+    Game.Lab.Turntable.Stop    Assets/Scripts/Lab/Turntable.cs:23
   serialized     1 component of Game.Lab.Turntable in 1 asset  [heuristic]
     1 Turntable  Assets/Prefabs/Turntable.prefab:33
   overridden in  2
     Lab Turntable: _speed = 3      Assets/Scenes/Lab.unity:133
     Turntable Variant: _speed = 5  Assets/Prefabs/Turntable Variant.prefab:19
-  note           field reads and writes are not in the graph: grep _speed for code uses
 
 $ ug impact Turntable.Tint
 Game.Lab.Turntable.Tint  property  Assets/Scripts/Lab/Turntable.cs:13  serialized  [exact]
-  affects     1 asset may hold data (1 prefab)
+  affects     1 place in 1 file: 1 read; 1 asset may hold data (1 prefab)
+  readers     1
+    Game.Lab.Spectator.OnRotated  Assets/Scripts/Lab/Turntable.cs:51
   serialized  1 component of Game.Lab.Turntable in 1 asset  [heuristic]
     1 Turntable  Assets/Prefabs/Turntable.prefab:33
 
 $ ug impact Turntable.Rotated
 Game.Lab.Turntable.Rotated  event  Assets/Scripts/Lab/Turntable.cs:15  [exact]
-  affects  1 place in 1 file: 1 caller
-  callers  1
+  affects      4 places in 1 file: 3 subscriptions, 1 raise
+  subscribers  3
+    Game.Lab.Spectator.Leave, handler Game.Lab.Spectator.OnRotated  Assets/Scripts/Lab/Turntable.cs:44
+    Game.Lab.Spectator.Watch, handler Game.Lab.Spectator.OnRotated  Assets/Scripts/Lab/Turntable.cs:37
+    Game.Lab.Spectator.Watch, handler lambda                        Assets/Scripts/Lab/Turntable.cs:38
+  raised by    1
     Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
 
 $ ug impact LabStage
@@ -241,13 +261,15 @@ ambiguous: Trace
 
 $ ug impact Turntable.cs
 Game.Lab.Turntable  class  Assets/Scripts/Lab/Turntable.cs:7-26  [exact]
-  affects                                5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)
-  type uses                              5
+  affects                                7 places in 3 files: 7 type uses; 1 asset hold data (1 prefab)
+  type uses                              7
     Game.Broken.Run               Assets/Scripts/Broken.cs:8
     Game.Lab.LabStage             Assets/Scripts/Lab/LabStage.cs:7
     Game.Lab.LabStage.Awake       Assets/Scripts/Lab/LabStage.cs:20
     Game.Lab.LabStage.OnClosed    Assets/Scripts/Lab/LabStage.cs:49
     Game.Lab.LabStage._turntable  Assets/Scripts/Lab/LabStage.cs:12
+    Game.Lab.Spectator.Watch      Assets/Scripts/Lab/Turntable.cs:34
+    Game.Lab.Spectator._deck      Assets/Scripts/Lab/Turntable.cs:30
   serialized                             1 component of Game.Lab.Turntable in 1 asset
     1 Turntable  Assets/Prefabs/Turntable.prefab:33
   held via Game.Lab.LabStage._turntable  1 component in 1 asset
@@ -263,13 +285,13 @@ $ ug impact cs:T:Game.Lab.Gone
 not found: cs:T:Game.Lab.Gone
 
 $ ug outline Turntable.cs --json
-{"file":"Assets/Scripts/Lab/Turntable.cs","kind":"script","counts":"1 type, 6 members","rows":[{"depth":0,"kind":"class","name":"Game.Lab.Turntable","lines":[7,26],"detail":": UnityEngine.MonoBehaviour  public MonoBehaviour"},{"depth":1,"kind":"field","name":"_speed","lines":[11,11],"detail":"float  serialized"},{"depth":1,"kind":"property","name":"Tint","lines":[13,13],"detail":"Color  public  serialized"},{"depth":1,"kind":"event","name":"Rotated","lines":[15,15],"detail":"Action<float>  public"},{"depth":1,"kind":"method","name":"Rotate","lines":[17,21],"detail":"Rotate(float)  public"},{"depth":1,"kind":"method","name":"Stop","lines":[23,23],"detail":"Stop()  public"},{"depth":1,"kind":"method","name":"OnOpened","lines":[25,25],"detail":"OnOpened()"}],"cut":false}
+{"file":"Assets/Scripts/Lab/Turntable.cs","kind":"script","counts":"2 types, 13 members","rows":[{"depth":0,"kind":"class","name":"Game.Lab.Turntable","lines":[7,26],"detail":": UnityEngine.MonoBehaviour  public MonoBehaviour"},{"depth":1,"kind":"field","name":"_speed","lines":[11,11],"detail":"float  serialized"},{"depth":1,"kind":"property","name":"Tint","lines":[13,13],"detail":"Color  public  serialized"},{"depth":1,"kind":"event","name":"Rotated","lines":[15,15],"detail":"Action<float>  public"},{"depth":1,"kind":"method","name":"Rotate","lines":[17,21],"detail":"Rotate(float)  public"},{"depth":1,"kind":"method","name":"Stop","lines":[23,23],"detail":"Stop()  public"},{"depth":1,"kind":"method","name":"OnOpened","lines":[25,25],"detail":"OnOpened()"},{"depth":0,"kind":"class","name":"Game.Lab.Spectator","lines":[28,58],"detail":"public"},{"depth":1,"kind":"field","name":"_deck","lines":[30,30],"detail":"Turntable"},{"depth":1,"kind":"field","name":"_cheered","lines":[31,31],"detail":"UnityEvent"},{"depth":1,"kind":"field","name":"Watched","lines":[32,32],"detail":"Action<float>  public"},{"depth":1,"kind":"method","name":"Watch","lines":[34,40],"detail":"Watch(Turntable)  public"},{"depth":1,"kind":"method","name":"Leave","lines":[42,47],"detail":"Leave()  public"},{"depth":1,"kind":"method","name":"OnRotated","lines":[49,55],"detail":"OnRotated(float)"},{"depth":1,"kind":"method","name":"OnCheered","lines":[57,57],"detail":"OnCheered()"}],"cut":false}
 
 $ ug impact Turntable --json
-{"symbol":[{"key":"cs:T:Game.Lab.Turntable","kind":"class","location":"Assets/Scripts/Lab/Turntable.cs:7-26"}],"affects":"5 places in 2 files: 5 type uses; 1 asset hold data (1 prefab)","groups":[{"label":"type uses","count":5,"summary":"5","confidence":"exact","rows":[{"name":"Game.Broken.Run","file":"Assets/Scripts/Broken.cs","line":8,"confidence":"exact"},{"name":"Game.Lab.LabStage","file":"Assets/Scripts/Lab/LabStage.cs","line":7,"confidence":"exact"},{"name":"Game.Lab.LabStage.Awake","file":"Assets/Scripts/Lab/LabStage.cs","line":20,"confidence":"exact"},{"name":"Game.Lab.LabStage.OnClosed","file":"Assets/Scripts/Lab/LabStage.cs","line":49,"confidence":"exact"},{"name":"Game.Lab.LabStage._turntable","file":"Assets/Scripts/Lab/LabStage.cs","line":12,"confidence":"exact"}],"more":0},{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"exact","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"held via Game.Lab.LabStage._turntable","count":1,"summary":"1 component in 1 asset","confidence":"exact","rows":[{"name":"1 LabStage","file":"Assets/Prefabs/Turntable.prefab","line":47,"confidence":"exact"}],"more":0}],"cut":false}
+{"symbol":[{"key":"cs:T:Game.Lab.Turntable","kind":"class","location":"Assets/Scripts/Lab/Turntable.cs:7-26"}],"affects":"7 places in 3 files: 7 type uses; 1 asset hold data (1 prefab)","groups":[{"label":"type uses","count":7,"summary":"7","confidence":"exact","rows":[{"name":"Game.Broken.Run","file":"Assets/Scripts/Broken.cs","line":8,"confidence":"exact"},{"name":"Game.Lab.LabStage","file":"Assets/Scripts/Lab/LabStage.cs","line":7,"confidence":"exact"},{"name":"Game.Lab.LabStage.Awake","file":"Assets/Scripts/Lab/LabStage.cs","line":20,"confidence":"exact"},{"name":"Game.Lab.LabStage.OnClosed","file":"Assets/Scripts/Lab/LabStage.cs","line":49,"confidence":"exact"},{"name":"Game.Lab.LabStage._turntable","file":"Assets/Scripts/Lab/LabStage.cs","line":12,"confidence":"exact"},{"name":"Game.Lab.Spectator.Watch","file":"Assets/Scripts/Lab/Turntable.cs","line":34,"confidence":"exact"},{"name":"Game.Lab.Spectator._deck","file":"Assets/Scripts/Lab/Turntable.cs","line":30,"confidence":"exact"}],"more":0},{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"exact","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"held via Game.Lab.LabStage._turntable","count":1,"summary":"1 component in 1 asset","confidence":"exact","rows":[{"name":"1 LabStage","file":"Assets/Prefabs/Turntable.prefab","line":47,"confidence":"exact"}],"more":0}],"cut":false}
 
 $ ug impact Turntable._speed --json
-{"symbol":[{"key":"cs:F:Game.Lab.Turntable._speed","kind":"field","location":"Assets/Scripts/Lab/Turntable.cs:11"}],"affects":"1 asset may hold data (1 prefab); 2 overrides","groups":[{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"heuristic","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"overridden in","count":2,"summary":"2","confidence":"exact","rows":[{"name":"Lab Turntable: _speed = 3","file":"Assets/Scenes/Lab.unity","line":133,"confidence":"exact"},{"name":"Turntable Variant: _speed = 5","file":"Assets/Prefabs/Turntable Variant.prefab","line":19,"confidence":"exact"}],"more":0}],"note":"field reads and writes are not in the graph: grep _speed for code uses","cut":false}
+{"symbol":[{"key":"cs:F:Game.Lab.Turntable._speed","kind":"field","location":"Assets/Scripts/Lab/Turntable.cs:11"}],"affects":"3 places in 1 file: 1 read, 2 writes; 1 asset may hold data (1 prefab); 2 overrides","groups":[{"label":"readers","count":1,"summary":"1","confidence":"exact","rows":[{"name":"Game.Lab.Turntable.Rotate","file":"Assets/Scripts/Lab/Turntable.cs","line":20,"confidence":"exact"}],"more":0},{"label":"writers","count":2,"summary":"2","confidence":"exact","rows":[{"name":"Game.Lab.Turntable.Rotate","file":"Assets/Scripts/Lab/Turntable.cs","line":19,"confidence":"exact"},{"name":"Game.Lab.Turntable.Stop","file":"Assets/Scripts/Lab/Turntable.cs","line":23,"confidence":"exact"}],"more":0},{"label":"serialized","count":1,"summary":"1 component of Game.Lab.Turntable in 1 asset","confidence":"heuristic","rows":[{"name":"1 Turntable","file":"Assets/Prefabs/Turntable.prefab","line":33,"confidence":"exact"}],"more":0},{"label":"overridden in","count":2,"summary":"2","confidence":"exact","rows":[{"name":"Lab Turntable: _speed = 3","file":"Assets/Scenes/Lab.unity","line":133,"confidence":"exact"},{"name":"Turntable Variant: _speed = 5","file":"Assets/Prefabs/Turntable Variant.prefab","line":19,"confidence":"exact"}],"more":0}],"cut":false}
 
 $ ug impact Nothing --json
 {"error":"not found: Nothing","lines":[]}
@@ -282,4 +304,26 @@ Game.Core.IOpenable  interface  Assets/Scripts/Core/Stage.cs:7-10  [exact]
     Game.Core.Stage                           Assets/Scripts/Core/Stage.cs:12
   extended by     1
     Game.Core.ILockable  Assets/Scripts/Core/Stage.cs:27
+
+$ ug impact Spectator.OnRotated
+Game.Lab.Spectator.OnRotated(float)  method  Assets/Scripts/Lab/Turntable.cs:49-55  [exact]
+  affects      2 places in 1 file: 2 subscriptions
+  subscribers  2
+    Game.Lab.Spectator.Leave, from Game.Lab.Turntable.Rotated  Assets/Scripts/Lab/Turntable.cs:44
+    Game.Lab.Spectator.Watch, to Game.Lab.Turntable.Rotated    Assets/Scripts/Lab/Turntable.cs:37
+
+$ ug impact Spectator._cheered
+Game.Lab.Spectator._cheered  field  Assets/Scripts/Lab/Turntable.cs:31  [exact]
+  affects      3 places in 1 file: 2 subscriptions, 1 raise
+  subscribers  2
+    Game.Lab.Spectator.Leave, handler Game.Lab.Spectator.OnCheered  Assets/Scripts/Lab/Turntable.cs:45
+    Game.Lab.Spectator.Watch, handler Game.Lab.Spectator.OnCheered  Assets/Scripts/Lab/Turntable.cs:39
+  raised by    1
+    Game.Lab.Spectator.OnRotated  Assets/Scripts/Lab/Turntable.cs:53
+
+$ ug impact LabStage.Count
+Game.Lab.LabStage.Count  field  Assets/Scripts/Lab/LabStage.cs:15  [exact]
+  affects  1 place in 1 file: 1 write
+  writers  1
+    Game.Lab.LabStage.Awake  Assets/Scripts/Lab/LabStage.cs:21
 

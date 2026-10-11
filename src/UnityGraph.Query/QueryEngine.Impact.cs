@@ -67,10 +67,7 @@ public sealed partial class QueryEngine
 
         groups = [.. Merge(groups).OrderBy(g => GroupOrder(g.Label))];
         string affects = Affects(groups);
-        string? note = symbols.Any(s => s.Kind == NodeKind.Field)
-            ? $"field reads and writes are not in the graph: grep {symbols.First(s => s.Kind == NodeKind.Field).Name} for code uses"
-            : null;
-        return json ? ImpactJson(symbols, affects, groups, note, command, budget) : ImpactText(symbols, affects, groups, note, command, budget);
+        return json ? ImpactJson(symbols, affects, groups, command, budget) : ImpactText(symbols, affects, groups, command, budget);
     }
 
     private void AddImpact(Node symbol, string? overload, List<ImpactGroup> groups)
@@ -87,7 +84,7 @@ public sealed partial class QueryEngine
         {
             (string label, string name) = edge.Kind switch
             {
-                EdgeKind.Calls => ("callers", Names.Qualified(edge.Src)),
+                EdgeKind.Calls => Use(edge),
                 EdgeKind.Dispatches => ("dispatched from", Names.Qualified(edge.Src)),
                 EdgeKind.Overrides => (InInterface(symbol) ? "implemented by" : "overridden by", Names.Qualified(edge.Src)),
                 EdgeKind.Inherits => (isInterface ? "extended by" : "subclasses", Names.Qualified(edge.Src)),
@@ -121,6 +118,21 @@ public sealed partial class QueryEngine
         {
             AddFieldHolders(symbol, groups);
         }
+    }
+
+    // A `calls` edge by how its source uses the symbol (B1g): `Game.Hud.OnEnable, handler
+    // Game.Hud.OnDied` on an event, `Game.Hud.OnEnable, to Game.Health.Died` on its handler.
+    private static (string Label, string Name) Use(Edge edge)
+    {
+        string source = Names.Qualified(edge.Src);
+        return Names.Prop(edge, "use") switch
+        {
+            "read" => ("readers", source),
+            "write" => ("writers", source),
+            "raise" => ("raised by", source),
+            "subscribe" or "unsubscribe" => ("subscribers", OtherEnd(edge) is { } end ? source + ", " + end : source),
+            _ => ("callers", source),
+        };
     }
 
     // A Unity type's own holders, then the holders it reaches as serialized data of another type.
@@ -405,16 +417,20 @@ public sealed partial class QueryEngine
     private static int GroupOrder(string label) => label switch
     {
         "callers" => 0,
-        "dispatched from" => 1,
-        "overridden by" or "implemented by" => 2,
-        "overrides" => 3,
-        "subclasses" or "extended by" => 4,
-        "type uses" => 6,
-        "unity events" => 7,
-        "serialized" => 8,
-        "overridden in" => 10,
-        "field data" => 11,
-        _ => 9,
+        "readers" => 1,
+        "writers" => 2,
+        "subscribers" => 3,
+        "raised by" => 4,
+        "dispatched from" => 5,
+        "overridden by" or "implemented by" => 6,
+        "overrides" => 7,
+        "subclasses" or "extended by" => 8,
+        "type uses" => 10,
+        "unity events" => 11,
+        "serialized" => 12,
+        "overridden in" => 14,
+        "field data" => 15,
+        _ => 13,
     };
 
     // `3 places in 3 files: 2 callers, 1 unity event (1 heuristic)`, then what holds serialized data.
@@ -465,6 +481,10 @@ public sealed partial class QueryEngine
     private static string Noun(string label) => label switch
     {
         "callers" => "caller",
+        "readers" => "read",
+        "writers" => "write",
+        "subscribers" => "subscription",
+        "raised by" => "raise",
         "dispatched from" => "dispatch",
         "overridden by" => "override",
         "implemented by" => "implementation",
@@ -475,7 +495,7 @@ public sealed partial class QueryEngine
         _ => label,
     };
 
-    private string ImpactText(List<Node> symbols, string affects, List<ImpactGroup> groups, string? note, string command, int budget)
+    private string ImpactText(List<Node> symbols, string affects, List<ImpactGroup> groups, string command, int budget)
     {
         int shown = All ? int.MaxValue : GroupRows;
         var answer = new Answer(budget, From);
@@ -498,11 +518,6 @@ public sealed partial class QueryEngine
             }
         }
 
-        if (note is not null)
-        {
-            answer.Add(Head("note", note));
-        }
-
         if (_cuts.Count > 0)
         {
             answer.Add(Head("note", $"cut: {string.Join(", ", _cuts)}: {command} --all"));
@@ -515,7 +530,7 @@ public sealed partial class QueryEngine
             : [row.Name, $"{row.File}:{row.Line}"];
     }
 
-    private string ImpactJson(List<Node> symbols, string affects, List<ImpactGroup> groups, string? note, string command, int budget)
+    private string ImpactJson(List<Node> symbols, string affects, List<ImpactGroup> groups, string command, int budget)
     {
         int rows = All ? int.MaxValue : GroupRows;
         string? capped = _cuts.Count > 0 ? $"{string.Join(", ", _cuts)}: {command} --all" : null;
@@ -563,11 +578,6 @@ public sealed partial class QueryEngine
             }
 
             w.WriteEndArray();
-            if (note is not null)
-            {
-                w.WriteString("note", note);
-            }
-
             if (capped is not null)
             {
                 w.WriteString("capped", capped);

@@ -78,7 +78,7 @@ name then line:
 
 | Edge in | Label |
 | --- | --- |
-| `calls` | `called from` |
+| `calls` | `called from`; by its `use`: `read by`, `written by`, `subscribed by`, `unsubscribed by`, `raised by`, `delegate from` |
 | `dispatches` | `dispatched from` (always `[heuristic]` unless exact) |
 | `overrides` | `overridden by` / `implemented by` (target is an interface member) |
 | `inherits` | `subclass` / `extended by` (target is an interface) |
@@ -109,6 +109,23 @@ Game.Lab.Turntable.Stop()  method  Assets/Scripts/Lab/Turntable.cs:23  [exact]
 ```
 
 A line whose source has no node (a file that failed to read) shows the raw key.
+
+**How a member is used** (B1g, 2026-10-11: `ug refs Health.Died` listed the `+=`, the `-=` and
+the raise alike as `called from` and named no handler, so the agent grepped for them; a field
+had no code lines at all). A `calls` line is labelled by the edge's `use` (SPEC-code-index,
+Uses), the `called from` family sorted by label. A subscription line ends with the other end:
+`handler <method>` (or `handler lambda`) on the event's lines, `to <event>` / `from <event>` on
+the handler's.
+
+```
+$ ug refs Turntable.Rotated
+Game.Lab.Turntable.Rotated  event  Assets/Scripts/Lab/Turntable.cs:15  [exact]
+  raised by        Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
+  subscribed by    Game.Lab.Spectator.Watch   Assets/Scripts/Lab/Turntable.cs:37  handler Game.Lab.Spectator.OnRotated
+  subscribed by    Game.Lab.Spectator.Watch   Assets/Scripts/Lab/Turntable.cs:38  handler lambda
+  unsubscribed by  Game.Lab.Spectator.Leave   Assets/Scripts/Lab/Turntable.cs:44  handler Game.Lab.Spectator.OnRotated
+4 references
+```
 
 **Implementers through extending interfaces** (B1c, 2026-10-11: "which classes implement
 `IPartRule`" took one `refs` per extending interface). For an interface, a type that implements
@@ -166,9 +183,9 @@ asset that holds the component, as `ug impact` does (O10 fix, 2026-10-11: `Progr
 only `ProgressBar.prefab`; it now also names the 5 assets `impact` lists and `GalaxyMap.unity`,
 which places `MapNode.prefab`).
 
-Lines with nothing to say are left out, except `used by` / `called from`, which say `(none)`
-(an unused symbol is an answer). Header: display name, kind (the subkind for types), base list,
-location, confidence. `unity` comes from the `unity` prop, the guid from `script_defines`.
+Lines with nothing to say are left out, except `used by` and a member's main use line (below),
+which say `(none)` (an unused symbol is an answer). Header: display name, kind (the subkind for
+types), base list, location, confidence. `unity` comes from the `unity` prop, the guid from `script_defines`.
 `engine calls` are members with `message`; `entry points` members with `entry`. Lists in a line
 are cut at 8 items with `(+N)`.
 
@@ -188,12 +205,19 @@ Game.Lab.Turntable.Rotate(float)  method  Assets/Scripts/Lab/Turntable.cs:17-21 
   more  ug refs Turntable.Rotate
 ```
 
-Member lines: `in`; `overrides` (what it overrides or implements); `called from` and
-`dispatched from`, callers counted when one calls it more than once in a file (edges are one per
-file, so the count is files); `calls` (outgoing `calls` and `dispatches`, deduplicated);
-`serialized` (with former names) for fields and properties; `type` for fields, properties and
-events; `flags` for what the header doesn't say. Fields have no `called from` (no read/write
-edges yet).
+Member lines: `in`; `overrides` (what it overrides or implements); the incoming `calls` lines by
+`use`, in this order: `called from`, `read by`, `written by`, `subscribed by`, `unsubscribed by`,
+`raised by`, `delegate from`; then `dispatched from`. Each source is counted when it uses the
+member that way more than once in a file (edges are one per file, so the count is files). A
+subscription names its other end: on an event, `Game.Lab.Spectator.Watch (Game.Lab.Spectator.OnRotated)`
+(or `(lambda)`); on a handler method the lines read `subscribed to` / `unsubscribed from`,
+`Game.Lab.Turntable.Rotated (Game.Lab.Spectator.Watch)`. The main line says `(none)` when empty
+(nothing calls it, nothing reads it, nothing listens: an answer): a method's `called from`, an
+event's `subscribed by`, a field's or property's `read by`, or `subscribed by` when it is
+subscribed to or raised (a delegate or UnityEvent); other lines only when they have sources.
+`calls` (outgoing `calls` and `dispatches` to methods, properties and events, deduplicated); `serialized` (with former
+names) for fields and properties; `type` for fields, properties and events; `flags` for what the
+header doesn't say.
 
 For an asset:
 
@@ -298,14 +322,18 @@ and scene objects answer `impact is for code symbols; use ug refs <symbol>`.
 
 ```
 $ ug impact Turntable._speed
-Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:9-11  serialized  [exact]
-  affects        1 asset may hold data (1 prefab); 2 overrides
+Game.Lab.Turntable._speed  field  Assets/Scripts/Lab/Turntable.cs:11  serialized  [exact]
+  affects        3 places in 1 file: 1 read, 2 writes; 1 asset may hold data (1 prefab); 2 overrides
+  readers        1
+    Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:20
+  writers        2
+    Game.Lab.Turntable.Rotate  Assets/Scripts/Lab/Turntable.cs:19
+    Game.Lab.Turntable.Stop    Assets/Scripts/Lab/Turntable.cs:23
   serialized     1 component of Game.Lab.Turntable in 1 asset  [heuristic]
     1 Turntable  Assets/Prefabs/Turntable.prefab:33
   overridden in  2
     Lab Turntable: _speed = 3      Assets/Scenes/Lab.unity:133
     Turntable Variant: _speed = 5  Assets/Prefabs/Turntable Variant.prefab:19
-  note           field reads and writes are not in the graph: grep _speed for code uses
 ```
 
 **Groups** (this order; a group with no rows is left out; a row is `<what>  <file>:<line>` and
@@ -313,7 +341,10 @@ ends `[heuristic]` when the edge is; a holder row is `<count> <type>  <file>:<li
 
 | Group | For | Rows |
 | --- | --- | --- |
-| `callers` | method, property, event | `calls` edges in |
+| `callers` | method, property, event | `calls` edges in with no `use`, or `delegate` (the method named as a delegate) |
+| `readers` / `writers` | field, property | `calls` edges in with `use` `read` / `write` |
+| `subscribers` | event, delegate or UnityEvent field or property, a handler method | `calls` edges in with `use` `subscribe` or `unsubscribe`: `<member>, handler <method>` on the event, `<member>, to <event>` (`from` for an unsubscribe) on the handler |
+| `raised by` | event, delegate or UnityEvent field or property | `calls` edges in with `use` `raise` |
 | `dispatched from` | method | `dispatches` edges in (string names; confidence of the edge) |
 | `overridden by` / `implemented by` | virtual, abstract and interface members | `overrides` edges in |
 | `overrides` | a member that overrides or implements one | the base members: changing the signature breaks that contract |
@@ -356,8 +387,8 @@ answer; a cut answer's `more` line says how many lines were left and names the l
 [{"label", "count", "rows": [{"name", "file", "line", "confidence"}], "more": n}], "cut": bool}`;
 rows are dropped from the end until it fits the budget.
 
-Not covered (ask first): transitive walks, impact of assets and scene objects, field reads and
-writes (the graph has none), a "what to change" plan.
+Not covered (ask first): transitive walks, impact of assets and scene objects, a "what to change"
+plan. Field reads and writes are `readers` and `writers` since B1g (before, a note said to grep).
 
 ## Resolving `<symbol>`
 

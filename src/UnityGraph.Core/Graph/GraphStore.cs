@@ -18,11 +18,11 @@ public sealed class GraphStore : IDisposable
 
     /// <summary>
     /// The meta key whose value <see cref="IndexRules"/> says the graph was indexed by the current
-    /// rules: values whole (C1), declarations from their line, not their attributes' (B1e). Named
-    /// for the first.
+    /// rules: values whole (C1), declarations from their line, not their attributes' (B1e), and
+    /// `calls` edges that say how a member is used, fields included (B1g). Named for the first.
     /// </summary>
     public const string ValuesKey = "values";
-    public const string IndexRules = "whole, declaration lines";
+    public const string IndexRules = "whole, declaration lines, uses";
 
     private const string Schema = """
         CREATE TABLE meta (
@@ -218,9 +218,10 @@ public sealed class GraphStore : IDisposable
             SqliteConnection existing = Connect(path, SqliteOpenMode.ReadWrite);
             try
             {
-                if (ReadSchemaVersion(existing) == SchemaVersion.ToString(CultureInfo.InvariantCulture))
+                // A graph built by older index rules is rebuilt like one of another schema: one bulk
+                // index takes seconds where indexing every file again one by one took minutes.
+                if (ReadSchemaVersion(existing) == SchemaVersion.ToString(CultureInfo.InvariantCulture) && ReadRules(existing) == IndexRules)
                 {
-                    MarkOlderRules(existing);
                     return new GraphStore(existing, projectRoot, directory, mode, created: false, writeLock, publishTo);
                 }
             }
@@ -774,31 +775,14 @@ public sealed class GraphStore : IDisposable
         return connection;
     }
 
-    // A graph built by older rules: before C1 it cut long values (signatures, message targets, paths,
-    // override values, labels); before B1e a declaration started at its attributes. Its schema is the
-    // same, so it is not rebuilt: every file is marked changed once, and the next update indexes
-    // them again by the current rules.
-    private static void MarkOlderRules(SqliteConnection db)
+    // The index rules a graph was built by: before C1 it cut long values (signatures, message
+    // targets, paths, override values, labels); before B1e a declaration started at its
+    // attributes; before B1g `calls` edges had no `use` and fields none.
+    private static string? ReadRules(SqliteConnection db)
     {
-        using (SqliteCommand read = Command(db, null, "SELECT value FROM meta WHERE key = $key"))
-        {
-            read.Parameters.AddWithValue("$key", ValuesKey);
-            if (read.ExecuteScalar() as string == IndexRules)
-            {
-                return;
-            }
-        }
-
-        using SqliteTransaction tx = db.BeginTransaction();
-        Execute(db, tx, "UPDATE files SET size = -1");
-        using (SqliteCommand mark = Command(db, tx, "INSERT OR REPLACE INTO meta(key, value) VALUES ($key, $value)"))
-        {
-            mark.Parameters.AddWithValue("$key", ValuesKey);
-            mark.Parameters.AddWithValue("$value", IndexRules);
-            mark.ExecuteNonQuery();
-        }
-
-        tx.Commit();
+        using SqliteCommand read = Command(db, null, "SELECT value FROM meta WHERE key = $key");
+        read.Parameters.AddWithValue("$key", ValuesKey);
+        return read.ExecuteScalar() as string;
     }
 
     private static string? ReadSchemaVersion(SqliteConnection db)

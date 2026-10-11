@@ -41,15 +41,20 @@
   method cs:M:Game.Core.Money.op_Addition(Game.Core.Money,Game.Core.Money) "op_Addition" 32-32 {"sig":"op_Addition(Money, Money)","access":"public","static":true}
   cs:T:Game.Core.Pool`1 contains cs:F:Game.Core.Pool`1._items exact @8
   cs:T:Game.Core.Pool`1 contains cs:P:Game.Core.Pool`1.Count exact @10
+  cs:P:Game.Core.Pool`1.Count calls cs:F:Game.Core.Pool`1._items exact @10 {"use":"read"}
   cs:T:Game.Core.Pool`1 contains cs:M:Game.Core.Pool`1.Get(System.Func{`0}) exact @12
+  cs:M:Game.Core.Pool`1.Get(System.Func{`0}) calls cs:F:Game.Core.Pool`1._items exact @15 {"use":"read"}
   cs:T:Game.Core.Pool`1 contains cs:M:Game.Core.Pool`1.Release(`0) exact @18
+  cs:M:Game.Core.Pool`1.Release(`0) calls cs:F:Game.Core.Pool`1._items exact @18 {"use":"read"}
   cs:T:Game.Core.Pool`1 contains cs:T:Game.Core.Pool`1.Handle exact @20
   cs:T:Game.Core.Pool`1.Handle contains cs:F:Game.Core.Pool`1.Handle.Owner exact @22
   cs:F:Game.Core.Pool`1.Handle.Owner uses_type cs:T:Game.Core.Pool`1 exact @22
   cs:T:Game.Core.Money contains cs:F:Game.Core.Money.Cents exact @28
   cs:T:Game.Core.Money contains cs:M:Game.Core.Money.#ctor(System.Int64) exact @30
+  cs:M:Game.Core.Money.#ctor(System.Int64) calls cs:F:Game.Core.Money.Cents exact @30 {"use":"write"}
   cs:T:Game.Core.Money contains cs:M:Game.Core.Money.op_Addition(Game.Core.Money,Game.Core.Money) exact @32
   cs:M:Game.Core.Money.op_Addition(Game.Core.Money,Game.Core.Money) calls cs:M:Game.Core.Money.#ctor(System.Int64) exact @32
+  cs:M:Game.Core.Money.op_Addition(Game.Core.Money,Game.Core.Money) calls cs:F:Game.Core.Money.Cents exact @32 {"use":"read"}
 # Assets/Scripts/Core/Stage.cs
   type cs:T:Game.Core.IOpenable "IOpenable" 7-10 {"subkind":"interface","access":"public"}
   method cs:M:Game.Core.IOpenable.Open(System.Int32) "Open" 9-9 {"sig":"Open(int)","access":"public"}
@@ -115,16 +120,24 @@
   cs:T:Game.Lab.LabStage contains cs:F:Game.Lab.LabStage.Count exact @15
   cs:T:Game.Lab.LabStage contains cs:F:Game.Lab.LabStage._opened exact @16
   cs:T:Game.Lab.LabStage contains cs:M:Game.Lab.LabStage.Awake exact @18
+  cs:M:Game.Lab.LabStage.Awake calls cs:F:Game.Lab.LabStage._turntable exact @20 {"use":"write"}
   cs:M:Game.Lab.LabStage.Awake uses_type cs:T:Game.Lab.Turntable exact @20
+  cs:M:Game.Lab.LabStage.Awake calls cs:F:Game.Lab.LabStage.Count exact @21 {"use":"write"}
   cs:T:Game.Lab.LabStage contains cs:M:Game.Lab.LabStage.Open(System.Int32) exact @24
   cs:M:Game.Lab.LabStage.Open(System.Int32) overrides cs:M:Game.Core.Stage.Open(System.Int32) exact @24
+  cs:M:Game.Lab.LabStage.Open(System.Int32) calls cs:F:Game.Lab.LabStage._opened exact @26 {"use":"write"}
+  cs:M:Game.Lab.LabStage.Open(System.Int32) calls cs:F:Game.Lab.LabStage._turntable exact @27 {"use":"read"}
   cs:M:Game.Lab.LabStage.Open(System.Int32) calls cs:M:Game.Lab.Turntable.Rotate(System.Single) exact @27
+  cs:M:Game.Lab.LabStage.Open(System.Int32) calls cs:F:Game.Lab.LabStage.speed exact @27 {"use":"read"}
   cs:M:Game.Lab.LabStage.Open(System.Int32) dispatches cs:M:Game.Lab.LabStage.ResetStage exact @29
+  cs:M:Game.Lab.LabStage.Open(System.Int32) calls cs:F:Game.Lab.LabStage.ResetMethod exact @29 {"use":"read"}
   cs:M:Game.Lab.LabStage.Open(System.Int32) dispatches cs:M:Game.Lab.LabStage.Spin exact @30
   cs:M:Game.Lab.LabStage.Open(System.Int32) dispatches cs:M:Game.Lab.Turntable.OnOpened heuristic @31
   cs:M:Game.Lab.LabStage.Open(System.Int32) calls cs:M:Game.Lab.LabStage.Trace(System.Int32) exact @34
   cs:T:Game.Lab.LabStage contains cs:M:Game.Lab.LabStage.ResetStage exact @38
+  cs:M:Game.Lab.LabStage.ResetStage calls cs:F:Game.Lab.LabStage._opened exact @38 {"use":"write"}
   cs:T:Game.Lab.LabStage contains cs:M:Game.Lab.LabStage.Spin exact @40
+  cs:M:Game.Lab.LabStage.Spin calls cs:F:Game.Lab.LabStage._turntable exact @43 {"use":"read"}
   cs:M:Game.Lab.LabStage.Spin calls cs:M:Game.Lab.Turntable.Rotate(System.Single) exact @43
   cs:T:Game.Lab.LabStage contains cs:M:Game.Lab.LabStage.OnClosed exact @46
   cs:M:Game.Lab.LabStage.OnClosed overrides cs:M:Game.Core.Stage.OnClosed exact @46
@@ -132,6 +145,7 @@
   cs:M:Game.Lab.LabStage.OnClosed uses_type cs:T:Game.Core.Pool`1 exact @49
   cs:M:Game.Lab.LabStage.OnClosed uses_type cs:T:Game.Lab.Turntable exact @49
   cs:M:Game.Lab.LabStage.OnClosed calls cs:M:Game.Core.Pool`1.Release(`0) exact @50
+  cs:M:Game.Lab.LabStage.OnClosed calls cs:F:Game.Lab.LabStage._turntable exact @50 {"use":"read"}
   cs:M:Game.Lab.LabStage.OnClosed calls cs:M:Game.Lab.Turntable.Stop exact @51
   cs:T:Game.Lab.LabStage contains cs:M:Game.Lab.LabStage.OpenFirst exact @56
   cs:M:Game.Lab.LabStage.OpenFirst calls cs:M:Game.Lab.LabStage.Open(System.Int32) exact @56
@@ -147,12 +161,49 @@
   method cs:M:Game.Lab.Turntable.Rotate(System.Single) "Rotate" 17-21 {"sig":"Rotate(float)","access":"public"}
   method cs:M:Game.Lab.Turntable.Stop "Stop" 23-23 {"sig":"Stop()","access":"public"}
   method cs:M:Game.Lab.Turntable.OnOpened "OnOpened" 25-25 {"sig":"OnOpened()","access":"private"}
+  type cs:T:Game.Lab.Spectator "Spectator" 28-58 {"subkind":"class","access":"public"}
+  field cs:F:Game.Lab.Spectator._deck "_deck" 30-30 {"type":"Turntable","access":"private"}
+  field cs:F:Game.Lab.Spectator._cheered "_cheered" 31-31 {"type":"UnityEvent","access":"private"}
+  field cs:F:Game.Lab.Spectator.Watched "Watched" 32-32 {"type":"Action<float>","access":"public"}
+  method cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) "Watch" 34-40 {"sig":"Watch(Turntable)","access":"public"}
+  method cs:M:Game.Lab.Spectator.Leave "Leave" 42-47 {"sig":"Leave()","access":"public"}
+  method cs:M:Game.Lab.Spectator.OnRotated(System.Single) "OnRotated" 49-55 {"sig":"OnRotated(float)","access":"private"}
+  method cs:M:Game.Lab.Spectator.OnCheered "OnCheered" 57-57 {"sig":"OnCheered()","access":"private"}
   a:0f9e8d7c6b5a49382716a5b4c3d2e1f0 script_defines cs:T:Game.Lab.Turntable exact @7
   cs:T:Game.Lab.Turntable inherits cs:T:UnityEngine.MonoBehaviour exact @7
   cs:T:Game.Lab.Turntable contains cs:F:Game.Lab.Turntable._speed exact @11
   cs:T:Game.Lab.Turntable contains cs:P:Game.Lab.Turntable.Tint exact @13
   cs:T:Game.Lab.Turntable contains cs:E:Game.Lab.Turntable.Rotated exact @15
   cs:T:Game.Lab.Turntable contains cs:M:Game.Lab.Turntable.Rotate(System.Single) exact @17
-  cs:M:Game.Lab.Turntable.Rotate(System.Single) calls cs:E:Game.Lab.Turntable.Rotated exact @20
+  cs:M:Game.Lab.Turntable.Rotate(System.Single) calls cs:F:Game.Lab.Turntable._speed exact @19 {"use":"write"}
+  cs:M:Game.Lab.Turntable.Rotate(System.Single) calls cs:E:Game.Lab.Turntable.Rotated exact @20 {"use":"raise"}
+  cs:M:Game.Lab.Turntable.Rotate(System.Single) calls cs:F:Game.Lab.Turntable._speed exact @20 {"use":"read"}
   cs:T:Game.Lab.Turntable contains cs:M:Game.Lab.Turntable.Stop exact @23
+  cs:M:Game.Lab.Turntable.Stop calls cs:F:Game.Lab.Turntable._speed exact @23 {"use":"write"}
   cs:T:Game.Lab.Turntable contains cs:M:Game.Lab.Turntable.OnOpened exact @25
+  cs:T:Game.Lab.Spectator contains cs:F:Game.Lab.Spectator._deck exact @30
+  cs:F:Game.Lab.Spectator._deck uses_type cs:T:Game.Lab.Turntable exact @30
+  cs:T:Game.Lab.Spectator contains cs:F:Game.Lab.Spectator._cheered exact @31
+  cs:T:Game.Lab.Spectator contains cs:F:Game.Lab.Spectator.Watched exact @32
+  cs:T:Game.Lab.Spectator contains cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) exact @34
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) uses_type cs:T:Game.Lab.Turntable exact @34
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:F:Game.Lab.Spectator._deck exact @36 {"use":"write"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:F:Game.Lab.Spectator._deck exact @37 {"use":"read"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:E:Game.Lab.Turntable.Rotated exact @37 {"use":"subscribe","handler":"cs:M:Game.Lab.Spectator.OnRotated(System.Single)"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:M:Game.Lab.Spectator.OnRotated(System.Single) exact @37 {"use":"subscribe","event":"cs:E:Game.Lab.Turntable.Rotated"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:E:Game.Lab.Turntable.Rotated exact @38 {"use":"subscribe","handler":"lambda"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:F:Game.Lab.Spectator.Watched exact @38 {"use":"raise"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:F:Game.Lab.Spectator._cheered exact @39 {"use":"subscribe","handler":"cs:M:Game.Lab.Spectator.OnCheered"}
+  cs:M:Game.Lab.Spectator.Watch(Game.Lab.Turntable) calls cs:M:Game.Lab.Spectator.OnCheered exact @39 {"use":"subscribe","event":"cs:F:Game.Lab.Spectator._cheered"}
+  cs:T:Game.Lab.Spectator contains cs:M:Game.Lab.Spectator.Leave exact @42
+  cs:M:Game.Lab.Spectator.Leave calls cs:F:Game.Lab.Spectator._deck exact @44 {"use":"read"}
+  cs:M:Game.Lab.Spectator.Leave calls cs:E:Game.Lab.Turntable.Rotated exact @44 {"use":"unsubscribe","handler":"cs:M:Game.Lab.Spectator.OnRotated(System.Single)"}
+  cs:M:Game.Lab.Spectator.Leave calls cs:M:Game.Lab.Spectator.OnRotated(System.Single) exact @44 {"use":"unsubscribe","event":"cs:E:Game.Lab.Turntable.Rotated"}
+  cs:M:Game.Lab.Spectator.Leave calls cs:F:Game.Lab.Spectator._cheered exact @45 {"use":"unsubscribe","handler":"cs:M:Game.Lab.Spectator.OnCheered"}
+  cs:M:Game.Lab.Spectator.Leave calls cs:M:Game.Lab.Spectator.OnCheered exact @45 {"use":"unsubscribe","event":"cs:F:Game.Lab.Spectator._cheered"}
+  cs:M:Game.Lab.Spectator.Leave calls cs:F:Game.Lab.Spectator.Watched exact @46 {"use":"write"}
+  cs:T:Game.Lab.Spectator contains cs:M:Game.Lab.Spectator.OnRotated(System.Single) exact @49
+  cs:M:Game.Lab.Spectator.OnRotated(System.Single) calls cs:F:Game.Lab.Spectator._deck exact @51 {"use":"read"}
+  cs:M:Game.Lab.Spectator.OnRotated(System.Single) calls cs:P:Game.Lab.Turntable.Tint exact @51 {"use":"read"}
+  cs:M:Game.Lab.Spectator.OnRotated(System.Single) calls cs:F:Game.Lab.Spectator._cheered exact @53 {"use":"raise"}
+  cs:T:Game.Lab.Spectator contains cs:M:Game.Lab.Spectator.OnCheered exact @57

@@ -504,3 +504,22 @@ written, the rest $0.09-0.11), no subagents.
 - A5 scored 0/3 in the results file: every answer said "C2_Central never uses it" and the `not`
   item matched the bare name. The item now takes C2_Central named as excluded (Suites); all three
   pass it, checked by hand. The results file keeps the score of the run.
+
+### Script mode after B1g, unitygraph, 2026-10-11
+
+purge-squad 9ce9995, `ug` with B1g (`calls` edges say how a member is used: read, write,
+subscribe, unsubscribe, raise, delegate, with the handler), navigation and asset questions.
+N5's recorded steps dropped their `grep -n "_value"`: `ug impact` said to grep, and now lists
+the readers and writers itself. `--baseline` the four-arm run: no regression, 10/10.
+
+| Question | After B1 | After B1g | Change |
+|---|---|---|---|
+| N3 | 1 / 146 | 1 / 192 | `ug refs Health.Died`: `raised by`, three `subscribed by`, two `unsubscribed by`, each with its handler (the agent run grepped `Died [+-]=` for it) |
+| N5 | 2 / 190 | 1 / 162 | `ug impact ProgressBar._value`: readers `Apply`, `Value`, writer `Value`; no grep |
+| others | 9 / 2,672 | 9 / 2,673 | none (a token of rounding) |
+
+- Navigation and asset, 11 calls / 3,027 tokens against 12 / 3,008: one call fewer, 19 tokens
+  more, and N3's answer now holds what its agent run went to grep for.
+- The graph: 39,286 edges, 30.5 MB (+0.6%); a full index 3.2 s, as before.
+- The first `ug` call after the upgrade rebuilt the graph in 3.9 s (older index rules now
+  rebuild like another schema; marking every file changed took 157 s this time, 61 s at B1e).

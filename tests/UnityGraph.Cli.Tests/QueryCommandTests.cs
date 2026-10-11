@@ -63,7 +63,7 @@ public sealed partial class QueryCommandTests : IDisposable
         var (_, byAbsolute) = Run("outline", full);
 
         Assert.Equal(0, exitCode);
-        Assert.StartsWith("indexed 28 files in <t> s\nAssets/Scripts/Lab/Turntable.cs  script  1 type, 6 members", byName, StringComparison.Ordinal);
+        Assert.StartsWith("indexed 28 files in <t> s\nAssets/Scripts/Lab/Turntable.cs  script  2 types, 13 members", byName, StringComparison.Ordinal);
         Assert.Equal(byPath, byAbsolute);
         Assert.EndsWith(byPath, byName, StringComparison.Ordinal);
         Assert.StartsWith("outside the project:", Run("outline", Path.Combine(_root, "..", "Other.cs")).Output, StringComparison.Ordinal);

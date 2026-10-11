@@ -88,6 +88,15 @@ public sealed class QueryEngineTests(QueryFixture fixture) : IClassFixture<Query
             "explain Lab.unity > Turntable > LabStage",
             "explain Turntable > Nope",
             "explain StageData",
+            "refs Turntable.Rotated",
+            "refs Spectator.OnRotated",
+            "refs Spectator._cheered",
+            "refs Turntable._speed",
+            "refs LabStage.Count",
+            "explain Turntable.Rotated",
+            "explain Spectator.OnRotated",
+            "explain Spectator._cheered",
+            "explain Spectator.Watched",
         ];
 
         var transcript = new StringBuilder();

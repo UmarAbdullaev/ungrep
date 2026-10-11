@@ -97,7 +97,7 @@ public sealed partial class QueryEngine
             foreach (Edge edge in Incoming(node, ref more))
             {
                 (int order, string label) = IncomingLabel(edge, node);
-                rows.Add(new RefRow(order, label, Source(edge), Label(edge.Src), edge, target, null));
+                rows.Add(new RefRow(order, label, Source(edge), Label(edge.Src), edge, target, OtherEnd(edge)));
             }
 
             foreach ((Edge edge, string via) in ImplementedVia(node))
@@ -361,11 +361,7 @@ public sealed partial class QueryEngine
         }
 
         AddIfAny(lines, "overrides", [.. outgoing.Where(e => e.Kind == EdgeKind.Overrides).Select(e => Names.Qualified(e.Dst)).Distinct().Order(StringComparer.Ordinal)]);
-        if (member.Kind != NodeKind.Field)
-        {
-            lines.Add(["called from", Join(Counted(incoming, EdgeKind.Calls))]);
-        }
-
+        AddUses(lines, member, incoming);
         AddIfAny(lines, "dispatched from", [.. Counted(incoming, EdgeKind.Dispatches).Select(s => s + " [heuristic]")]);
         if (member.Kind == NodeKind.Method)
         {
@@ -377,13 +373,67 @@ public sealed partial class QueryEngine
         AddIfAny(lines, InInterface(member) ? "implemented by" : "overridden by", Sources(incoming, EdgeKind.Overrides));
         if (member.Kind is NodeKind.Method or NodeKind.Property or NodeKind.Event)
         {
-            lines.Add(["calls", Join([.. outgoing.Where(e => e.Kind is EdgeKind.Calls or EdgeKind.Dispatches)
+            lines.Add(["calls", Join([.. outgoing.Where(e => e.Kind is EdgeKind.Calls or EdgeKind.Dispatches && !e.Dst.StartsWith("cs:F:", StringComparison.Ordinal))
                 .Select(e => Names.Qualified(e.Dst)).Distinct().Order(StringComparer.Ordinal)])]);
         }
 
         AddIfAny(lines, "flags", [.. Flags(member).Where(f => f != "serialized" && f != Names.Prop(member, "access"))]);
         answer.AddRange(Answer.Table(lines, "  "));
     }
+
+    // The incoming `calls` lines by use (B1g). The member's main line says `(none)` when nothing
+    // uses it that way: a method's `called from`, an event's (or a field or property subscribed
+    // to or raised) `subscribed by`, otherwise `read by`. A handler method lists the events it
+    // is subscribed to: `Game.Health.Died (Game.Hud.OnEnable)`.
+    private void AddUses(List<string[]> lines, Node member, List<Edge> incoming)
+    {
+        List<Edge> calls = [.. incoming.Where(e => e.Kind == EdgeKind.Calls)];
+        bool method = member.Kind == NodeKind.Method;
+        bool listened = !method && (member.Kind == NodeKind.Event || calls.Any(e => Names.Prop(e, "use") is "subscribe" or "unsubscribe" or "raise"));
+        string main = method ? "called from" : listened ? "subscribed by" : "read by";
+        foreach (string label in _useLabels)
+        {
+            List<Edge> edges = [.. calls.Where(e => UseLabel(e) == label)];
+            bool subscription = label is "subscribed by" or "unsubscribed by";
+            List<string> items = !subscription ? Counted(edges)
+                : method ? Sorted(edges.Select(e => $"{Names.Qualified(Names.Prop(e, "event") ?? "?")} ({Names.Qualified(e.Src)})"))
+                : Sorted(edges.Select(e => Names.Qualified(e.Src) + (Names.Prop(e, "handler") is { } handler ? $" ({Names.Qualified(handler)})" : "")));
+            string shown = !method || !subscription ? label : label == "subscribed by" ? "subscribed to" : "unsubscribed from";
+            if (label == main)
+            {
+                lines.Add([shown, Join(items)]);
+            }
+            else
+            {
+                AddIfAny(lines, shown, items);
+            }
+        }
+    }
+
+    private static List<string> Sorted(IEnumerable<string> items) => [.. items.Distinct().Order(StringComparer.Ordinal)];
+
+    private static readonly string[] _useLabels = ["called from", "read by", "written by", "subscribed by", "unsubscribed by", "raised by", "delegate from"];
+
+    // A `calls` edge's label by how its source uses the member (B1g; SPEC-code-index, Uses).
+    private static string UseLabel(Edge edge) => Names.Prop(edge, "use") switch
+    {
+        null => "called from",
+        "read" => "read by",
+        "write" => "written by",
+        "subscribe" => "subscribed by",
+        "unsubscribe" => "unsubscribed by",
+        "raise" => "raised by",
+        "delegate" => "delegate from",
+        { } use => use + " by",
+    };
+
+    // The other end of a subscription, ending its `refs` line: the handler on the event's line,
+    // the event on the handler's.
+    private static string? OtherEnd(Edge edge) =>
+        edge.Kind != EdgeKind.Calls ? null
+        : Names.Prop(edge, "handler") is { } handler ? "handler " + Names.Qualified(handler)
+        : Names.Prop(edge, "event") is { } listened ? (Names.Prop(edge, "use") == "unsubscribe" ? "from " : "to ") + Names.Qualified(listened)
+        : null;
 
     private void ExplainAsset(Node asset, Answer answer)
     {
@@ -732,7 +782,7 @@ public sealed partial class QueryEngine
 
     private (int Order, string Label) IncomingLabel(Edge edge, Node target) => edge.Kind switch
     {
-        EdgeKind.Calls => (0, "called from"),
+        EdgeKind.Calls => (0, UseLabel(edge)),
         EdgeKind.Dispatches => (1, "dispatched from"),
         EdgeKind.Overrides => (2, InInterface(target) ? "implemented by" : "overridden by"),
         EdgeKind.Inherits => (3, Names.Prop(target, "subkind") == "interface" ? "extended by" : "subclass"),
@@ -780,8 +830,10 @@ public sealed partial class QueryEngine
         [.. edges.Where(e => e.Kind == kind).Select(e => Names.Qualified(e.Src)).Distinct().Order(StringComparer.Ordinal)];
 
     // Callers with the number of files they call from, when more than one.
-    private static List<string> Counted(List<Edge> edges, EdgeKind kind) =>
-        [.. edges.Where(e => e.Kind == kind).GroupBy(e => Names.Qualified(e.Src)).OrderBy(g => g.Key, StringComparer.Ordinal)
+    private static List<string> Counted(List<Edge> edges, EdgeKind kind) => Counted(edges.Where(e => e.Kind == kind));
+
+    private static List<string> Counted(IEnumerable<Edge> edges) =>
+        [.. edges.GroupBy(e => Names.Qualified(e.Src)).OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => g.Count() > 1 ? $"{g.Key} ({g.Count()})" : g.Key)];
 
     private List<Edge> In(string key) => Edges(_store.EdgesTo(key, EdgeKindSet.All, EdgeCap));
