@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "suite": "purge-squad",
+  "mode": "agent",
+  "date": "2026-10-11",
+  "commit": "9ce9995",
+  "head": "9ce9995",
+  "arms": [
+    "unitygraph"
+  ],
+  "questions": [
+    {
+      "id": "N3",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 0,
+          "of": 0,
+          "runs": [
+            {
+              "sessionId": "60650147-4651-42d5-9451-900c40d4b7f8",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 170944,
+              "subagentTokens": 0,
+              "usd": 0.0955,
+              "seconds": 18.1,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "1bf81857-5154-47dd-a1c4-ef15f06fbe3e",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 172554,
+              "subagentTokens": 0,
+              "usd": 0.0971,
+              "seconds": 11.5,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "143957a1-7d59-4448-87b0-fd69483228b4",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 172673,
+              "subagentTokens": 0,
+              "usd": 0.0978,
+              "seconds": 12.7,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N5",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 0,
+          "of": 0,
+          "runs": [
+            {
+              "sessionId": "b116d2a4-9a93-4fba-8b73-a020984e0fcb",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 172621,
+              "subagentTokens": 0,
+              "usd": 0.3064,
+              "seconds": 13.8,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "162fd9d2-17da-4b62-bea1-46d7d95980ce",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 172484,
+              "subagentTokens": 0,
+              "usd": 0.099,
+              "seconds": 14.5,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            },
+            {
+              "sessionId": "cbd2c57d-7e94-4a0b-aba5-a66d081ce061",
+              "turns": 3,
+              "toolCalls": 2,
+              "contextTokens": 172470,
+              "subagentTokens": 0,
+              "usd": 0.0991,
+              "seconds": 13.5,
+              "correct": true,
+              "missing": [],
+              "unwanted": [],
+              "redo": false,
+              "leaked": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "idle": [],
+  "budgets": [
+    {
+      "name": "skill description",
+      "ok": true,
+      "detail": "80/300"
+    },
+    {
+      "name": "skill body",
+      "ok": true,
+      "detail": "598/600"
+    },
+    {
+      "name": "compile gate",
+      "ok": true,
+      "detail": "0 bytes clean, 20/20 error lines"
+    }
+  ],
+  "model": "claude-opus-5-5"
+}
