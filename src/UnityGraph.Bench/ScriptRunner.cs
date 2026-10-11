@@ -160,6 +160,7 @@ public sealed class ScriptRunner
 
         string check = RunUncounted(question.Check, "check", executor, values, dump);
         RunUncounted(question.After, "after", executor, values, dump);
+        executor.EndSession();
         IReadOnlyList<string> missing = Scoring.Missing(question.Key, answers.ToString(), check);
         WriteAnswers(options.AnswersDir, question.Id, leg, dump);
 
@@ -183,7 +184,6 @@ public sealed class ScriptRunner
     /// </summary>
     private static IReadOnlyList<IdleRow> Idle(IReadOnlyList<Arm> arms, Dictionary<string, HashSet<(string Server, string Tool)>> used, StepExecutor executor, RunOptions options)
     {
-        var sessions = executor.Sessions.ToDictionary(s => s.Server, s => s.Session, StringComparer.Ordinal);
         var rows = new List<IdleRow>();
         foreach (Arm arm in arms)
         {
@@ -209,20 +209,9 @@ public sealed class ScriptRunner
             {
                 foreach (var server in tools.GroupBy(t => t.Server).OrderBy(g => g.Key, StringComparer.Ordinal))
                 {
-                    if (!sessions.TryGetValue(server.Key, out IMcpSession? session))
+                    if (executor.ToolsOf(server.Key, out string? error) is not { } list)
                     {
-                        detail.Add($"mcp {server.Key} did not start");
-                        continue;
-                    }
-
-                    IReadOnlyList<(string Name, string Json)> list;
-                    try
-                    {
-                        list = session.Tools();
-                    }
-                    catch (McpException e)
-                    {
-                        detail.Add($"mcp {server.Key} tools/list failed: {e.Message}");
+                        detail.Add($"mcp {server.Key} {error}");
                         continue;
                     }
 

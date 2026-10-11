@@ -70,7 +70,7 @@ public static class BenchText
         if (arm.Runs is { Count: > 0 } runs)
         {
             int correct = runs.Count(r => r.Correct);
-            cell = Invariant($"{arm.Calls:0.#} / {arm.Tokens:#,0} / {arm.Seconds:0} {(correct == runs.Count ? "ok" : $"{correct}/{runs.Count} ok")}");
+            cell = Invariant($"{arm.Calls:0.#} / {arm.Tokens:#,0} / {arm.Seconds:0} {(correct == runs.Count ? "ok" : $"{correct}/{runs.Count} right")}");
             int redo = runs.Count(r => r.Redo);
             int leaked = runs.Count(r => r.Leaked);
             cell += (redo > 0 ? Invariant($" redo {redo}") : "") + (leaked > 0 ? Invariant($" leaked {leaked}") : "");

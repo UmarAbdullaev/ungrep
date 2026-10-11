@@ -139,6 +139,26 @@ public sealed class ScriptRunnerTests : IDisposable
     }
 
     [Fact]
+    public void Each_leg_starts_its_servers_fresh_and_a_server_that_failed_is_not_tried_again()
+    {
+        // A server may remember what it sent in a session (codegraph does); a real session answers one question.
+        Suite suite = Suite.Parse(SuiteTests.Minimal.Replace(
+            "\"questions\": [",
+            "\"questions\": [ { \"id\": \"Q0\", \"kind\": \"navigation\", \"prompt\": \"Set?\", \"key\": { \"items\": [\"ok\"], \"checked\": \"by hand\" }, \"steps\": { \"grep\": [ { \"mcp\": \"pipe\", \"tool\": \"set\", \"args\": {} } ] } },",
+            StringComparison.Ordinal));
+
+        BenchRun run = Run(suite, "grep");
+        Assert.Equal(2, _host.Calls.Count(c => c == "open pipe-mcp"));
+        Assert.Equal("mcp pipe 3 tools, 2 used", run.Idle[0].Detail);
+
+        _host.Calls.Clear();
+        _host.Servers.Clear();
+        run = Run(suite, "grep");
+        Assert.Single(_host.Calls, c => c == "open pipe-mcp");
+        Assert.Equal("mcp pipe did not start", run.Idle[0].Detail);
+    }
+
+    [Fact]
     public void Answers_are_dumped_per_leg_with_uncounted_steps_marked()
     {
         Run();

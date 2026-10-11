@@ -130,8 +130,9 @@ internal static class BenchCommand
                 stdout.Write(BenchText.Render(run, comparison, result.GetValue(baseline), outPath).ReplaceLineEndings());
                 return run.Budgets.Any(b => b.Ok == false) || comparison?.Regressed == true ? 1 : 0;
             }
-            catch (ArgumentException e)
+            catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException)
             {
+                // IOException: an arm's skill to copy is missing, or the results can't be written.
                 stderr.WriteLine("ug bench: " + e.Message);
                 return 2;
             }

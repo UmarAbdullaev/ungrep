@@ -7,8 +7,9 @@ namespace UnityGraph.Bench;
 
 /// <summary>
 /// Runs steps in a project the way Claude Code's tools would answer them (SPEC-bench, Suites):
-/// `run` through the shell, `read` like the Read tool, `mcp` on a suite server started once and
-/// kept open for the whole run. Records which MCP tools each caller used, for the idle cost.
+/// `run` through the shell, `read` like the Read tool, `mcp` on a suite server started on its
+/// first call and kept open until <see cref="EndSession"/>. Keeps each server's tool list, for
+/// the idle cost.
 /// </summary>
 public sealed class StepExecutor : IDisposable
 {
@@ -22,8 +23,10 @@ public sealed class StepExecutor : IDisposable
     private readonly IBenchHost _host;
     private readonly Suite _suite;
     private readonly string _project;
-    private readonly Dictionary<string, IMcpSession?> _sessions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IMcpSession> _sessions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _startErrors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<(string Name, string Json)>> _tools = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _toolErrors = new(StringComparer.Ordinal);
     private readonly Action<TimeSpan> _sleep;
 
     // sleep: waits between polls; tests pass a no-op.
@@ -35,9 +38,38 @@ public sealed class StepExecutor : IDisposable
         _sleep = sleep ?? Thread.Sleep;
     }
 
-    /// <summary>Servers that started, for their tool lists.</summary>
-    public IEnumerable<(string Server, IMcpSession Session)> Sessions =>
-        _sessions.Where(s => s.Value is not null).Select(s => (s.Key, s.Value!));
+    /// <summary>
+    /// A server's tool list, read in its first session; null with the reason when it never
+    /// started or tools/list failed.
+    /// </summary>
+    public IReadOnlyList<(string Name, string Json)>? ToolsOf(string server, out string? error)
+    {
+        if (_sessions.TryGetValue(server, out IMcpSession? session))
+        {
+            ReadTools(server, session);
+        }
+
+        error = _startErrors.ContainsKey(server) ? "did not start"
+            : _toolErrors.TryGetValue(server, out string? failed) ? "tools/list failed: " + failed
+            : _tools.ContainsKey(server) ? null : "did not start";
+        return _tools.GetValueOrDefault(server);
+    }
+
+    /// <summary>
+    /// Closes the open servers, so the next leg starts them fresh: a real session answers one
+    /// question, and a server may keep state between calls (codegraph's explore leaves out source
+    /// it already sent in the session). A server that did not start is not tried again.
+    /// </summary>
+    public void EndSession()
+    {
+        foreach ((string server, IMcpSession session) in _sessions)
+        {
+            ReadTools(server, session);
+            session.Dispose();
+        }
+
+        _sessions.Clear();
+    }
 
     /// <summary>
     /// Runs one step: once, or as a poll until its answer matches (each poll a call). A failing
@@ -88,12 +120,29 @@ public sealed class StepExecutor : IDisposable
 
     public void Dispose()
     {
-        foreach (IMcpSession? session in _sessions.Values)
+        foreach (IMcpSession session in _sessions.Values)
         {
-            session?.Dispose();
+            session.Dispose();
         }
 
         _sessions.Clear();
+    }
+
+    private void ReadTools(string server, IMcpSession session)
+    {
+        if (_tools.ContainsKey(server) || _toolErrors.ContainsKey(server))
+        {
+            return;
+        }
+
+        try
+        {
+            _tools[server] = session.Tools();
+        }
+        catch (McpException e)
+        {
+            _toolErrors[server] = e.Message;
+        }
     }
 
     /// <summary>
@@ -151,6 +200,11 @@ public sealed class StepExecutor : IDisposable
 
     private CallAnswer Call(McpStep step)
     {
+        if (_startErrors.TryGetValue(step.Server, out string? failed))
+        {
+            return new CallAnswer(failed, 1, TimeSpan.Zero);
+        }
+
         if (!_sessions.TryGetValue(step.Server, out IMcpSession? session))
         {
             try
@@ -160,14 +214,13 @@ public sealed class StepExecutor : IDisposable
             catch (Exception e) when (e is McpException or IOException or Win32Exception or InvalidOperationException)
             {
                 _startErrors[step.Server] = $"MCP server {step.Server} did not start: {e.Message}";
+                return new CallAnswer(_startErrors[step.Server], 1, TimeSpan.Zero);
             }
 
             _sessions[step.Server] = session;
         }
 
-        return session is null
-            ? new CallAnswer(_startErrors[step.Server], 1, TimeSpan.Zero)
-            : session.Call(step.Tool, step.ArgumentsJson, _mcpTimeout);
+        return session.Call(step.Tool, step.ArgumentsJson, _mcpTimeout);
     }
 
     private static int Bytes(string text) => Encoding.UTF8.GetByteCount(text);

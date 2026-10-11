@@ -67,6 +67,11 @@ ug bench budgets [--project <dir>] [--gate]
   on chores 1-7 and 9-11). Shared steps run once and their score counts for each of the three.
 - Indexing a project for codegraph or Graphify is the user's decision (their global
   instructions); a missing index makes that arm "not run: needs codegraph-index".
+- How each arm asks: codegraph's `codegraph_explore` takes the symbol names from the question
+  (its MCP instructions: names, not prose; the verbatim question matched unrelated symbols);
+  `graphify query` takes the question as asked (its skill: the question goes to the graph first).
+  When the graph has no answer (no event subscriptions, no callers of a member, no field uses),
+  the arm's next steps are grep's, marked `redo`.
 
 ## Suites
 
@@ -160,7 +165,9 @@ Commands first named (now corrected there): System.Text.Json is already in, and 
 - Key items are .NET regular expressions (`(?i)` for case). Items name what the answer must say
   in a tool-neutral form: file names
   with line numbers (`Enemy\.cs\D{1,12}66\b` matches `Enemy.cs:66`, `Enemy.cs L66` and `Enemy.cs,
-  line 66`), type and member names, asset file names, object names.
+  line 66`; `Enemy\.cs[^\n]{0,200}(:|\bline |\bL)66\b` the shorthand agents write, `Enemy.cs:188
+  ... subscribes at :66`), type and member names, asset file names, object names. A question
+  that reads two ways takes either answer (N3: the subscribing methods or the handlers).
 - `checked` records how the key was verified by hand. A key without it is refused.
 - The suite runs from its own folder's view of PATH plus the `bin/` beside the running `ug`, so
   `ug` in a step is this build.
@@ -185,6 +192,11 @@ Rules the steps follow, so no arm is written to lose:
    arm's calls returned. Whether an item was found for the right reason (a caller line, not a
    comment) is checked by hand once per suite change and written into the Measured section.
 
+MCP servers start on a leg's first call and stop after its `after` steps, so each leg starts them
+fresh: a real session answers one question, and a server may keep state between calls
+(codegraph's explore leaves out source it already sent in the session; one server for all legs
+cost N3 its third subscriber).
+
 Scores per question and arm: calls; tokens as request plus answer bytes / 4; wall seconds;
 items found of all; redo calls. Totals per arm over the questions every arm ran; an arm that ran
 no question (its index missing) is left out of the totals and named.
@@ -197,7 +209,11 @@ project folder, then the run's transcript is read from Claude Code's project fol
 
 - Isolation: `--setting-sources project,local` (the user's own plugins and hooks stay out: the
   caveman hook alone changes answer length), `--strict-mcp-config` with only the arm's MCP
-  servers, `--plugin-dir <repo>` on the unitygraph arm only, and `--disallowedTools` naming the
+  servers, `--plugin-dir <repo>` on the unitygraph arm only, a skill an arm lists outside that
+  plugin (Graphify's, a personal skill in `~/.claude/skills`, which the `user` source would load)
+  copied with its folder into a temp plugin named after the arm and passed with a second
+  `--plugin-dir` (written for the run, removed after; `--dry-run` writes nothing), so the
+  Graphify arm is listed `graphify:graphify`, and `--disallowedTools` naming the
   other arms' CLIs (`Bash(ug:*)`, `Bash(codegraph:*)`, `Bash(graphify:*)`, `Skill(graphify)`).
   Deny rules are not a fence (spike S3: a denied search came back through PowerShell); a run that
   used another arm's tool is marked `leaked`.
@@ -286,7 +302,7 @@ by hand against the code and assets; the `checked` field says how.
 |---|---|---|---|
 | N1 | navigation | where is `RunDirector` defined; its Unity messages | `RunDirector.cs:24` (23 with its attribute); Awake, OnEnable, OnDisable, Start |
 | N2 | navigation | what calls `Wallet.TrySpend` (both overloads) | `Fabrication.TryFabricate` (Fabrication.cs:32); 6 tests in WalletTests.cs |
-| N3 | navigation | which methods subscribe to `Health.Died` | `Enemy.Awake` (Enemy.cs:66), `PlayerCharacter.OnEnable` (:92), `RunDirector.OnEnable` (:105) |
+| N3 | navigation | which methods subscribe to `Health.Died` | the `+=` at Enemy.cs:66 (`Enemy.Awake`), PlayerCharacter.cs:92 (`OnEnable`), RunDirector.cs:105 (`OnEnable`); the methods named as those or as the `OnDied` handlers |
 | N4 | navigation | which concrete classes implement `IPartRule`, directly or through interfaces | `StraightPayload` (WeaponRules.cs:10), `SimpleEmitter` (:71), `OnKillVolleyTrigger` (:125) |
 | N5 | navigation | what breaks if the serialized field `ProgressBar._value` is renamed | `ProgressBar.prefab` (the field's data), `RevivePanel.prefab` (override on `Countdown`), the code uses at ProgressBar.cs 18, 21, 40; `HealthBar._value` is another field |
 | A1 | asset | which prefabs and scenes use the `ProgressBar` script (O10 chore 11) | 4 prefabs, 2 scenes |
@@ -304,7 +320,7 @@ runner's save prompt, so C8 is "not run" until the user saves or undoes.
 ## Code
 
 - `src/UnityGraph.Bench`: `Suite` (model, loader, validation), `StepExecutor` (run, read, mcp;
-  polls, captures), `BenchHost` (shell, files, processes, MCP servers), `McpClient` (stdio
+  polls, captures; servers fresh per leg), `BenchHost` (shell, files, processes, MCP servers), `McpClient` (stdio
   JSON-RPC: initialize, tools/list, tools/call), `ScriptRunner`, `AgentRunner`, `Scoring` (key
   items, redo, leaks), `BenchResults` (JSON), `Baseline`, `BenchText`, `Budgets`, `SkillFile`.
 - `src/UnityGraph.Cli/BenchCommand.cs`: arguments, paths, dry runs, exit codes.
@@ -318,11 +334,13 @@ runner's save prompt, so C8 is "not run" until the user saves or undoes.
     committed purge-squad suite loads with a unitygraph leg on every question.
   - Scoring: items found, `not` items, tool uses, redo, leaks, text searches.
   - Script runner: before, leg, check, after in order; a shared leg once; `needs` unmet; polls
-    stop at `max`; a server that does not start; captures filled; answers dumped; reads numbered
-    like the Read tool; JSON round trip; the report (golden).
+    stop at `max`; a server that does not start, and is not tried again; servers fresh per leg;
+    captures filled; answers dumped; reads numbered like the Read tool; JSON round trip; the
+    report (golden).
   - `McpClient` against an in-process server over pipes: handshake, tools, a call, an error.
   - Agent runner: command lines per arm, the plan, a fixture transcript scored like `ug stats`,
-    a missing JSON answer, a chore's before and check steps around `claude`.
+    a missing JSON answer, a chore's before and check steps around `claude`, a skill outside the
+    plugin copied into the arm's plugin for the run only.
   - Baseline compare and its report (golden).
   - Budgets: skill files over and under; the gate through the dispatcher with a fake check, the
     after-check retried while the editor reloads.
@@ -342,39 +360,52 @@ runner's save prompt, so C8 is "not run" until the user saves or undoes.
 
 ## Measured
 
-### Script mode, grep and unitygraph, 2026-10-11
+### Script mode, four arms, 2026-10-11
 
-purge-squad 9ce9995, Unity 6000.3.14f1, bridge 0.15.0, `ug` at this commit, Pipeline (`unity
-mcp`) for the grep leg's chores. `Boot` open with the user's unsaved changes, left as found (still
-`modified`, edit mode, probe gone, `git status` unchanged). codegraph and Graphify not run: the
-project is not indexed for them (the user's decision, asked). C8 not run (`scenes-saved`).
-`bench/baselines/bench-purge-squad-script.json` is this run.
+purge-squad 9ce9995, Unity 6000.3.14f1, bridge 0.15.0, `ug` at this commit, codegraph 1.6.0
+(`codegraph serve --mcp`), Graphify's AST graph (`graphify update`, no LLM pass), Pipeline (`unity
+mcp`) for the other arms' chores. Both indexes built on the user's yes and kept out of
+purge-squad's git (`.git/info/exclude`). `Boot` open, left as found. C8 not run
+(`scenes-saved`). `bench/baselines/bench-purge-squad-script.json` is this run (it replaced the
+grep-and-unitygraph run of the same day: four arms, servers fresh per leg).
 
-| Question | grep calls / tokens | unitygraph calls / tokens | Note |
-|---|---|---|---|
-| N1 | 2 / 110 | 1 / 178 | |
-| N2 | 2 / 721 | 1 / 367 | |
-| N3 | 2 / 962 | 1 / 145 | |
-| N4 | 2 / 221 | 4 / 688 | one `ug refs` per interface: no transitive implementers in one call |
-| N5 | 4 / 279 | 2 / 190 | |
-| A1 | 2 / 98 | 1 / 413 | `ug impact` names objects too; `grep -l` lists files only |
-| A2 | 2 / 97 | 1 / 643 | as A1 |
-| A3 | 4 / 543 | 1 / 274 | |
-| A4 | 5 / 468 | 5 / 624 | scene field values are not in `ug` offline: YAML fallback |
-| A5 | 2 / 140 | 3 / 8,139, redo 2 | `ug refs` on a prefab: a row per field, cut twice, whole at `--budget 4800` |
-| C1-C7, C9, C10 | 44 / 3,757 (Pipeline) | 19 / 1,189 | C5: 10 polls, 36.8 s against one `ug compile`, 13.4 s |
+| Question | grep | codegraph | Graphify | unitygraph | Note |
+|---|---|---|---|---|---|
+| N1 | 2 / 110 | 1 / 6,266 | 1 / 1,665 | 1 / 178 | |
+| N2 | 2 / 721 | 2 / 11,783, redo 1 | 3 / 1,204, redo 2 | 1 / 367 | Graphify has no member-call edges across files: grep fallback |
+| N3 | 2 / 962 | 1 / 6,284 | 3 / 2,604, redo 2 | 1 / 145 | Graphify has no event nodes, only the `OnDied` methods |
+| N4 | 2 / 221 | 2 / 10,630, redo 1 | 2 / 2,317, redo 1 | 4 / 688 | `graphify affected` finds implementers through derived interfaces; `ug` needs one `refs` per interface |
+| N5 | 4 / 279 | 4 / 6,471 | 5 / 3,581, redo 1 | 2 / 190 | both graphs code-only: prefab data by grep |
+| A1 | 2 / 98 | grep's | grep's | 1 / 413 | `ug impact` names objects too; `grep -l` lists files only |
+| A2 | 2 / 97 | grep's | grep's | 1 / 643 | as A1 |
+| A3 | 4 / 543 | grep's | grep's | 1 / 274 | |
+| A4 | 5 / 468 | grep's | grep's | 5 / 624 | scene field values are not in `ug` offline: YAML fallback |
+| A5 | 2 / 140 | grep's | grep's | 3 / 8,139, redo 2 | `ug refs` on a prefab: a row per field, cut twice, whole at `--budget 4800` |
+| C1-C7, C9, C10 | 44 / 3,757 (Pipeline) | Pipeline's | Pipeline's | 19 / 1,188 | C5: 10 polls, 43.3 s against one `ug compile`, 14.7 s |
+
+Calls / tokens per cell; codegraph and Graphify have no asset or editor side, so their asset
+questions are grep's steps and their chores Pipeline's (Arms).
 
 | Arm | Calls | Tokens | Seconds | Correct | Redo | Idle (always + on use) |
 |---|---|---|---|---|---|---|
-| grep | 71 | 7,393 | 111.0 | 19/19 | 0 | 1,510 + 2,698 (Pipeline's 151 tool names; schemas of the 16 used) |
-| unitygraph | 39 | 12,847 | 65.3 | 19/19 | 2 | 27 + 599 (skill line, skill body) |
+| grep | 71 | 7,394 | 134.1 | 19/19 | 0 | 1,510 + 2,698 (Pipeline's 151 tool names; schemas of the 16 used) |
+| codegraph | 69 | 46,537 | 134.5 | 19/19 | 2 | 1,518 + 3,133 (Pipeline's, plus `codegraph_explore`: 8 + 435) |
+| Graphify | 73 | 16,472 | 141.9 | 19/19 | 6 | 1,602 + 13,528 (Pipeline's, plus the skill: 92 + 10,830) |
+| unitygraph | 39 | 12,846 | 72.9 | 19/19 | 2 | 27 + 599 (skill line, skill body) |
 
-- unitygraph against grep: calls −45%, tokens +74%. Without A5, unitygraph 36 calls, 4,708 tokens
-  against grep's 69 and 7,253 (−48% calls, −35% tokens).
-- By kind: navigation 9 / 1,568 against 12 / 2,293; asset 11 / 10,093 (1,954 without A5) against
-  15 / 1,346; chores 19 / 1,189 against Pipeline's 44 / 3,757 (O10's chore result held).
-- Graphify's skill would add 92 tokens a turn and 10,831 on use (its idle cost was read; the arm
-  did not run).
+- Against grep: codegraph calls −3%, tokens +529%; Graphify calls +3%, tokens +123%; unitygraph
+  calls −45%, tokens +74%. Without A5, unitygraph 36 calls, 4,707 tokens against grep's 69 and
+  7,254 (−48% calls, −35% tokens).
+- Tokens here are what the calls answered. In a session each call also re-reads the context
+  (the agent pilot: about 52k a turn before any answer), so a call saved is worth far more than
+  its answer's bytes; the calls column is the closer measure of cost.
+- Navigation (N1-N5), where all four use their own tool: grep 12 / 2,293; codegraph 10 / 41,434;
+  Graphify 14 / 11,371; unitygraph 9 / 1,568. codegraph's explore answers with the verbatim source
+  of every related symbol and the call paths, about 6,300 tokens a call however small the
+  question; Graphify's `query` is capped at 2,000 tokens of NODE and EDGE lines and falls back to
+  grep on N2, N3 and N5.
+- Asset: unitygraph 11 / 10,093 (1,954 without A5) against grep's 15 / 1,346. Chores: unitygraph
+  19 / 1,188 against Pipeline's 44 / 3,757 (O10's chore result held).
 - Budgets: skill description 27/300, body 599/600, compile gate 0 bytes clean and 20/20 error
   lines on the 30-error probe: all held, the gate checked live.
 - Script mode flatters grep on navigation and assets: its steps are written by someone who knows
@@ -384,9 +415,41 @@ project is not indexed for them (the user's decision, asked). C8 not run (`scene
   key item found for the right reason. Keys fixed while checking: N1 the class line is 24 (23 is
   its attribute; `ug explain` gives 23); N5 the third item is the code that uses the field, not a
   `Value` property; C1 Pipeline answers JSON; C5 no errors is the right answer; C9 marker names.
+  For codegraph and Graphify: a line item also matches the line in numbered source (codegraph's
+  and the Read tool's `66\t... Died +=`); N4's lines take the attribute's or the class's (Graphify
+  gives L9, L70, L124, the attribute lines); N5's third item lost a bare `Value`, which matched an
+  unrelated `Json.Value` in codegraph's answer. Unity-message items checked against the method's
+  own source or NODE line (N3: `Enemy.cs:64 Awake`, not `Health.Awake`).
   Steps fixed: A3 and A4's grep legs read `m_Name` with `awk` (a GameObject's component list
   outruns `grep -A10`); A5's `ug` leg needs a third call; C4's Pipeline `eval` needs 30 s on a
   cold compile.
 - `ug` gaps found, filed as follow-ups (B1 in tasks/todo.md): `ug refs <prefab>` grouped per
   asset; scene and prefab field values offline; implementers through derived interfaces in one
   call; `ug find <guid>` (found nothing); `ug explain`'s line at the attribute, not the class.
+
+### Agent mode pilot, N3 on four arms, 2026-10-11
+
+On the user's yes (4 runs, about $1-2 quoted): `claude-opus-5-5`, `--max-usd 0.5`, the desktop
+build's `claude` 2.1.295. 4 runs, $0.68 in all, no subagents.
+
+| Arm | Calls | Main context | $ | Its own tool used |
+|---|---|---|---|---|
+| grep | 2 | 180,117 | 0.34 (the first run: 36k of cache written) | (Grep is its tool) |
+| codegraph | 2 | 182,304 | 0.12 | no: two Grep calls |
+| Graphify | 2 | 180,305 | 0.12 | no: two Grep calls |
+| unitygraph | 3 | 171,090 | 0.10 | no: three Grep calls |
+
+- Every arm was offered its tool (`codegraph_explore` deferred, `graphify:graphify` and
+  `unitygraph:unity` listed) and every run answered with the built-in Grep. On this question the
+  tools were not chosen at all, so agent mode measured Grep four times.
+- About 52k of context a turn before any answer (system prompt, built-in tools, the desktop
+  build's own skills and deferred tools), the same on every arm.
+- Isolation also drops what each tool's install adds outside its plugin or server: codegraph's
+  CLAUDE.md block ("reach for it before grep"), Graphify's `graphify claude install` section and
+  its PreToolUse hook. unitygraph ships no CLAUDE.md (SPEC.md Decisions #7); its skill and hooks
+  came through `--plugin-dir`, and its PreToolUse hook does not match Grep.
+- All four answers were right; the key was not. It asked for Awake and OnEnable, and every answer
+  named the `OnDied` handlers, three of them with `:92` after another line of the same file. The
+  key now takes either reading and the same-line form (Suites); all four pass it, checked by hand.
+  Scored before the fix, the run's results file says 0/1 on each arm.
+- The full set (76 runs, about $14 a variant) is not run: the user stopped at the pilot.

@@ -48,7 +48,8 @@ public sealed class AgentRunner
                 for (int i = 1; i <= agent.Repeat; i++)
                 {
                     string id = _newSessionId();
-                    plan.Add(new AgentPlan(question, arm, i, id, Arguments(suite, arm, question, id, agent, options.PluginRoot)));
+                    string? skills = OutsideSkills(arm, options).Count == 0 ? null : SkillPluginDir(suite, arm);
+                    plan.Add(new AgentPlan(question, arm, i, id, Arguments(suite, arm, question, id, agent, options.PluginRoot, skills)));
                 }
             }
         }
@@ -56,8 +57,55 @@ public sealed class AgentRunner
         return plan;
     }
 
-    /// <summary>The `claude` arguments of one run (SPEC-bench, Agent mode: isolation).</summary>
-    public static IReadOnlyList<string> Arguments(Suite suite, Arm arm, Question question, string sessionId, AgentOptions agent, string? pluginRoot)
+    /// <summary>
+    /// The skills an arm lists outside the unitygraph plugin. `--setting-sources project,local`
+    /// leaves out personal skills (`~/.claude/skills`), so agent mode copies each one's folder into
+    /// a plugin named after the arm, loaded with `--plugin-dir`.
+    /// </summary>
+    public static IReadOnlyList<string> OutsideSkills(Arm arm, RunOptions options)
+    {
+        string? root = options.PluginRoot is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.PluginRoot)) + Path.DirectorySeparatorChar;
+        return arm.Skills.Select(s => SkillFile.Resolve(s, options.PluginRoot, options.SuiteDir))
+            .Where(p => root is null || !p.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>Where an arm's skill plugin is written for a run, and removed after it.</summary>
+    public static string SkillPluginDir(Suite suite, Arm arm) => Path.Combine(Path.GetTempPath(), "ug-bench-skills", suite.Name + "-" + arm.Name);
+
+    /// <summary>A plugin named <paramref name="name"/> holding a copy of each skill's folder.</summary>
+    /// <exception cref="IOException">A skill folder can't be read, or the plugin can't be written.</exception>
+    internal static void WriteSkillPlugin(string dir, string name, IReadOnlyList<string> skills)
+    {
+        if (Directory.Exists(dir))
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+
+        Directory.CreateDirectory(Path.Combine(dir, ".claude-plugin"));
+        File.WriteAllText(Path.Combine(dir, ".claude-plugin", "plugin.json"), new JsonObject { ["name"] = name }.ToJsonString());
+        foreach (string skill in skills)
+        {
+            var from = new DirectoryInfo(Path.GetDirectoryName(skill)!);
+            if (!File.Exists(skill))
+            {
+                throw new FileNotFoundException("skill not found: " + skill, skill);
+            }
+
+            foreach (FileInfo file in from.EnumerateFiles("*", SearchOption.AllDirectories))
+            {
+                string to = Path.Combine(dir, "skills", from.Name, Path.GetRelativePath(from.FullName, file.FullName));
+                Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+                file.CopyTo(to);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The `claude` arguments of one run (SPEC-bench, Agent mode: isolation); `skillPlugin` is the
+    /// arm's skill plugin (<see cref="OutsideSkills"/>), or null.
+    /// </summary>
+    public static IReadOnlyList<string> Arguments(Suite suite, Arm arm, Question question, string sessionId, AgentOptions agent, string? pluginRoot, string? skillPlugin = null)
     {
         string prompt = suite.AgentPrompt is null ? question.Prompt : question.Prompt + "\n\n" + suite.AgentPrompt;
         var args = new List<string>
@@ -93,6 +141,12 @@ public sealed class AgentRunner
             args.Add(pluginRoot);
         }
 
+        if (skillPlugin is not null)
+        {
+            args.Add("--plugin-dir");
+            args.Add(skillPlugin);
+        }
+
         args.Add("--allowedTools");
         args.Add(string.Join(",", BaseTools.Concat(arm.Agent.Mcp.Select(s => "mcp__" + s))));
         if (arm.Agent.DisallowedTools.Count > 0)
@@ -126,6 +180,28 @@ public sealed class AgentRunner
     {
         IReadOnlyList<Arm> arms = ScriptRunner.Selected(suite, options.Arms);
         IReadOnlyList<AgentPlan> plan = Plan(suite, options, agent);
+        var plugins = arms.Select(a => (Arm: a, Skills: OutsideSkills(a, options))).Where(p => p.Skills.Count > 0)
+            .ToDictionary(p => SkillPluginDir(suite, p.Arm), p => p, StringComparer.Ordinal);
+        try
+        {
+            foreach ((string dir, (Arm arm, IReadOnlyList<string> skills)) in plugins)
+            {
+                WriteSkillPlugin(dir, arm.Name, skills);
+            }
+
+            return Run(suite, options, agent, date, head, arms, plan);
+        }
+        finally
+        {
+            foreach (string dir in plugins.Keys.Where(Directory.Exists))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+
+    private BenchRun Run(Suite suite, RunOptions options, AgentOptions agent, string date, string? head, IReadOnlyList<Arm> arms, IReadOnlyList<AgentPlan> plan)
+    {
         var needs = new Needs(_host, suite, options.Project);
         string transcripts = ClaudeProjects.TranscriptDirectory(options.Project, agent.ClaudeConfigDir);
         var results = new List<QuestionResult>();

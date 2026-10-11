@@ -67,6 +67,35 @@ public sealed class AgentRunnerTests : IDisposable
     }
 
     [Fact]
+    public void A_skill_outside_the_plugin_is_loaded_from_a_plugin_of_the_arm_for_the_run_only()
+    {
+        // --setting-sources project,local leaves out personal skills (~/.claude/skills).
+        string skill = Path.Combine(_temp, "personal", "graphy");
+        Directory.CreateDirectory(Path.Combine(skill, "references"));
+        File.WriteAllText(Path.Combine(skill, "SKILL.md"), "---\nname: graphy\ndescription: Graphs.\n---\nUse graphy.\n");
+        File.WriteAllText(Path.Combine(skill, "references", "query.md"), "query notes\n");
+        Suite suite = Suite.Parse(SuiteTests.Minimal.Replace(
+            "\"grep\": { \"agent\"", "\"grep\": { \"skills\": [\"personal/graphy/SKILL.md\"], \"agent\"", StringComparison.Ordinal));
+        string dir = AgentRunner.SkillPluginDir(suite, suite.Arms[0]);
+        var copied = new List<string>();
+        _host.OnExec = (_, args) =>
+        {
+            copied.AddRange(Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(dir, f).Replace('\\', '/')).Order(StringComparer.Ordinal));
+            copied.Add(File.ReadAllText(Path.Combine(dir, ".claude-plugin", "plugin.json")));
+            return (0, Output, "", TimeSpan.Zero);
+        };
+
+        IReadOnlyList<AgentPlan> plan = new AgentRunner(_host, () => "s-" + ++_ids).Plan(suite, Options("grep", "unitygraph") with { Questions = ["Q1"] }, Agent());
+        Assert.Equal(["--plugin-dir", dir], plan[0].Arguments.SkipWhile(a => a != "--plugin-dir").Take(2));
+        Assert.Equal(["--plugin-dir", "D:/plugin", "--allowedTools"], plan[1].Arguments.SkipWhile(a => a != "--plugin-dir").Take(3));
+        Assert.False(Directory.Exists(dir));
+
+        new AgentRunner(_host, () => "s-" + ++_ids, _ => { }).Run(suite, Options("grep") with { Questions = ["Q1"] }, Agent(), "2026-10-11", null);
+        Assert.Equal([".claude-plugin/plugin.json", "skills/graphy/SKILL.md", "skills/graphy/references/query.md", """{"name":"grep"}"""], copied);
+        Assert.False(Directory.Exists(dir));
+    }
+
+    [Fact]
     public void The_plan_is_every_question_arm_and_repeat()
     {
         IReadOnlyList<AgentPlan> plan = new AgentRunner(_host, () => "s-" + ++_ids).Plan(_suite, Options("grep", "unitygraph"), Agent(repeat: 2));

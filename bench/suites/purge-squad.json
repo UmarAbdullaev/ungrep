@@ -56,11 +56,17 @@
       "kind": "navigation",
       "prompt": "Where is the class RunDirector defined, and which Unity messages (Awake, Start, OnEnable, ...) does it implement?",
       "key": {
-        "items": ["RunDirector\\.cs\\D{1,12}2[34]\\b", "\\bAwake\\b", "\\bOnEnable\\b", "\\bOnDisable\\b", "\\bStart\\b"],
+        "items": ["RunDirector\\.cs\\D{1,12}2[34]\\b|RunDirector\\.cs[^\\n]{0,200}(:|\\bline |\\bL)2[34]\\b", "\\bAwake\\b", "\\bOnEnable\\b", "\\bOnDisable\\b", "\\bStart\\b"],
         "not": ["\\bUpdate\\b", "\\bOnDestroy\\b"],
         "checked": "2026-10-11, RunDirector.cs read whole: attribute at 23 (ug explain starts there), class at 24; Awake 90, OnEnable 101, OnDisable 108, Start 117; no other Unity message"
       },
       "steps": {
+        "codegraph": [
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "RunDirector" } }
+        ],
+        "graphify": [
+          { "run": "graphify query \"Where is the class RunDirector defined, and which Unity messages (Awake, Start, OnEnable, ...) does it implement?\"" }
+        ],
         "grep": [
           { "run": "grep -rn \"class RunDirector\" Assets --include=*.cs" },
           { "run": "grep -nE \"void (Awake|Start|OnEnable|OnDisable|Update|FixedUpdate|LateUpdate|OnDestroy|OnValidate|Reset|OnApplication\\w+|OnTrigger\\w+|OnCollision\\w+)\\s*\\(\" Assets/Scripts/Run/RunDirector.cs" }
@@ -76,13 +82,22 @@
       "prompt": "Which methods call Wallet.TrySpend (either overload)?",
       "key": {
         "items": [
-          "Fabrication\\.cs\\D{1,12}32\\b", "\\bTryFabricate\\b",
+          "Fabrication\\.cs\\D{1,12}32\\b|Fabrication\\.cs[^\\n]{0,200}(:|\\bline |\\bL)32\\b|(?m)^\\s*32\\t[^\\n]*Wallet\\.TrySpend\\(", "\\bTryFabricate\\b",
           "TrySpend_MoreThanHeld_FailsAndChangesNothing", "TrySpend_ExactlyWhatIsHeld_LeavesZero", "TrySpend_Cost_IsAllOrNothing",
           "TrySpend_Cost_TakesEveryResource", "TrySpend_Cost_SumsRepeatedEntries", "TrySpend_NegativeAmount_Throws"
         ],
-        "checked": "2026-10-11, grep TrySpend over Assets and each hit read: overloads at Wallet.cs:67 and :84; Fabrication.TryFabricate :32; WalletTests.cs lines 67, 77, 91, 102, 115, 122, 123 in the six named tests; no other caller"
+        "checked": "2026-10-11, grep TrySpend over Assets and each hit read: overloads at Wallet.cs:67 and :84; Fabrication.TryFabricate :32 (also matched as line 32 of numbered source, the Read tool's and codegraph's form); WalletTests.cs lines 67, 77, 91, 102, 115, 122, 123 in the six named tests; no other caller"
       },
       "steps": {
+        "codegraph": [
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "Wallet.TrySpend" } },
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "Fabrication.TryFabricate" }, "redo": "the first answer named the caller, not its line" }
+        ],
+        "graphify": [
+          { "run": "graphify query \"Which methods call Wallet.TrySpend (either overload)?\"" },
+          { "run": "grep -rn \"TrySpend(\" Assets --include=*.cs", "redo": "the graph holds no caller of .TrySpend()" },
+          { "run": "grep -nE \"^\\s*(public|private|internal|protected)?\\s*(static\\s+)?\\w+\\s+\\w+\\s*\\(\" Assets/Scripts/Economy/Fabrication.cs Assets/Tests/EditMode/WalletTests.cs", "redo": "the graph holds no caller of .TrySpend()" }
+        ],
         "grep": [
           { "run": "grep -rn \"TrySpend(\" Assets --include=*.cs" },
           { "run": "grep -nE \"^\\s*(public|private|internal|protected)?\\s*(static\\s+)?\\w+\\s+\\w+\\s*\\(\" Assets/Scripts/Economy/Fabrication.cs Assets/Tests/EditMode/WalletTests.cs" }
@@ -97,11 +112,23 @@
       "kind": "navigation",
       "prompt": "Which methods subscribe to the Health.Died event?",
       "key": {
-        "items": ["Enemy\\.cs\\D{1,12}66\\b", "PlayerCharacter\\.cs\\D{1,12}92\\b", "RunDirector\\.cs\\D{1,12}105\\b", "\\bAwake\\b", "\\bOnEnable\\b"],
+        "items": [
+          "Enemy\\.cs\\D{1,12}66\\b|Enemy\\.cs[^\\n]{0,200}(:|\\bline |\\bL)66\\b|(?m)^\\s*66\\t[^\\n]*Died\\s*\\+=", "PlayerCharacter\\.cs\\D{1,12}92\\b|PlayerCharacter\\.cs[^\\n]{0,200}(:|\\bline |\\bL)92\\b|(?m)^\\s*92\\t[^\\n]*Died\\s*\\+=",
+          "RunDirector\\.cs\\D{1,12}105\\b|RunDirector\\.cs[^\\n]{0,200}(:|\\bline |\\bL)105\\b|(?m)^\\s*105\\t[^\\n]*Died\\s*\\+=",
+          "\\bOnDied\\b|(?s:\\bAwake\\b.*\\bOnEnable\\b)|(?s:\\bOnEnable\\b.*\\bAwake\\b)"
+        ],
         "not": ["TakeHit[^\\n]{0,40}subscri"],
-        "checked": "2026-10-11, grep Died over Assets/*.cs, each hit read: += in Enemy.Awake (Enemy.cs:66), PlayerCharacter.OnEnable (:92), RunDirector.OnEnable (:105); -= in PlayerCharacter.OnDisable 93, RunDirector.OnDisable 112; raised in Health.TakeHit 95"
+        "checked": "2026-10-11, grep Died over Assets/*.cs, each hit read (line items also match numbered source with the += on that line): += in Enemy.Awake (Enemy.cs:66), PlayerCharacter.OnEnable (:92), RunDirector.OnEnable (:105); -= in PlayerCharacter.OnDisable 93, RunDirector.OnDisable 112; raised in Health.TakeHit 95. The methods are named either way: the handlers (OnDied at Enemy.cs:188, PlayerCharacter.cs:97, RunDirector.cs:217, grep 'void OnDied') or the methods holding the += (Awake and OnEnable); the agent pilot's four answers all named the handlers"
       },
       "steps": {
+        "codegraph": [
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "Health.Died" } }
+        ],
+        "graphify": [
+          { "run": "graphify query \"Which methods subscribe to the Health.Died event?\"" },
+          { "run": "grep -rnw \"Died\" Assets --include=*.cs", "redo": "the graph has no Died event, only OnDied methods" },
+          { "run": "grep -nE \"void \\w+\\s*\\(\" Assets/Scripts/Combat/Enemy.cs Assets/Scripts/Combat/PlayerCharacter.cs Assets/Scripts/Run/RunDirector.cs", "redo": "the graph has no Died event, only OnDied methods" }
+        ],
         "grep": [
           { "run": "grep -rnw \"Died\" Assets --include=*.cs" },
           { "run": "grep -nE \"void \\w+\\s*\\(\" Assets/Scripts/Combat/Enemy.cs Assets/Scripts/Combat/PlayerCharacter.cs Assets/Scripts/Run/RunDirector.cs" }
@@ -116,10 +143,22 @@
       "kind": "navigation",
       "prompt": "Which concrete classes implement IPartRule, directly or through an interface that extends it?",
       "key": {
-        "items": ["\\bStraightPayload\\b", "\\bSimpleEmitter\\b", "\\bOnKillVolleyTrigger\\b", "WeaponRules\\.cs\\D{1,12}10\\b", "WeaponRules\\.cs\\D{1,12}71\\b", "WeaponRules\\.cs\\D{1,12}125\\b"],
-        "checked": "2026-10-11, WeaponPartDef.cs and WeaponRules.cs read: IPartRule (WeaponPartDef.cs:40) is extended by IPayload 45, IEmitter 61, ITrigger 71; implemented by StraightPayload (WeaponRules.cs:10), SimpleEmitter (:71), OnKillVolleyTrigger (:125); grep for each interface name over Assets finds no other implementer"
+        "items": [
+          "\\bStraightPayload\\b", "\\bSimpleEmitter\\b", "\\bOnKillVolleyTrigger\\b",
+          "WeaponRules\\.cs\\D{1,12}(9|10)\\b|WeaponRules\\.cs[^\\n]{0,200}(:|\\bline |\\bL)(9|10)\\b|(?m)^\\s*10\\t[^\\n]*class StraightPayload\\b", "WeaponRules\\.cs\\D{1,12}7[01]\\b|WeaponRules\\.cs[^\\n]{0,200}(:|\\bline |\\bL)7[01]\\b|(?m)^\\s*71\\t[^\\n]*class SimpleEmitter\\b",
+          "WeaponRules\\.cs\\D{1,12}12[45]\\b|WeaponRules\\.cs[^\\n]{0,200}(:|\\bline |\\bL)12[45]\\b|(?m)^\\s*125\\t[^\\n]*class OnKillVolleyTrigger\\b"
+        ],
+        "checked": "2026-10-11, WeaponPartDef.cs and WeaponRules.cs read: IPartRule (WeaponPartDef.cs:40) is extended by IPayload 45, IEmitter 61, ITrigger 71; implemented by StraightPayload (WeaponRules.cs:10, its [Serializable] at 9), SimpleEmitter (:71, attribute 70), OnKillVolleyTrigger (:125, attribute 124); grep for each interface name over Assets finds no other implementer"
       },
       "steps": {
+        "codegraph": [
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "IPartRule" } },
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "StraightPayload SimpleEmitter OnKillVolleyTrigger" }, "redo": "the first answer named the classes, not their lines" }
+        ],
+        "graphify": [
+          { "run": "graphify query \"Which concrete classes implement IPartRule, directly or through an interface that extends it?\"" },
+          { "run": "graphify affected \"IPartRule\"", "redo": "the query's traversal missed the implementers" }
+        ],
         "grep": [
           { "run": "grep -rnw \"IPartRule\" Assets --include=*.cs" },
           { "run": "grep -rnE \"(class|struct)\\s+\\w+[^{]*:[^{]*\\b(IPartRule|IPayload|IEmitter|ITrigger)\\b\" Assets --include=*.cs" }
@@ -137,11 +176,24 @@
       "kind": "navigation",
       "prompt": "What breaks if the serialized field ProgressBar._value is renamed?",
       "key": {
-        "items": ["ProgressBar\\.prefab", "RevivePanel\\.prefab", "\\bValue\\b|get => _value|ProgressBar\\.cs\\D{1,12}(18|21|40)\\b|(?m)^(18|21|40):"],
+        "items": ["ProgressBar\\.prefab", "RevivePanel\\.prefab", "ProgressBar\\.Value\\b|get => _value|_value = Mathf\\.Clamp01|ProgressBar\\.cs\\D{1,12}(18|21|40)\\b|ProgressBar\\.cs[^\\n]{0,200}(:|\\bline |\\bL)(18|21|40)\\b"],
         "not": ["HealthBar\\.cs[^\\n]{0,60}breaks"],
-        "checked": "2026-10-11, ProgressBar.cs read (field at 14; code uses at 18 and 21 in the Value property, 40 in OnGUI); grep _value over every prefab and scene holding the script guid: data in ProgressBar.prefab:80, override `Countdown: _value = 1` in RevivePanel.prefab:368-369; HealthBar._value (HealthBar.cs:18) is another class's field"
+        "checked": "2026-10-11, ProgressBar.cs read (field at 14; code uses at 18 and 21 in the Value property, 40 in OnGUI; a bare `Value` no longer counts: codegraph's answer holds an unrelated Json.Value); grep _value over every prefab and scene holding the script guid: data in ProgressBar.prefab:80, override `Countdown: _value = 1` in RevivePanel.prefab:368-369; HealthBar._value (HealthBar.cs:18) is another class's field"
       },
       "steps": {
+        "codegraph": [
+          { "mcp": "codegraph", "tool": "codegraph_explore", "args": { "query": "ProgressBar._value" } },
+          { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
+          { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset" },
+          { "run": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity" }
+        ],
+        "graphify": [
+          { "run": "graphify query \"What breaks if the serialized field ProgressBar._value is renamed?\"" },
+          { "run": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs", "redo": "the graph holds no field uses" },
+          { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
+          { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset" },
+          { "run": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity" }
+        ],
         "grep": [
           { "run": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs" },
           { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
@@ -163,6 +215,7 @@
         "checked": "2026-10-11, O10 chore 11 re-checked: grep of the script guid and of ProgressBar.prefab's guid over prefabs and scenes, each hit read: ProgressBar.prefab:80; MapNode.prefab:323; ResultsPanel.prefab:784; RevivePanel.prefab:54; Arena_Greybox.unity (HealthBar 377, RunHud 455); Boot.unity (PlaceholderAds 241, LoadingWindow 832)"
       },
       "steps": {
+        "codegraph": "grep", "graphify": "grep",
         "grep": [
           { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
           { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity" }
@@ -181,6 +234,7 @@
         "checked": "2026-10-11, grep of the prefab guid c4bb93726453a2e45977d1d160cb09f2 over Assets, each file read at the hit: instances Continue (ResultsPanel.prefab), Deploy (LabPanel.prefab, GalaxyMap.unity), Fabricate (FabricatePanel.prefab), Locate (LocatePanel.prefab); no other user"
       },
       "steps": {
+        "codegraph": "grep", "graphify": "grep",
         "grep": [
           { "run": "grep guid Assets/Prefabs/UI/ButtonPrimary.prefab.meta" },
           { "run": "grep -rl c4bb93726453a2e45977d1d160cb09f2 Assets --include=*.prefab --include=*.unity" }
@@ -202,6 +256,7 @@
         "checked": "2026-10-11, grep of the material guid 39f287a42b19a594a91e2edd041ed306 over Assets: only the 7 part prefabs; each renderer's m_GameObject followed to its m_Name: Body in the four Core_ prefabs, Tip (Front_Bullet), ProngL and ProngR (Front_Laser), Tube (Front_Rocket)"
       },
       "steps": {
+        "codegraph": "grep", "graphify": "grep",
         "grep": [
           { "run": "grep guid Assets/Materials/Gun_Metal.mat.meta" },
           { "run": "grep -rln 39f287a42b19a594a91e2edd041ed306 Assets --include=*.prefab --include=*.unity" },
@@ -222,6 +277,7 @@
         "checked": "2026-10-11, Arena_Greybox.unity read at the RunDirector component (line 3386 on): _nodes NodeCatalog.asset, _rooms SolReach_Rooms.asset (guids followed to their .meta), _spawner the WaveSpawner on Waves (1063757135 -> GameObject 1063757134), _player the Player prefab instance (stripped 223296612, instance 223296611, Player.prefab), _fade the ScreenFade on RoomFade (1835141970 -> 1835141965)"
       },
       "steps": {
+        "codegraph": "grep", "graphify": "grep",
         "grep": [
           { "run": "grep guid Assets/Scripts/Run/RunDirector.cs.meta" },
           { "run": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity" },
@@ -251,6 +307,7 @@
         "checked": "2026-10-11, grep of the prefab guid f62d13d931b1f8347bcc5d21ca5cc9f0 over Assets: 11 node assets in Assets/Data/Nodes (C1_Central, C1_Sat1-3, C2_Sat1-3, C3_Central, C3_Sat1-3), each as a wave group's _prefab; C2_Central does not use it; no prefab or scene does"
       },
       "steps": {
+        "codegraph": "grep", "graphify": "grep",
         "grep": [
           { "run": "grep guid Assets/Prefabs/Enemies/Enemy_Shooter.prefab.meta" },
           { "run": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity" }
