@@ -276,8 +276,9 @@ Game.Tools  3 static methods
   without `Undo` calls are not recorded, Unity's rule for every editor script. Only the synchronous
   part is in the group: what an awaited or stepped call records on later updates lands in the
   editor's own groups as it comes (collapsing them later could swallow other commands' changes).
-  `ug undo` names the last record, so it says the code's own name (`undid spawn` for
-  `Undo.RegisterCreatedObjectUndo(go, "spawn")`). The group is not named (X1, found end to end):
+  `ug undo` names the group, and Unity names an unnamed group after its first record, so it says
+  the code's own name (`undid spawn` for `Undo.RegisterCreatedObjectUndo(go, "spawn")`). The
+  group is not named (X1, found end to end):
   `Undo.SetCurrentGroupName` adds a record even to a group that stays empty, so a call that
   records nothing (`ug eval "Selection.count"`) put `ug eval` over the last change's name, and the
   next `ug undo` said `undid ug eval` while it reverted that change. Nothing is saved; a loaded scene that was clean before the call and modified after is named on a `changed:`
