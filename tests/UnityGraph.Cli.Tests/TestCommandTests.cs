@@ -130,8 +130,26 @@ public sealed class TestCommandTests : LoopFixture
         Assert.DoesNotContain(Bridge.Requests, r => r.StartsWith("/tests", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void A_stopped_run_gives_its_reason_and_ends_the_wait()
+    {
+        Handle(Clean, "{\"state\":\"stopped\",\"reason\":\"canceled in Unity before it finished\"}", "0.11.0");
+
+        Assert.Equal("EditMode: canceled in Unity before it finished\n", Run("test", "--timeout", "1").Output);
+        Assert.Equal("last run: canceled in Unity before it finished\n", Run("test", "--failures").Output);
+        Assert.Equal("last run: canceled in Unity before it finished\n", Run("test", "--failure", "Turret").Output);
+
+        const string error = "Unity stopped the run: An unexpected error happened while running tests. (ug console shows the error)";
+        Handle(Clean, "{\"state\":\"stopped\",\"reason\":\"" + error + "\"}", "0.11.0");
+        Assert.Equal("PlayMode: " + error + "\n", Run("test", "--mode", "PlayMode").Output);
+    }
+
     [Theory]
     [InlineData(409, "a test run is in progress", "not run: a test run is in progress\n")]
+    [InlineData(
+        409,
+        "unsaved changes in Assets/Scenes/Main.unity (the test runner would ask to save them): ug save or ug undo first",
+        "not run: unsaved changes in Assets/Scenes/Main.unity (the test runner would ask to save them): ug save or ug undo first\n")]
     [InlineData(501, "com.unity.test-framework is not in this project", "not run: com.unity.test-framework is not in this project\n")]
     public void A_refused_start_is_the_bridge_s_reason(int status, string error, string expected)
     {

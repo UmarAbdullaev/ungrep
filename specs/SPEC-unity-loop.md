@@ -82,7 +82,48 @@ EditMode: 1 failed, 11 passed in 1.4 s
 Other answers: `EditMode: no tests ran` (nothing matched); `not run: the scripts do not compile (1 error)`
 and the lines; `Unity was still running tests after 300 s` (the run goes on in the editor; a new
 `ug test` is refused with `a test run is in progress`); `com.unity.test-framework is not in this
-project`. `inconclusive` is counted when there are some.
+project`. `inconclusive` is counted when there are some. From bridge 0.11.0 (Modified scenes and
+stopped runs, below): `not run: unsaved changes in Assets/Scenes/Main.unity (the test runner would
+ask to save them): ug save or ug undo first`; `EditMode: canceled in Unity before it finished`;
+`EditMode: Unity stopped the run: <its message> (ug console shows the error)`.
+
+#### Modified scenes and stopped runs (F2, bridge 0.11.0)
+
+Measured 2026-10-11 (Unity 6000.3.14f1, com.unity.test-framework 1.6.0): before every run
+`TestRunnerApi.Execute` runs `SaveModifiedSceneTask`, which calls
+`EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()`. In batch mode Editor.log shows
+`DisplayDialog: Scene(s) Have Been Modified ... This should not be called in batch mode.`, the run
+ends without `RunFinished`, and `ug test` waited out its 300 s. In a GUI editor it is a modal Save /
+Don't Save / Cancel dialog in front of the user: the run blocks until someone answers, Save writes
+the scene (against SPEC-editor-ops safety rule 2, no saving unasked), and Cancel ends the run with
+`TestRunCanceledException` and no `RunFinished`. The bridge's running id then stayed set, so every
+later `ug test` answered `a test run is in progress` until the editor restarted. The Test Runner
+window's Cancel button ends a run the same way. Decision:
+
+- **Refuse, never save.** `/tests` refuses (409) while any loaded scene is modified, untitled ones
+  included, and starts nothing: `unsaved changes in Assets/Scenes/Main.unity (the test runner would
+  ask to save them): ug save or ug undo first`. Scenes are listed by path, `untitled scene` for
+  one with no path (`ug save` then says what to do with it). `ug test` prints it after `not run: `
+  like every refusal. `a test run is in progress` is checked first: a run's own scenes are often
+  modified while it runs. Saving for the user, as MCP for Unity's `run_tests` does (SPEC-editor-ops,
+  O10 results), was rejected by rule 2; discarding the changes by rule 4.
+- **A run that ends without a result ends the wait.** The bridge answers `/tests/result` with
+  `{"state": "stopped", "reason": "..."}` when the test runner reports an error for its run
+  (`IErrorCallbacks.OnError`, e.g. a failing `IPrebuildSetup`: `Unity stopped the run: <its message>
+  (ug console shows the error)`), or when its run is gone from the test runner without
+  `RunFinished` (`canceled in Unity before it finished`). Gone is read from the test framework's
+  internal `TestRunnerApi.IsRunning(guid)` by reflection, on every `/tests/result` and before a new
+  run starts. A run is registered inside `Execute` and registered again by an
+  `[InitializeOnLoadMethod]` after each domain reload, before any editor update where the bridge
+  answers, so a live run never reads as gone. The stopped run is the last run (`ug test --failures`
+  and `--failure` answer `last run: <reason>`), and a new run can start at once.
+- `ug test` prints `<mode>: <reason>`, exit 0 as for every answer.
+- **Older test frameworks.** `IsRunning(guid)` is in 1.6.0, not in 1.4.6 or 1.1.33. Without it a
+  canceled run is not noticed: `ug test` waits out `--timeout` and the bridge says `a test run is in
+  progress` until the editor restarts, as before. The refusal works on every version (1.1.33 has
+  the same save step, `SaveModiedSceneTask`), so a run `ug` starts no longer meets the dialog.
+- Bridge 0.11.0 (package and `Bridge.Version`); `ug` gates nothing on it. An older bridge neither
+  refuses nor stops; an older `ug` prints a stopped run as `no tests ran`.
 
 ### `ug log`
 
@@ -212,15 +253,19 @@ unless it fires (design rules 3 and 9).
   answers; test run green, red with 20-line cap, no tests, compile errors first, a refused
   connection mid-run with a new port, timeout, 501 and 409; log with and without a session, old
   bridge; `play --for`; unreachable answers for each command; the gate's check (clean, errors,
-  playing, unreachable, timeout) against the fake bridge.
+  playing, unreachable, timeout) against the fake bridge; the modified-scene refusal and a stopped
+  run for `ug test` and `ug test --failures`.
 - **Hooks** (`tests/UnityGraph.Hooks.Tests`): the recorded PostToolUse and Stop payloads: a `.cs`
   edit marks, a `.txt` or outside-project edit does not, Stop with no marker is silent and calls
   nothing, errors give the block JSON, a clean check and an unreachable bridge are silent, the
   marker is deleted, a second Stop is silent, module off is silent.
 - **Bridge** (EditMode in `fixtures/BridgeHost`): `PlayLog` recording from simulated state changes,
-  JSON shape, survival through `Save` and `Restore`.
+  JSON shape, survival through `Save` and `Restore`. A modified untitled scene refuses a run and
+  starts none; a running id the test runner does not know answers `stopped` and frees the bridge
+  for the next run.
 - **End to end** (`UG_UNITY`): `ug console` shows a logged fixture error, `ug test` runs the
-  fixture's EditMode tests green and one red, `ug log` after a `ug play --for 2`. Times and token
+  fixture's EditMode tests green and one red, `ug log` after a `ug play --for 2`; with Main.unity
+  modified `ug test` answers the refusal at once, and after `ug save` the run goes. Times and token
   sizes go in Measured.
 
 ## Boundaries
@@ -244,6 +289,8 @@ Tokens are bytes / 4 of the printed answer.
 | compile gate check, 1 error | 0.6 s | block reason, the `ug compile` text |
 | compile gate check after the fix (domain reload) | 1.6 s | silent |
 | `ug play --for 2` | 3.4 s | `ug log` digest, 2 lines when clean |
+| `ug test --filter E2E`, Main.unity modified (refused, F2, 2026-10-11) | 0.04 s | 31 tokens |
+| `ug test`, run canceled 6 s into a 20 s test (F2, 2026-10-11) | 7.3 s | `EditMode: canceled in Unity before it finished` |
 
 Not measured: a PlayMode `ug test` run, and a Stop hook against a project with many errors (cut at 20 lines by design).
 

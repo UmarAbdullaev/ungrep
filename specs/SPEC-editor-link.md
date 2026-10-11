@@ -483,6 +483,14 @@ a viewpoint or sheet whose source camera's culling mask is Nothing draws every l
 (SPEC-editor-ops, Viewpoints), and `ug inspect` on a prefab instance root counts its overrides
 as `ug prefab overrides` lists them (SPEC-editor-ops, C1). An older bridge keeps the old answers.
 
+## Bridge 0.11.0 (F2)
+
+`ug test` hung on a modified scene: the test runner asks to save it first, a dialog batch mode
+never answers and a GUI user may answer Save. The bridge now refuses `/tests` while a loaded scene
+is modified, and `/tests/result` answers `stopped` with a reason for a run that the test runner
+canceled or ended on an error (SPEC-unity-loop, Modified scenes and stopped runs). No new request
+or flag, so `ug` gates nothing on it.
+
 ## Performance targets
 
 | Operation | Target |

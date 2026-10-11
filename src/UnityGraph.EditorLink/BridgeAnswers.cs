@@ -38,10 +38,15 @@ public sealed record PlayLogPage(PlaySession? Session);
 /// <summary>A failed test in a run's answer; <see cref="Stack"/> is its whole stack trace (bridge 0.9.0).</summary>
 public sealed record TestFailure(string Name, string? Message, string? Frame, string? Stack = null);
 
-/// <summary>`GET /tests/result`: `running`, or the finished run's totals.</summary>
-public sealed record TestRunResult(string State, int Passed, int Failed, int Skipped, int Inconclusive, double Seconds, IReadOnlyList<TestFailure>? Failures)
+/// <summary>
+/// `GET /tests/result`: `running`, the finished run's totals, or (bridge 0.11.0) `stopped` with the
+/// <see cref="Reason"/> a canceled or failed run ended without results.
+/// </summary>
+public sealed record TestRunResult(string State, int Passed, int Failed, int Skipped, int Inconclusive, double Seconds, IReadOnlyList<TestFailure>? Failures, string? Reason = null)
 {
     public bool IsRunning => State == "running";
+
+    public bool IsStopped => State == "stopped";
 }
 
 /// <summary>
