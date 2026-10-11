@@ -523,3 +523,23 @@ the readers and writers itself. `--baseline` the four-arm run: no regression, 10
 - The graph: 39,286 edges, 30.5 MB (+0.6%); a full index 3.2 s, as before.
 - The first `ug` call after the upgrade rebuilt the graph in 3.9 s (older index rules now
   rebuild like another schema; marking every file changed took 157 s this time, 61 s at B1e).
+
+### Agent mode after B1g, 2026-10-11
+
+On the user's yes (6 runs, about $1 quoted): N3 and N5 on the unitygraph arm, 3 repeats,
+`claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, `ug` with B1g, the B1f skill description.
+6 runs, $0.79 in all (the first N5 run $0.31, cache written, the rest $0.10), no subagents.
+`bench/results/purge-squad-agent-2026-10-11-b1g.json`.
+
+| Question | Picked `ug` | Calls | Main context | Right (by hand) |
+|---|---|---|---|---|
+| N3 | 2 of 3 | 2 | 172,057 | 3/3, no redo |
+| N5 | 3 of 3 | 2 | 172,525 | 3/3 |
+
+- Each run that picked `ug` made two calls: the skill, then one `ug refs Health.Died` or `ug
+  impact ProgressBar._value`, and answered from it with no grep. N3's answers name each handler,
+  where it subscribes and unsubscribes, and that `Enemy` never unsubscribes; N5's name the
+  reads at 18 and 40 and the write at 21, the prefab data and the RevivePanel override.
+- The N3 run without `ug` grepped `.Dieds*[+-]=` twice and answered as well.
+- Against the B1f check (N3 1 of 3 picked, the one `ug` run grepped after it): 5 of 6 picked,
+  0 redo. Two questions, three repeats: a direction, not a rate.
