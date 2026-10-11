@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="card-size" content="880x740">
+<link rel="stylesheet" href="card.css">
+<style>
+  .head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; }
+  .head .label { font-size: 13px; }
+  .count { font-size: 46px; font-weight: 700; letter-spacing: -0.02em; }
+  .count.dim { color: #8f877c; }
+  .steps { margin: 16px 0 0; padding: 0; list-style: none; display: grid; row-gap: 9px; font-size: 13.5px; color: var(--dim); counter-reset: step; }
+  .steps li { counter-increment: step; }
+  .steps li::before { content: counter(step); display: inline-block; width: 30px; color: var(--muted); }
+  .note { font-size: 13px; color: var(--muted); font-style: italic; margin-top: 16px; }
+  .rule { margin-top: 30px; }
+  .cmd { margin-top: 14px; font-size: 14px; color: var(--ink); }
+  .answer { margin-top: 14px; display: grid; grid-template-columns: 150px auto 1fr; row-gap: 10px; column-gap: 18px; font-size: 14px; align-items: baseline; }
+  .answer .k { color: var(--muted); }
+  .answer .hl { color: var(--ink); font-weight: 700; background: rgba(94, 234, 212, 0.12); border-radius: 3px; padding: 1px 4px; margin: 0 -4px; }
+  .answer .ar { color: var(--a1); font-style: italic; font-size: 13px; }
+  .foot { margin-top: 22px; color: var(--ink); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="card" style="height:740px">
+  <div class="label">"What breaks if I rename this field?"</div>
+  <h2>Grep finds the text.<br><span class="grad">ug</span> finds the wiring.</h2>
+
+  <div class="head"><span class="label">Search by hand</span><span class="count dim">5 steps</span></div>
+  <ol class="steps">
+    <li>Search the code for the field</li>
+    <li>Open the script's .meta file for its ID</li>
+    <li>Search every scene and prefab for that ID</li>
+    <li>Open the prefab to find the saved value</li>
+    <li>Search again for overrides</li>
+  </ol>
+  <div class="note">…then piece five answers together.</div>
+
+  <hr class="rule">
+
+  <div class="head"><span class="label">unitygraph</span><span class="count">1 step</span></div>
+  <div class="cmd">$ ug impact Turntable._speed</div>
+  <div class="answer">
+    <span class="k">read by</span><span>Rotate()</span><span></span>
+    <span class="k">changed by</span><span>Rotate(), Stop()</span><span></span>
+    <span class="k">saved in</span><span>the Turntable prefab</span><span></span>
+    <span class="k">overridden in</span><span><span class="hl">the Lab scene</span></span><span class="ar">← a change made in the scene itself</span>
+    <span class="k"></span><span>a prefab variant</span><span></span>
+  </div>
+
+  <div class="foot">Every line comes with its file and line number.</div>
+</div>
+</body>
+</html>

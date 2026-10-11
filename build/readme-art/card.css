@@ -1,0 +1,36 @@
+/* Shared look for the README cards. build/readme-art/render.sh turns each page into a PNG. */
+:root {
+  --bg: #100f0e;
+  --edge: #26231f;
+  --ink: #efe8dc;
+  --muted: #8f877c;
+  --dim: #5f5850;
+  --faint: #2e2a27;
+  --bar0: #3a3632;
+  --bar1: #5e5852;
+  --a1: #5eead4;
+  --a2: #bef264;
+  --grad: linear-gradient(90deg, var(--a1), var(--a2));
+  --glow: 0 0 18px rgba(94, 234, 212, 0.35);
+}
+html, body { margin: 0; background: transparent; }
+* { box-sizing: border-box; }
+body {
+  font-family: "Cascadia Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+.card {
+  position: relative;
+  width: 880px;
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  padding: 46px 45px 40px;
+  overflow: hidden;
+}
+.label { font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--muted); }
+h2 { font-size: 28px; line-height: 1.35; font-weight: 700; margin: 14px 0 0; letter-spacing: -0.01em; }
+.grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.foot { font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.rule { border: 0; border-top: 1px solid var(--edge); margin: 0; }

@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="card-size" content="880x590">
+<link rel="stylesheet" href="card.css">
+<style>
+  .groups { margin-top: 38px; display: grid; gap: 30px; }
+  .group { display: grid; grid-template-columns: 170px 1fr; align-items: center; }
+  .gname { font-size: 15px; font-weight: 700; }
+  .gname small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; }
+  .bars { display: grid; gap: 7px; }
+  .row { display: flex; align-items: center; gap: 11px; height: 17px; }
+  .bar { height: 17px; border-radius: 4px; }
+  .b0 { background: var(--bar0); }
+  .b1 { background: var(--bar1); }
+  .b2 { background: var(--grad); box-shadow: var(--glow); }
+  .v { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .v.ug { color: var(--ink); font-weight: 700; }
+  .legend { display: flex; gap: 26px; margin-top: 34px; font-size: 13px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 9px; }
+  .legend i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .foot { margin-top: 26px; }
+</style>
+</head>
+<body>
+<div class="card" style="height:590px">
+  <div class="label">Benchmark · 10 tasks · live Unity 6 editor</div>
+  <h2>Same chores, same editor.<br><span class="grad">ug</span> gets there with less.</h2>
+
+  <div class="groups" id="groups"></div>
+
+  <div class="legend">
+    <span><i class="b0"></i>MCP for Unity</span>
+    <span><i class="b1"></i>Unity's own MCP</span>
+    <span><i class="b2" style="box-shadow:none"></i>unitygraph</span>
+  </div>
+
+  <p class="foot">
+    Same tasks in the same editor, every result checked. The whole session includes what each
+    tool costs just by being installed. Percentages compare with the better of the two.
+  </p>
+</div>
+<script>
+  const groups = [
+    ["Tool calls", "", [44, 44, 25], "−43%"],
+    ["Tokens", "", [5430, 3524, 1939], "−45%"],
+    ["Whole session", "setup included", [11576, 7960, 2619], "−67%"],
+  ];
+  const max = 480;
+  const fmt = n => n.toLocaleString("en-US");
+  document.getElementById("groups").innerHTML = groups.map(([name, sub, vals, delta]) => {
+    const top = Math.max(...vals);
+    const rows = vals.map((v, i) => {
+      const w = Math.round(max * v / top);
+      const label = i === 2 ? `${fmt(v)} · ${delta}` : fmt(v);
+      return `<div class="row"><div class="bar b${i}" style="width:${w}px"></div><span class="v${i === 2 ? " ug" : ""}">${label}</span></div>`;
+    }).join("");
+    return `<div class="group"><div class="gname">${name}${sub ? `<small>${sub}</small>` : ""}</div><div class="bars">${rows}</div></div>`;
+  }).join("");
+</script>
+</body>
+</html>

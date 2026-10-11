@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="card-size" content="880x560">
+<link rel="stylesheet" href="card.css">
+<style>
+  .rows { margin-top: 34px; border-top: 1px solid var(--edge); }
+  .row { display: grid; grid-template-columns: 46px 1fr auto; align-items: baseline; padding: 15px 2px; border-bottom: 1px solid var(--edge); }
+  .n { font-size: 14px; color: var(--muted); }
+  .what { font-size: 15.5px; }
+  .how { font-size: 13px; color: var(--muted); }
+  .row.last .n { color: var(--a1); font-weight: 700; }
+  .row.last .what { font-weight: 700; }
+  .foot { margin-top: 22px; }
+</style>
+</head>
+<body>
+<div class="card" style="height:560px">
+  <div class="label">How it works</div>
+  <h2>Your code and your assets,<br>in one graph Claude can ask.</h2>
+
+  <div class="rows">
+    <div class="row"><span class="n">1</span><span class="what">It reads your scripts</span><span class="how">without building them</span></div>
+    <div class="row"><span class="n">2</span><span class="what">And your scenes and prefabs</span><span class="how">every object, value and override</span></div>
+    <div class="row"><span class="n">3</span><span class="what">Then connects the two</span><span class="how">which script sits where</span></div>
+    <div class="row"><span class="n">4</span><span class="what">Into one graph on your machine</span><span class="how">nothing leaves it</span></div>
+    <div class="row"><span class="n">5</span><span class="what">Claude asks it</span><span class="how">one question, one answer</span></div>
+    <div class="row last"><span class="n">6</span><span class="what">And works the open editor, if you want</span><span class="how">compile, test, play, edit, all undoable</span></div>
+  </div>
+
+  <p class="foot">It keeps itself up to date as Claude edits. No editor needed for the graph.</p>
+</div>
+</body>
+</html>
