@@ -167,7 +167,9 @@ Commands first named (now corrected there): System.Text.Json is already in, and 
   with line numbers (`Enemy\.cs\D{1,12}66\b` matches `Enemy.cs:66`, `Enemy.cs L66` and `Enemy.cs,
   line 66`; `Enemy\.cs[^\n]{0,200}(:|\bline |\bL)66\b` the shorthand agents write, `Enemy.cs:188
   ... subscribes at :66`), type and member names, asset file names, object names. A question
-  that reads two ways takes either answer (N3: the subscribing methods or the handlers).
+  that reads two ways takes either answer (N3: the subscribing methods or the handlers). A `not`
+  item matches the wrong claim, not the bare name: an answer that names it as excluded passes
+  (A5: `C2_Central` beside a never, not, without or n't on its line).
 - `checked` records how the key was verified by hand. A key without it is refused.
 - The suite runs from its own folder's view of PATH plus the `bin/` beside the running `ug`, so
   `ug` in a step is this build.
@@ -477,3 +479,28 @@ build's `claude` 2.1.295. 4 runs, $0.68 in all, no subagents.
   key now takes either reading and the same-line form (Suites); all four pass it, checked by hand.
   Scored before the fix, the run's results file says 0/1 on each arm.
 - The full set (76 runs, about $14 a variant) is not run: the user stopped at the pilot.
+
+### Agent mode, B1f skill description, 2026-10-11
+
+On the user's yes (9 runs, about $1-1.50 quoted): N3, N4 and A5 on the unitygraph arm, 3 repeats,
+`claude-opus-5-5`, `--max-usd 0.5`, `claude` 2.1.295, the skill description of the B1 fixes.
+9 runs, $1.55 in all (`total_cost_usd`; the first run of each question about $0.30, cache
+written, the rest $0.09-0.11), no subagents.
+
+| Question | Picked `ug` | Calls | Main context | Right (by hand) |
+|---|---|---|---|---|
+| N3 | 1 of 3 | 2.3 | 191,072 | 3/3, one redo |
+| N4 | 0 of 3 | 2.3 | 190,129 | 3/3 |
+| A5 | 2 of 3 | 2.3 | 191,495 | 3/3 |
+
+- The skill was loaded and `ug` run in 3 of 9 runs, against 0 of 1 in the pilot; the other six
+  answered with Grep. N4 ("which classes implement IPartRule") never picked it, though the
+  description names "implements X".
+- With `ug` or without, 2-3 calls and the same context a run: on these questions grep is two
+  narrow calls too, so the saving is in the answer, not the run (A5 by `ug`: 11 files with their
+  counts and line ranges, no YAML read).
+- N3's redo: `ug refs Health.Died` lists the `+=`, the `-=` and the raise alike as `called from`
+  and names no handler, so the run grepped `Died [+-]=` for `OnDied` (B1g).
+- A5 scored 0/3 in the results file: every answer said "C2_Central never uses it" and the `not`
+  item matched the bare name. The item now takes C2_Central named as excluded (Suites); all three
+  pass it, checked by hand. The results file keeps the score of the run.

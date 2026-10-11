@@ -297,8 +297,8 @@
           "C1_Central", "C1_Sat1", "C1_Sat2", "C1_Sat3", "C2_Sat1", "C2_Sat2", "C2_Sat3",
           "C3_Central", "C3_Sat1", "C3_Sat2", "C3_Sat3"
         ],
-        "not": ["C2_Central"],
-        "checked": "2026-10-11, grep of the prefab guid f62d13d931b1f8347bcc5d21ca5cc9f0 over Assets: 11 node assets in Assets/Data/Nodes (C1_Central, C1_Sat1-3, C2_Sat1-3, C3_Central, C3_Sat1-3), each as a wave group's _prefab; C2_Central does not use it; no prefab or scene does"
+        "not": ["(?i)(?<!\\b(not|never|no|without|except)\\b[^\\n]{0,60}|n['’]t\\b[^\\n]{0,60})C2_Central(?![^\\n]{0,60}(\\b(never|not|without)\\b|n['’]t\\b))"],
+        "checked": "2026-10-11, grep of the prefab guid f62d13d931b1f8347bcc5d21ca5cc9f0 over Assets: 11 node assets in Assets/Data/Nodes (C1_Central, C1_Sat1-3, C2_Sat1-3, C3_Central, C3_Sat1-3), each as a wave group's _prefab; C2_Central does not use it; no prefab or scene does. The not item takes C2_Central named as excluded (a never, not, without or n't within 60 characters on its line): the B1f runs' three answers all said C2_Central never uses it and were scored wrong on a bare C2_Central"
       },
       "steps": {
         "codegraph": "grep", "graphify": "grep",
