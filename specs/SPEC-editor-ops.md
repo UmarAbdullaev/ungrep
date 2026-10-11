@@ -678,8 +678,11 @@ and D is not started. The choice is the user's.
   `--skill` flags, so they are left off), and `unity mcp`, the user-level MCP server
   `unity-editor-mcp`. Both reach the same editor commands.
 - MCP for Unity (CoplayDev): its Unity package comes from a git URL and its server runs under
-  `uv`, both a network use and a package add, so it is installed only on the user's yes; without
-  it, only its idle cost is measured, from its documented tools.
+  `uv`, both a network use and a package add, so it is installed only on the user's yes. Installed
+  on that yes (2026-10-11): `com.coplaydev.unity-mcp` 10.3.0 by `ug package add` of
+  `https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.3.0`; the editor starts its
+  server (`mcpforunityserver` 10.3.0 from the `uv` cache) over HTTP on `127.0.0.1:8080`. Driven by
+  a small MCP client over that HTTP transport, not registered in Claude Code.
 
 **Chores** on purge-squad's open editor (`Assets/Scenes/Boot.unity` open, nothing saved):
 
@@ -707,7 +710,7 @@ output; an MCP call: the tool name, the arguments' JSON and the result's text), 
 correctness, checked by a `ug` read after the chore. Pictures are counted by their answer text;
 the PNG Claude reads costs the same image tokens on every leg at the same size. Polls (tests,
 recompile, waits) count as calls. Idle cost per leg: `ug`'s skill description and SKILL.md body;
-each MCP server's `tools/list` over stdio (bytes / 4 of the full schemas) and its deferred names
+each MCP server's `tools/list` (bytes / 4 of the full schemas) and its deferred names
 list; the `unity:unity-cli` skill's description and body, which Claude reads before a `unity`
 call. Before numbers: `ug stats` on purge-squad's past sessions. Between legs every edit is undone
 (`ug undo` until the scene is unmodified); `git -C D:\Projects\Unity\purge-squad status` is the
@@ -724,20 +727,20 @@ Per chore: calls / tokens (bytes / 4) / seconds. A Bash `sleep N` an agent needs
 counts as one call of 7 bytes. The Edit tool's break and fix in chore 6 is the same on every leg
 and left out.
 
-| chore | `ug` | `unity-editor-mcp` | `unity command` |
-|---|---|---|---|
-| 1 find, read | 2 / 80 / 0.4 | 2 / 399 / 0.5 | 2 / 370 / 2.0 |
-| 2 set | 1 / 36 / 0.7 | 1 / 89 / 0.3 | 1 / 131 / 1.0 |
-| 3 cube | 1 / 144 / 0.5 | 1 / 396 / 0.5 | 1 / 409 / 1.0 |
-| 4 prefab | 1 / 249 / 0.4 | 4 / 342 / 0.9 | 4 / 550 / 4.7 |
-| 5 play errors | 1 / 19 / 27.5 | 9 / 468 / 21.4 | 7 / 510 / 11.1 |
-| 6 compile | 3 / 80 / 24.3 | 4 / 180 / 7.7 | 6 / 395 / 6.9 |
-| 7 pictures | 6 / 410 / 1.4 | 2 / 297 / 0.2 | 2 / 527 / 2.2 |
-| 8 tests | 1 / 9 / 4.6 | failed | failed |
-| 9 profile | 3 / 338 / 8.7 | 8 / 673 / 6.9 | 7 / 1,163 / 12.8 |
-| 10 click | 6 / 167 / 15.2 | 11 / 523 / 6.7 | 9 / 665 / 12.9 |
-| 11 graph | 1 / 419 / 0.4 | 2 / 157 / 1.3 (grep) | 2 / 157 / 1.3 (grep) |
-| **all but 8** | **25 / 1,939 / 79.5** | **44 / 3,524 / 46.4** | **41 / 4,877 / 55.9** |
+| chore | `ug` | `unity-editor-mcp` | `unity command` | MCP for Unity |
+|---|---|---|---|---|
+| 1 find, read | 2 / 80 / 0.4 | 2 / 399 / 0.5 | 2 / 370 / 2.0 | 2 / 151 / 4.7 |
+| 2 set | 1 / 36 / 0.7 | 1 / 89 / 0.3 | 1 / 131 / 1.0 | 2 / 165 / 4.9 |
+| 3 cube | 1 / 144 / 0.5 | 1 / 396 / 0.5 | 1 / 409 / 1.0 | 1 / 218 / 5.4 |
+| 4 prefab | 1 / 249 / 0.4 | 4 / 342 / 0.9 | 4 / 550 / 4.7 | 4 / 468 / 14.1 |
+| 5 play errors | 1 / 19 / 27.5 | 9 / 468 / 21.4 | 7 / 510 / 11.1 | 8 / 986 / 8.5 |
+| 6 compile | 3 / 80 / 24.3 | 4 / 180 / 7.7 | 6 / 395 / 6.9 | 4 / 298 / 40.0 |
+| 7 pictures | 6 / 410 / 1.4 | 2 / 297 / 0.2 | 2 / 527 / 2.2 | 2 / 217 / 0.6 |
+| 8 tests | 1 / 9 / 4.6 | failed | failed | not run (saves scenes) |
+| 9 profile | 3 / 338 / 8.7 | 8 / 673 / 6.9 | 7 / 1,163 / 12.8 | 8 / 1,442 / 10.5 |
+| 10 click | 6 / 167 / 15.2 | 11 / 523 / 6.7 | 9 / 665 / 12.9 | 11 / 1,327 / 10.5 |
+| 11 graph | 1 / 419 / 0.4 | 2 / 157 / 1.3 (grep) | 2 / 157 / 1.3 (grep) | 2 / 157 / 1.3 (grep) |
+| **all but 8** | **25 / 1,939 / 79.5** | **44 / 3,524 / 46.4** | **41 / 4,877 / 55.9** | **44 / 5,430 / 100.4** |
 
 Idle cost, tokens:
 
@@ -746,15 +749,16 @@ Idle cost, tokens:
 | `ug` | skill description 25 | SKILL.md body 600 |
 | `unity-editor-mcp` | 151 deferred names 1,509 (641 without the `mcp__unity-editor-mcp__` prefix) | schemas of the 19 tools used 2,927 (all 151: 24,023 when not deferred) |
 | `unity command` | skill description 166 | skill body 8,977 |
-| MCP for Unity | skill description 91 | skill body 3,543, tools reference 15,157; 33 documented tools, `tools/list` not measured (not installed) |
+| MCP for Unity | 49 deferred names 372 (188 without the `mcp__UnityMCP__` prefix); skill description 91 | schemas of the 9 tools used 5,774 (all 49: 28,711 when not deferred); skill body 3,543, tools reference 15,157 |
 
 A session doing these ten chores, chores plus idle: `ug` 2,564, `unity-editor-mcp` 7,960,
-`unity command` 14,020.
+`unity command` 14,020, MCP for Unity 11,576 (names and used schemas; 15,210 with its skill
+description and body).
 
 **Correctness**, each chore checked by a `ug` read (values, `Probe`'s transform and `Rigidbody`,
 no overrides after revert, the picture files, the active scene, the profiler's top markers):
 
-- All three legs did chores 1-7 and 9-11 right.
+- All four legs did chores 1-7 and 9-11 right.
 - Chore 8 failed on both Pipeline legs, in the user's `-automated` editor. Pipeline's `run_tests`
   listed 167 tests and never ran one.
   - The synchronous form timed out after 360 s. Every later Pipeline command then timed out until
@@ -781,7 +785,27 @@ no overrides after revert, the picture files, the active scene, the profiler's t
   - Unity Search `ref:` (MCP, 1 call, 555 tokens) missed `MapNode.prefab` and
     `ProgressBar.prefab`, and added 2 transitive users.
   - Grep was cheaper than `ug` on this chore.
-- Wall time: `ug` was slower overall.
+- MCP for Unity:
+  - Chore 8 was not run. Its `run_tests` saves every modified scene before a run
+    (`TestRunnerService.SaveDirtyScenesIfNeeded`), which would have saved the user's unsaved
+    `Boot.unity`.
+  - Its five edits (set, create, create, set, revert) landed in one undo group: one `ug undo`
+    (one Ctrl+Z) reverted them all, under the name "Revert Prefab Instance".
+  - It has no overrides list, prefab revert or profiler marker read: chore 4's list and revert,
+    chore 9 and chore 10's click are `execute_code` (CodeDom compiler). `manage_profiler
+    profiler_start` sets `Profiler.enabled` and keeps the old frames.
+  - `find_gameobjects` answers instance IDs only, so names take a resource read per object.
+  - `mcpforunity://editor/state` is refreshed only on play and compile events. Its
+    `ready_for_tools` stays false ("stale_status") and `is_changing` stays true through play
+    mode. The first run polled `is_changing` and hit its 60-poll cap on every play; the recorded
+    rerun polls `is_playing`. The first read after entering play fails with "Unity session not
+    ready" after 6 s.
+  - Wall time: each edit-mode `manage_*` call took about 5 s; `refresh_unity` waits 11.8 s on a
+    compile error and 28.1 s through the domain reload.
+  - The install added its line to `Packages/manifest.json` (Unity also moved
+    `com.unity.pipeline` into sorted order) and to `packages-lock.json`. At start it logged
+    "refreshed 5 client config(s)"; no client config file changed.
+- Wall time: `ug` was slower than both Pipeline legs.
   - Chore 5: `play --for 3` took 27.5 s, because entering play mode varies from 6 to 26 s in this
     project.
   - Chore 6: the busy `compile` above.
@@ -803,11 +827,12 @@ calls). Editor work was 36.8% of context:
 - On the chores, `ug` used 45% fewer tokens than the best other leg, `unity-editor-mcp`: 1,939
   against 3,524. With idle cost counted it used 68% fewer: 2,564 against 7,960. It also made 43%
   fewer calls.
-- Its correctness was equal or better: both Pipeline legs failed chore 8.
-- The rule does not point to D. On these numbers, A holds.
-- B cannot be judged per chore until MCP for Unity is installed.
-- The `claude -p` runs were not made.
-- Both are open on the user's yes. The choice is the user's.
+- Against MCP for Unity, `ug` used 64% fewer tokens on the chores (1,939 against 5,430) and 78%
+  fewer with idle cost (2,564 against 11,576).
+- Its correctness was equal or better: both Pipeline legs failed chore 8, and MCP for Unity could
+  not run it without saving the scene.
+- The rule does not point to D. On these numbers, A holds over B, C and D.
+- The `claude -p` runs were not made; they are open on the user's yes. The choice is the user's.
 
 ## Testing
 
