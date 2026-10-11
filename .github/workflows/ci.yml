@@ -45,4 +45,6 @@ jobs:
           project="$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")/fixture"
           cp -R fixtures/CodeProject "$project"
           bin/ug doctor --project "$project"
-          bin/ug refs Turntable.Rotated --project "$project" | tee /dev/stderr | grep -q "subscribed by"
+          bin/ug refs Turntable.Rotated --project "$project" > refs.txt
+          cat refs.txt
+          grep -q "subscribed by" refs.txt

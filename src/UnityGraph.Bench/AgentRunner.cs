@@ -64,7 +64,8 @@ public sealed class AgentRunner
     /// </summary>
     public static IReadOnlyList<string> OutsideSkills(Arm arm, RunOptions options)
     {
-        string? root = options.PluginRoot is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.PluginRoot)) + Path.DirectorySeparatorChar;
+        // Resolved against the suite folder, as SkillFile.Resolve resolves the skills under it.
+        string? root = options.PluginRoot is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.PluginRoot, options.SuiteDir)) + Path.DirectorySeparatorChar;
         return arm.Skills.Select(s => SkillFile.Resolve(s, options.PluginRoot, options.SuiteDir))
             .Where(p => root is null || !p.StartsWith(root, StringComparison.OrdinalIgnoreCase))
             .ToList();

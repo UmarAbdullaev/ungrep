@@ -107,7 +107,16 @@ public sealed class McpClientTests : IDisposable
         CallAnswer answer = _client.Call("echo", """{"msg":"hello"}""", TimeSpan.FromSeconds(5));
 
         Assert.Equal(("hello\n[image]\n", 0), (answer.Text, answer.Exit));
-        Assert.Contains(_received, l => l.Contains("\"method\":\"notifications/initialized\"", StringComparison.Ordinal));
+        Assert.Contains(Received(), l => l.Contains("\"method\":\"notifications/initialized\"", StringComparison.Ordinal));
+    }
+
+    // The fake server may still be adding stray lines while a test reads what it got.
+    private List<string> Received()
+    {
+        lock (_received)
+        {
+            return [.. _received];
+        }
     }
 
     [Fact]
@@ -126,7 +135,7 @@ public sealed class McpClientTests : IDisposable
         CallAnswer answer = _client.Call("ask", "{}", TimeSpan.FromSeconds(5));
 
         Assert.Equal("ask\n[image]\n", answer.Text);
-        Assert.Contains(_received, l => l.Contains("\"id\":\"s1\"", StringComparison.Ordinal) && l.Contains("-32601", StringComparison.Ordinal));
+        Assert.Contains(Received(), l => l.Contains("\"id\":\"s1\"", StringComparison.Ordinal) && l.Contains("-32601", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -159,16 +159,8 @@ public sealed class CompileTextTests : IDisposable
     [Fact]
     public void The_default_log_is_in_the_users_folder()
     {
-        string? path = EditorLog.DefaultPath();
-
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
-        {
-            Assert.EndsWith("Editor.log", path);
-        }
-        else
-        {
-            Assert.Null(path);
-        }
+        // Windows, macOS and Linux each have one (SPEC-editor-link).
+        Assert.EndsWith("Editor.log", EditorLog.DefaultPath());
     }
 
     [Fact]

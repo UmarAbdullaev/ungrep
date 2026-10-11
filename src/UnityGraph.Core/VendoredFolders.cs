@@ -35,7 +35,8 @@ public sealed class VendoredFolders
     public static string? Problem(string prefix) =>
         prefix.Length < 2 ? "empty"
         : prefix.Contains('\\') ? "use forward slashes"
-        : prefix.StartsWith('/') || Path.IsPathRooted(prefix) ? "must be project-relative"
+        // A drive letter is absolute on every OS: the config is shared by a team on all three.
+        : prefix.StartsWith('/') || Path.IsPathRooted(prefix) || (char.IsAsciiLetter(prefix[0]) && prefix[1] == ':') ? "must be project-relative"
         : !prefix.EndsWith('/') ? "must end in '/'"
         : prefix.Split('/').Any(part => part is "." or "..") ? "no '.' or '..' parts"
         : null;
