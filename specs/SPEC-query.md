@@ -435,6 +435,16 @@ A token is estimated as 4 UTF-8 bytes. Lines are added whole until the next one 
 budget; then the answer ends with `  more  <the same command> --budget <2 × budget, max 8000>`.
 The header line always fits. Deterministic: same graph and command, same bytes.
 
+## Session hint (B1f)
+
+In a Unity project the SessionStart hook adds one line of context (`SessionHintHandler.Hint`,
+78 tokens, budget 80): `ug refs|explain|impact <X>` answers who calls, uses, subscribes to or
+implements X, what a scene or prefab wires and what breaks, in one call with file:line. The
+skill listing alone left Claude on Grep in most agent runs (SPEC-bench, Agent mode after B1g);
+the hint arrives before the first tool call, where a PreToolUse note comes after Grep is chosen.
+It is a fact, not a block: interception stays dropped (Decisions #4). `query` off: no hint.
+`ug` works bare because Claude Code puts a plugin's `bin/` on the Bash tool's PATH.
+
 ## Nothing out of reach (C1)
 
 User rule (2026-10-10): full capability; answers stay compact and say how to get the rest.
