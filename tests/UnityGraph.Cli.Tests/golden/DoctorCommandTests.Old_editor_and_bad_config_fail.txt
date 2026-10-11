@@ -1,6 +1,6 @@
 ok    runtime  .NET 8.0.0 (test)
 FAIL  unity    <root>: Unity 2021.3.45f1 is not supported; needs 2022.3 or newer
 ok    assets   Force Text serialization
-FAIL  config   .claude/unitygraph.json: unknown module 'graph' (known: asset-index, code-index, editor-link, guards, play-input, project-map, query, unity-loop, viewer, worker-agent)
+FAIL  config   .claude/unitygraph.json: unknown module 'graph' (known: asset-index, code-index, editor-link, guards, play-input, project-map, query, unity-loop, viewer)
 warn  graph    not built yet (Library/unitygraph/graph.db)
 doctor: 2 failures, 1 warning
