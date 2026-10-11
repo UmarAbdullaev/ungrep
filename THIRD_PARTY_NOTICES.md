@@ -1,6 +1,6 @@
 # Third-party notices
 
-unitygraph is MIT licensed (`LICENSE`). The `ug` build in `dist/ug` ships these libraries
+ungrep is MIT licensed (`LICENSE`). The `ug` build in `dist/ug` ships these libraries
 unchanged, under their own licences.
 
 | Component | Version | Licence | Source |
@@ -12,7 +12,7 @@ unchanged, under their own licences.
 | System.CommandLine | 2.0.12 | MIT | https://github.com/dotnet/command-line-api |
 | System.Collections.Immutable, System.Reflection.Metadata | with Roslyn | MIT | https://github.com/dotnet/runtime |
 
-`ug view` pages inline these scripts, kept byte for byte in `src/UnityGraph.Viewer/vendor/` with
+`ug view` pages inline these scripts, kept byte for byte in `src/Ungrep.Viewer/vendor/` with
 the npm integrity hashes in `SOURCES.md` there. Their licence files (all MIT) ship in `licenses/`:
 
 | Script | Version | Licence |

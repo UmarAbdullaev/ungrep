@@ -1,12 +1,12 @@
 {
-  "name": "unitygraph-dev",
-  "description": "Local development marketplace for the unitygraph plugin.",
+  "name": "ungrep-dev",
+  "description": "Local development marketplace for the ungrep plugin.",
   "owner": {
     "name": "Umar"
   },
   "plugins": [
     {
-      "name": "unitygraph",
+      "name": "ungrep",
       "source": "./",
       "description": "Unity project graph for Claude Code (local development build)."
     }

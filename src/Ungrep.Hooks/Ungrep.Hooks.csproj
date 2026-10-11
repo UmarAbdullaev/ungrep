@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Ungrep.Core\Ungrep.Core.csproj" />
+    <ProjectReference Include="..\Ungrep.EditorLink\Ungrep.EditorLink.csproj" />
+    <ProjectReference Include="..\Ungrep.Query\Ungrep.Query.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ungrep.Hooks.Tests" />
+  </ItemGroup>
+</Project>

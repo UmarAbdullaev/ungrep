@@ -1,4 +1,4 @@
-# Spec: unitygraph
+# Spec: ungrep
 
 A Claude Code plugin that makes work on Unity projects cheaper and faster.
 
@@ -15,7 +15,7 @@ those turns goes to work that is mechanical (compile, wait, read the console), n
 test output, scene dumps, screenshots) or blind (finding code and inspector wiring by grepping
 C# and GUID-linked YAML).
 
-unitygraph cuts that cost without changing how the user works. It:
+ungrep cuts that cost without changing how the user works. It:
 
 - answers code **and** asset-wiring questions in one call from a local graph;
 - makes the compile loop automatic, and silent when the build is clean;
@@ -157,7 +157,7 @@ under 10%.
    Launcher strategy: installed runtime, as above (the bundled runtime is too old, and a
    self-contained build would add an estimated 70–90 MB per OS).
 3. **Own editor bridge.** Live Unity access goes through a small editor-only package the plugin
-   ships (`com.unitygraph.bridge`), independent of which Unity MCP server the user runs.
+   ships (`com.ungrep.bridge`), independent of which Unity MCP server the user runs.
    `Editor.log` is the fallback when Unity is unreachable. An adapter for Unity's official CLI may
    follow after v1.
 4. **No hook interception in v1; the skill alone points Claude at `ug`.** The plan was to deny
@@ -186,12 +186,12 @@ under 10%.
    - After the answer, every run opened the listed files to verify it (2–7 Reads). Hook-off runs
      read a similar amount. The answer replaces no reads; it only adds the deny turns.
    - The reason is shown to the model in full (~1 KB tested); the size limit was not tested.
-   - Limits: subagents, not main-thread sessions; the model was not told about unitygraph (no
+   - Limits: subagents, not main-thread sessions; the model was not told about ungrep (no
      skill, no SessionStart note); n = 10 per arm. A skill telling Claude that denied greps carry
      graph answers might lower retries. That is not measured and would need a rerun before
      interception is turned back on.
 5. **Graph viewer for people.** `ug view <symbol|asset> [--depth N]` writes a self-contained,
-   offline HTML page (Cytoscape.js bundled) to `Library/unitygraph/view.html`; `--open` opens it
+   offline HTML page (Cytoscape.js bundled) to `Library/ungrep/view.html`; `--open` opens it
    (the plan was to always open it; changed 2026-10-11, `specs/SPEC-viewer.md`). Claude sees one line (the
    path): 0 tokens of graph. Built after the step-3 checkpoint.
 6. **Dropped (2026-10-11, user):** the worker subagent was built (W1) and removed after its dry
@@ -199,7 +199,7 @@ under 10%.
    (`specs/SPEC-worker-agent.md`, Removed). The number stays so references to later decisions hold.
 7. **Dropped (2026-10-01, user):** no generated project map, so no `project-map` module and no
    writes into `CLAUDE.md` files. The number stays so references to later decisions hold.
-8. Name `unitygraph`, CLI `ug`. Name availability (GitHub, plugin directory) is checked before
+8. Name `ungrep`, CLI `ug`. Name availability (GitHub, plugin directory) is checked before
    release.
 9. **MIT licence.** Distributed from its own GitHub marketplace first, the official directory
    later.
@@ -232,7 +232,7 @@ Standing assumptions:
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
 | `worker-agent` | Removed 2026-10-11 (user) after its dry run: in dollars, delegating saved only on long chores in large sessions; Claude Code's own subagents run a chore when asked (`specs/SPEC-worker-agent.md`). | — |
 | `viewer` | `ug view`: self-contained HTML graph for people; nodes coloured by kind, `exact` edges solid and `heuristic` dashed, filter and search. 0 tokens to Claude. | `query` |
-| `bench` | Question suites on purge-squad and 2–3 open Unity projects; arms: grep baseline, codegraph, Graphify, unitygraph; scores calls, tokens and correctness. | `stats`, all feature modules |
+| `bench` | Question suites on purge-squad and 2–3 open Unity projects; arms: grep baseline, codegraph, Graphify, ungrep; scores calls, tokens and correctness. | `stats`, all feature modules |
 
 **Build order** (measure first, biggest lever first, each step dogfooded on purge-squad):
 
@@ -254,7 +254,7 @@ building further.
   headers, stripped objects, multi-document files). General YAML libraries are slow on it or
   reject it.
 - Unity bridge: UPM package, editor-only asmdef, localhost HTTP on a random port recorded in
-  `Library/unitygraph/bridge.json`.
+  `Library/ungrep/bridge.json`.
 - Viewer: Cytoscape.js, vendored into the published CLI and inlined into the generated page (no
   network at view time).
 - Build: .NET 10 SDK (pinned in `global.json`) targeting `net8.0`; central package versions in
@@ -265,21 +265,21 @@ building further.
 ## Commands
 
 ```
-Build         dotnet build unitygraph.sln -c Release
-Test          dotnet test --solution unitygraph.sln
-Coverage      dotnet test --project tests/UnityGraph.Core.Tests --coverage --coverage-output-format cobertura --coverage-output core.cobertura.xml
+Build         dotnet build ungrep.sln -c Release
+Test          dotnet test --solution ungrep.sln
+Coverage      dotnet test --project tests/Ungrep.Core.Tests --coverage --coverage-output-format cobertura --coverage-output core.cobertura.xml
               (report lands in TestResults/)
-Performance   dotnet test --project tests/UnityGraph.Core.Tests -c Release --filter-class UnityGraph.Core.Tests.GraphPerformanceTests --output Detailed
-Format        dotnet format unitygraph.sln --verify-no-changes
-Publish CLI   dotnet publish src/UnityGraph.Cli -c Release -o dist/ug
+Performance   dotnet test --project tests/Ungrep.Core.Tests -c Release --filter-class Ungrep.Core.Tests.GraphPerformanceTests --output Detailed
+Format        dotnet format ungrep.sln --verify-no-changes
+Publish CLI   dotnet publish src/Ungrep.Cli -c Release -o dist/ug
 Doctor        ug doctor --project D:\Projects\Unity\purge-squad
 Bridge tests  <Unity> -batchmode -projectPath fixtures/BridgeHost -runTests -testPlatform EditMode -testResults artifacts/bridge.xml
-Dogfood       claude plugin marketplace add D:\Projects\unitygraph
-              claude plugin install unitygraph@unitygraph-dev --scope local
-One session   claude --plugin-dir D:\Projects\unitygraph
+Dogfood       claude plugin marketplace add D:\Projects\ungrep
+              claude plugin install ungrep@ungrep-dev --scope local
+One session   claude --plugin-dir D:\Projects\ungrep
 Validate      claude plugin validate .claude-plugin/marketplace.json
 Stats         ug stats --project D:\Projects\Unity\purge-squad --since 2026-09-01
-Bench         ug bench run bench/suites/purge-squad.json --arm unitygraph
+Bench         ug bench run bench/suites/purge-squad.json --arm ungrep
 ```
 
 `<Unity>` is the installed editor's executable.
@@ -289,8 +289,8 @@ Bench         ug bench run bench/suites/purge-squad.json --arm unitygraph
 `bin/ug` (POSIX sh, used by hooks) and `bin/ug.cmd` (cmd/PowerShell) run `dist/ug/ug.dll` on the
 first `dotnet` root holding `Microsoft.NETCore.App` 8.0 or newer, skipping Unity's bundled 6.0.
 
-Config lives in the Unity project at `.claude/unitygraph.json`. It is optional and holds only
-what differs from the defaults in code (`UnityGraphConfig`); unitygraph reads it, never writes
+Config lives in the Unity project at `.claude/ungrep.json`. It is optional and holds only
+what differs from the defaults in code (`UngrepConfig`); ungrep reads it, never writes
 it. Comments and trailing commas are allowed; an unknown setting or module is an error that
 `ug doctor` names.
 
@@ -307,15 +307,15 @@ it. Comments and trailing commas are allowed; an unknown setting or module is an
 Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 11):
 
 - The in-session forms are the same: `/plugin marketplace add <path>`, `/plugin install
-  unitygraph@unitygraph-dev`. `--scope` is `user` (default), `project` or `local` (written to
+  ungrep@ungrep-dev`. `--scope` is `user` (default), `project` or `local` (written to
   `<cwd>/.claude/settings.local.json`); dogfood uses `local` so other projects are untouched.
 - Layout: `.claude-plugin/plugin.json` (`name`, `version`, `description`, `author`) and
-  `.claude-plugin/marketplace.json` (`name: unitygraph-dev`, `owner`, `plugins: [{ name, source:
+  `.claude-plugin/marketplace.json` (`name: ungrep-dev`, `owner`, `plugins: [{ name, source:
   "./" }]`); `skills/<name>/SKILL.md`, `hooks/hooks.json` are picked up by convention.
-  `claude plugin details unitygraph@unitygraph-dev` prints the components and the always-on
+  `claude plugin details ungrep@ungrep-dev` prints the components and the always-on
   token cost (the hello skill: ~20 tokens; hooks: 0).
 - A directory marketplace is registered as `"source": "directory"` in `~/.claude/settings.json`.
-  `CLAUDE_PLUGIN_ROOT` points at the **source folder** (`D:/Projects/unitygraph`, forward
+  `CLAUDE_PLUGIN_ROOT` points at the **source folder** (`D:/Projects/ungrep`, forward
   slashes), not the install cache, so edits to hooks and `bin/` apply to the next session
   without reinstalling. `--plugin-dir` behaves the same.
 - Install still copies the whole marketplace folder into `~/.claude/plugins/cache/`. Before
@@ -332,7 +332,7 @@ Plugin install, confirmed by spike S2 (2026-09-29, Claude Code 2.1.258, Windows 
   Grep and Read are not matched: interception was dropped (Decisions #4), and every matched
   call pays the `ug` start. `ug hook` bypasses the command parser, reads and writes UTF-8, and
   exits 0 with no output outside a Unity project, on any exception, and past 2 s (Stop: 40 s, the compile gate waits for Unity); failures go
-  to `Library/unitygraph/hook-errors.log` (rolled over at 1 MB). Cold start on Windows,
+  to `Library/ungrep/hook-errors.log` (rolled over at 1 MB). Cold start on Windows,
   measured: ~100 ms through `bin/ug`, ~115 ms including the `bash -c` hooks run in (`dotnet
   ug.dll` alone ~85 ms); the launcher starts no subshells on this path.
 - Desktop app: uses the same `~/.claude` settings, so a marketplace added from the CLI is
@@ -349,16 +349,16 @@ research/transcript-analysis/   the scripts behind the Evidence section (prototy
 skills/unity/                   on-demand skill: CLI usage, Unity traps
 hooks/hooks.json                hook wiring, every hook calls `ug hook <event>`
 bin/                            launchers that find a .NET runtime and start ug
-src/UnityGraph.Cli              commands and output rendering
-src/UnityGraph.Core             graph-core
-src/UnityGraph.Code             code-index
-src/UnityGraph.Assets           asset-index
-src/UnityGraph.Query            query
-src/UnityGraph.EditorLink       editor-link client
-src/UnityGraph.Hooks            hook handlers (unity-loop, guards, reindex on edit)
-src/UnityGraph.Stats            stats
-src/UnityGraph.Viewer           viewer (HTML page generation)
-unity/com.unitygraph.bridge     the Unity editor package
+src/Ungrep.Cli              commands and output rendering
+src/Ungrep.Core             graph-core
+src/Ungrep.Code             code-index
+src/Ungrep.Assets           asset-index
+src/Ungrep.Query            query
+src/Ungrep.EditorLink       editor-link client
+src/Ungrep.Hooks            hook handlers (unity-loop, guards, reindex on edit)
+src/Ungrep.Stats            stats
+src/Ungrep.Viewer           viewer (HTML page generation)
+unity/com.ungrep.bridge     the Unity editor package
 tests/<Project>.Tests           unit and golden tests, one project per source project
 fixtures/                       small text-serialized Unity projects used by tests
 bench/                          suites, expected answers, scoring
@@ -367,7 +367,7 @@ bench/                          suites, expected answers, scoring
 ## Code style
 
 ```csharp
-namespace UnityGraph.Assets;
+namespace Ungrep.Assets;
 
 /// <summary>
 /// Maps a .meta GUID to its asset path. Scenes and prefabs point at scripts and assets by

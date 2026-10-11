@@ -2,7 +2,7 @@
 # Builds the plugin payload users install (specs/SPEC-release.md): the committed plugin files from
 # HEAD, a fresh framework-dependent ug build, licences, and the public marketplace file.
 #
-#   build/package.sh             payload in artifacts/package/unitygraph
+#   build/package.sh             payload in artifacts/package/ungrep
 #   build/package.sh --commit    also commits it to the `release` branch (worktree in artifacts/release)
 #
 # It never pushes. The build must come from committed sources: src/ and the build files may not
@@ -11,7 +11,7 @@
 set -eu
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
-out="$repo/artifacts/package/unitygraph"
+out="$repo/artifacts/package/ungrep"
 commit=false
 for arg in "$@"; do
     case $arg in
@@ -41,16 +41,16 @@ git archive HEAD .claude-plugin/plugin.json assets bin hooks skills unity README
     | tar -x -C "$out"
 
 mkdir -p "$out/licenses"
-cp src/UnityGraph.Viewer/vendor/*.LICENSE "$out/licenses/"
+cp src/Ungrep.Viewer/vendor/*.LICENSE "$out/licenses/"
 
 cat > "$out/.claude-plugin/marketplace.json" <<EOF
 {
-  "name": "unitygraph",
-  "description": "unitygraph: Unity project graph and editor bridge for Claude Code.",
+  "name": "ungrep",
+  "description": "ungrep: Unity project graph and editor bridge for Claude Code.",
   "owner": { "name": "Umar" },
   "plugins": [
     {
-      "name": "unitygraph",
+      "name": "ungrep",
       "source": "./",
       "description": "Who calls, uses or breaks what in a Unity project, in one call with file:line; plus an editor bridge, guard hooks and token stats.",
       "version": "$version"
@@ -62,10 +62,10 @@ EOF
 # Stored byte for byte on the release branch: no line-ending conversion of the build or launchers.
 printf '%s\n' '* -text' > "$out/.gitattributes"
 
-dotnet publish src/UnityGraph.Cli -c Release -o "$out/dist/ug" -nologo -v quiet
+dotnet publish src/Ungrep.Cli -c Release -o "$out/dist/ug" -nologo -v quiet
 
 "$out/bin/ug" --version >/dev/null
-echo "package: unitygraph $version in ${out#"$repo"/} ($(du -sh "$out" | cut -f1))"
+echo "package: ungrep $version in ${out#"$repo"/} ($(du -sh "$out" | cut -f1))"
 
 if ! $commit; then
     exit 0
@@ -91,5 +91,5 @@ if git -C "$worktree" diff --cached --quiet; then
     exit 0
 fi
 
-git -C "$worktree" commit -q -m "unitygraph $version" -m "Built from main $(git rev-parse --short HEAD)."
-echo "package: committed unitygraph $version to the release branch ($(git -C "$worktree" rev-parse --short HEAD)); push it with: git push origin release"
+git -C "$worktree" commit -q -m "ungrep $version" -m "Built from main $(git rev-parse --short HEAD)."
+echo "package: committed ungrep $version to the release branch ($(git -C "$worktree" rev-parse --short HEAD)); push it with: git push origin release"

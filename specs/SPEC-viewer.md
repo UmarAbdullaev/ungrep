@@ -29,9 +29,9 @@ ug view <symbol|asset> [--depth N] [--kind <k>[,<k>]] [--all] [--open] [--out <f
   its children sit loose. An unknown name is refused with the list.
 - Edges whose far end has no node (engine and package APIs, deleted symbols) are left out; the
   page says how many.
-- Output: `Library/unitygraph/view.html` (or `--out`), one file, no network at view time,
+- Output: `Library/ungrep/view.html` (or `--out`), one file, no network at view time,
   Cytoscape.js and the layout plugins inlined. The answer is one line:
-  `Library/unitygraph/view.html  41 nodes (38 drawn), 57 edges  generated 2026-10-11 14:03 from graph 3f2a9c1b7e04`.
+  `Library/ungrep/view.html  41 nodes (38 drawn), 57 edges  generated 2026-10-11 14:03 from graph 3f2a9c1b7e04`.
   The browser opens only with `--open` (SPEC.md Decision 5 said "and opens it"; changed here,
   since `ug` cannot count on a desktop session). `--open` hands the file to the system's default
   browser; when that fails the answer adds `(could not open a browser)`, still exit 0.
@@ -43,8 +43,8 @@ ug view <symbol|asset> [--depth N] [--kind <k>[,<k>]] [--all] [--open] [--out <f
 - Unknown or ambiguous symbol: same answers as `ug explain`, with `ug view` in the commands they
   name; no file is written.
 - The graph is brought up to date first, as for the query commands.
-- The `viewer` module switch (`.claude/unitygraph.json`) turns it off: the answer is
-  `viewer is off in .claude/unitygraph.json` and no file is written.
+- The `viewer` module switch (`.claude/ungrep.json`) turns it off: the answer is
+  `viewer is off in .claude/ungrep.json` and no file is written.
 
 ## Caps (SPEC-query, Nothing out of reach)
 
@@ -119,20 +119,20 @@ ug view <symbol|asset> [--depth N] [--kind <k>[,<k>]] [--all] [--open] [--out <f
 
 ## Code
 
-- `src/UnityGraph.Viewer`: `Neighbourhood` (the walk, caps and bundles; plain data, golden
+- `src/Ungrep.Viewer`: `Neighbourhood` (the walk, caps and bundles; plain data, golden
   tested), `ViewPage` (the HTML: template, data, vendored scripts and notices, all embedded
-  resources). References `UnityGraph.Query` for symbol resolution and naming. `ViewPage` fills
+  resources). References `Ungrep.Query` for symbol resolution and naming. `ViewPage` fills
   the template's placeholders in one pass (a query or path holding one stays text), inlines each
   vendored script in its own `<script>` without its `sourceMappingURL` comment, and refuses a
   script holding `</script` or `<!--`. The data is JSON with `<`, `>`, `&`, `'`, `+` escaped.
-- `ug view` lives in `src/UnityGraph.Cli/ViewCommand.cs`; it shares the query commands' graph
+- `ug view` lives in `src/Ungrep.Cli/ViewCommand.cs`; it shares the query commands' graph
   update and lock handling.
 
 ## Boundaries
 
 - Reads the graph only; writes only the output file; never from a hook; never over the network;
   the page makes no requests.
-- Vendored under `src/UnityGraph.Viewer/vendor`, unmodified, with their licences, all MIT:
+- Vendored under `src/Ungrep.Viewer/vendor`, unmodified, with their licences, all MIT:
   cytoscape 3.34.3 (`dist/cytoscape.min.js`), cytoscape-dagre 4.0.1 (`dist/cytoscape-dagre.min.js`,
   which bundles @dagrejs/dagre 3 and @dagrejs/graphlib 4), cytoscape-fcose 2.2.0, cose-base 2.2.0,
   layout-base 2.0.1 (its SVD routine carries JamaJS's Apache-2.0 notice inline). The page keeps

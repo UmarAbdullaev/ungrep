@@ -1,6 +1,6 @@
 # Spec: guards
 
-Part of unitygraph (see `../SPEC.md`, module table). Status: **built 2026-10-10** (G1; cases and
+Part of ungrep (see `../SPEC.md`, module table). Status: **built 2026-10-10** (G1; cases and
 modes decided with the user 2026-10-01; mechanism check still pending, see Mechanism). Builds on
 `graph-core`, `code-index`, `asset-index`, `query` (holder counts) and the hook dispatcher of
 `plugin-shell`.
@@ -71,7 +71,7 @@ Shared rules:
    check. The next index (`ug index`, any query) makes the graph current again.
 3. **Silent when nothing is at stake.** A field renamed that no asset holds data for, a moved file
    nothing references, a copy outside the project: no output.
-4. **At most five lines**, plain ASCII, first line `unitygraph: ...`, project-relative paths with
+4. **At most five lines**, plain ASCII, first line `ungrep: ...`, project-relative paths with
    `/`, counts exact where the graph is exact and "up to N" / "may hold" where it is not (a
    component saved before a field existed holds no value for it). The five-line bound stays under
    C1 (no hard caps) as a bound on the hook's output: a note's `(+N more)` counts lines of the
@@ -79,10 +79,10 @@ Shared rules:
 5. **Once per session and subject.** A note is printed the first time and not again for the same
    case and subject (the file and members of case 1, the type of case 2, the paths of case 3, the
    folder of case 4, the file and lines of case 5) in the same session; the session's fired keys
-   are in `Library/unitygraph/guards-<session id>` (`SessionMarker`, shared with the compile
+   are in `Library/ungrep/guards-<session id>` (`SessionMarker`, shared with the compile
    gate's `gate-<session id>`). A deny is never filtered: the retried call must meet it again.
    A deny's reason is the note plus one line: `  Blocked by guards.<case> = "deny" in
-   .claude/unitygraph.json: ask the user before doing this anyway.` (`guards.lint.mode` for the lint).
+   .claude/ungrep.json: ask the user before doing this anyway.` (`guards.lint.mode` for the lint).
 6. **Switches.** `modules.guards: false` turns the whole handler off; each case has a mode.
    Dispatcher timeouts, parse errors and exceptions are logged to `hook-errors.log` and print
    nothing.
@@ -97,7 +97,7 @@ Shared rules:
 
 ## Config
 
-In `.claude/unitygraph.json` (a new top-level `guards` object; unknown keys are an error, as
+In `.claude/ungrep.json` (a new top-level `guards` object; unknown keys are an error, as
 elsewhere):
 
 ```jsonc
@@ -115,7 +115,7 @@ elsewhere):
 }
 ```
 
-`UnityGraphConfig.Guards` exposes the parsed section. A bad value names the setting
+`UngrepConfig.Guards` exposes the parsed section. A bad value names the setting
 (`guards.meta must be "warn", "deny" or "off"`; `guards.lint.patterns[0].pattern is not a valid
 regex: ...`).
 
@@ -145,7 +145,7 @@ used in the replacement text (a read of the field) hides a removal.
 **Note** (three lines; `ug impact` names the exact holders):
 
 ```
-unitygraph: Turntable._speed is serialized and this edit renames or removes it.
+ungrep: Turntable._speed is serialized and this edit renames or removes it.
   Saved values would be lost: up to 1 asset (1 prefab) holds data of Game.Lab.Turntable (ug impact Turntable._speed).
   To keep them, put [FormerlySerializedAs("_speed")] on the new name; to drop them on purpose, ignore this note.
 ```
@@ -187,7 +187,7 @@ every saved instance; nothing else breaks loudly.
 **Note** (from the fixture):
 
 ```
-unitygraph: Game.Core.SpinBehaviour is stored by name in [SerializeReference] fields (Game.Lab.Spinner._behaviour).
+ungrep: Game.Core.SpinBehaviour is stored by name in [SerializeReference] fields (Game.Lab.Spinner._behaviour).
   Renaming it or changing its namespace or assembly orphans saved instances: up to 1 asset (1 prefab) may hold one (ug impact SpinBehaviour).
   Add [MovedFrom(true, sourceNamespace: "Game.Core", sourceAssembly: "Game.Core", sourceClassName: "SpinBehaviour")] to carry them over.
 ```
@@ -233,7 +233,7 @@ destination outside the project (a backup), a move of both files.
 **Notes:**
 
 ```
-unitygraph: this mv leaves Assets/Prefabs/Turntable.prefab.meta behind.
+ungrep: this mv leaves Assets/Prefabs/Turntable.prefab.meta behind.
   Assets/Prefabs/Turntable.prefab is referenced by 3 assets (ug refs Turntable.prefab); at the new path Unity gives it a new GUID and they lose it.
   Move the .meta with it: mv Assets/Prefabs/Turntable.prefab.meta Assets/Prefabs/Old.prefab.meta
 ```
@@ -243,13 +243,13 @@ The fix names the `.meta`'s own target (inside the destination folder when the m
 ` (+N more .meta files)` on line 1. The verb is the one typed (`git mv`, `Move-Item`).
 
 ```
-unitygraph: this rm deletes Assets/Prefabs/A.prefab.meta but keeps the asset.
+ungrep: this rm deletes Assets/Prefabs/A.prefab.meta but keeps the asset.
   Assets/Prefabs/A.prefab is referenced by 2 assets (ug refs A.prefab); Unity would give it a new GUID and they lose it.
   Remove both files, or neither.
 ```
 
 ```
-unitygraph: this cp copies 14 .meta files under Assets/Art/Icons (a folder copy copies metas).
+ungrep: this cp copies 14 .meta files under Assets/Art/Icons (a folder copy copies metas).
   The copies share their GUIDs with the originals, so references resolve to either at random.
   Copy the files without the .meta files and let Unity import them, or duplicate the folder in the Project window.
 ```
@@ -274,9 +274,9 @@ against `cwd`, is inside the project and inside a vendored folder (`vendored` in
 **Note:**
 
 ```
-unitygraph: Assets/Plugins/Foo/Bar.cs is in a vendored folder (Assets/Plugins/); local edits are lost when the package is updated.
+ungrep: Assets/Plugins/Foo/Bar.cs is in a vendored folder (Assets/Plugins/); local edits are lost when the package is updated.
   Prefer a wrapper, subclass or partial class outside it. If this edit is intended, set guards.vendored to "off"
-  in .claude/unitygraph.json, or take the folder out of `vendored`.
+  in .claude/ungrep.json, or take the folder out of `vendored`.
 ```
 
 **Decision.** warn (user decision, 2026-10-01; SPEC Boundaries say Never edit vendored code, so
@@ -302,7 +302,7 @@ match timeout counts as no match.
 **Note:**
 
 ```
-unitygraph lint: Assets/Scripts/Lab/LabStage.cs, added lines match your guards.lint.patterns:
+ungrep lint: Assets/Scripts/Lab/LabStage.cs, added lines match your guards.lint.patterns:
   GameObject.Find("A");   look it up once and cache it, or serialize a reference
   SendMessage("C");
   (+2 more)
@@ -327,14 +327,14 @@ starting with `-`) are dropped except the recursive flags (`-r`, `-R`, `-a` in B
 
 ## Code
 
-`src/UnityGraph.Hooks`: `GuardsHandler` (registered in `HookHandlers.All`; `Check` runs the cases
+`src/Ungrep.Hooks`: `GuardsHandler` (registered in `HookHandlers.All`; `Check` runs the cases
 without the repeat filter, for the replay), `GuardContext` (what one call's guards share: paths,
 shell operations, the graph opened read-only on first use), `GuardNote` and `GuardOutput` (the
 text and its warn/deny rendering), `EditCall` (an edit call's replacements, applied and located
 as the tools match them), `FieldGuard`, `SerializeReferenceGuard`, `ScriptAssembly`,
 `MetaGuard`, `VendoredGuard`, `LintGuard`, `ShellCommand`, `GuardSession` and `SessionMarker`
-(the repeat marker). `src/UnityGraph.Core`: `GuardSettings`, `UnityGraphConfig.Guards`,
-`GraphStore.GetFile` and `FilesUnder`. `src/UnityGraph.Query`: `QueryEngine.DataHolders`,
+(the repeat marker). `src/Ungrep.Core`: `GuardSettings`, `UngrepConfig.Guards`,
+`GraphStore.GetFile` and `FilesUnder`. `src/Ungrep.Query`: `QueryEngine.DataHolders`,
 `SerializeReferenceUsers`, `SerializedMembers`, `TypesIn`, `AssetGuid`, `AssetReferrers`.
 
 ## Testing

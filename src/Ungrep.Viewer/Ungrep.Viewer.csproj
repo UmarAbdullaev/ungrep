@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Ungrep.Core\Ungrep.Core.csproj" />
+    <ProjectReference Include="..\Ungrep.Query\Ungrep.Query.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ungrep.Viewer.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The page template and the vendored scripts with their licences (SPEC-viewer, Boundaries). -->
+    <EmbeddedResource Include="page\*" LogicalName="page/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="vendor\*.js;vendor\*.LICENSE" LogicalName="vendor/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

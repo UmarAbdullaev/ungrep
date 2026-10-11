@@ -1,0 +1,25 @@
+## added call
+ungrep lint: Assets/Scripts/Lab/LabStage.cs, added lines match your guards.lint.patterns:
+  var t = GameObject.Find("Turntable");   look it up once and cache it, or serialize a reference
+
+## call already there (unchanged line)
+(silent)
+
+## commented out
+(silent)
+
+## four hits, a long one clipped
+ungrep lint: Assets/Scripts/Lab/LabStage.cs, added lines match your guards.lint.patterns:
+  GameObject.Find("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...   look it up once and cache it, or serialize a reference
+  SendMessage("C");
+  (+2 more)
+
+## Write adds a line
+ungrep lint: Assets/Scripts/Lab/New.cs, added lines match your guards.lint.patterns:
+  class New { void A() { UnityEngine.GameObject.Find("A"); } }   look it up once and cache it, or serialize a reference
+
+## vendored file (case 4 speaks)
+ungrep: Assets/3rd Party/Tweens/Tween.cs is in a vendored folder (Assets/3rd Party/); local edits are lost when the package is updated.
+  Prefer a wrapper, subclass or partial class outside it. If this edit is intended, set guards.vendored to "off"
+  in .claude/ungrep.json, or take the folder out of `vendored`.
+

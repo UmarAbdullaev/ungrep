@@ -30,7 +30,7 @@ runtime, or self-contained publish.
 ### S2. Local plugin install (≤ 0.5 day)
 Question: the exact `marketplace.json` / `plugin.json` layout and commands to install a plugin
 from a local folder in the CLI and in the desktop app; how hooks find `bin/` (plugin root env var).
-Done when: a hello-world plugin with one skill and one hook installs from `D:\Projects\unitygraph`,
+Done when: a hello-world plugin with one skill and one hook installs from `D:\Projects\ungrep`,
 the hook fires, and `SPEC.md` Commands is updated with the confirmed commands.
 
 ### S3. Hook interception (≤ 1 day)
@@ -44,8 +44,8 @@ for interception on by default (threshold ~10% retries).
 ## Tasks
 
 ### T1. Solution skeleton
-- `unitygraph.sln`; projects `UnityGraph.Cli`, `UnityGraph.Core`, `UnityGraph.Stats`,
-  `UnityGraph.Hooks` and their `tests/*.Tests`; `Directory.Build.props` with .NET 8, C# 12,
+- `ungrep.sln`; projects `Ungrep.Cli`, `Ungrep.Core`, `Ungrep.Stats`,
+  `Ungrep.Hooks` and their `tests/*.Tests`; `Directory.Build.props` with .NET 8, C# 12,
   nullable, warnings as errors, invariant globalization; `.editorconfig`.
 - `ug --version` prints the version.
 Acceptance: `dotnet build`, `dotnet test`, `dotnet format --verify-no-changes` all pass on a
@@ -53,7 +53,7 @@ clean clone. CI workflow (GitHub Actions, Windows + macOS) runs the same three c
 
 ### T2. stats: transcript reader and categorizer
 - Port `research/transcript-analysis/usage.js` (`categorize`) and the per-turn context sum from
-  `turns.js` to `UnityGraph.Stats`: read `~/.claude/projects/<project-dir>/*.jsonl`, group by
+  `turns.js` to `Ungrep.Stats`: read `~/.claude/projects/<project-dir>/*.jsonl`, group by
   session, compute context tokens per turn (input + cache read + cache write), detect compaction
   (> 40% drop), attribute context to categories.
 - Project directory derived from `--project <path>` the way Claude Code names it.
@@ -73,7 +73,7 @@ want public; ask).
 ### T4. plugin-shell: plugin files and launcher
 - `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (per S2), `skills/unity/SKILL.md`
   (stub, description ≤ 60 tokens), `bin/ug` and `bin/ug.cmd` launchers (per S1), config file
-  `unitygraph.json` (per-module on/off switches, answer budget) with defaults in code.
+  `ungrep.json` (per-module on/off switches, answer budget) with defaults in code.
 - `ug doctor`: runtime found, Unity project detected, config valid, graph present.
 Acceptance: local install works per S2; `ug doctor` passes on purge-squad; idle cost measured with
 `ug stats` on a fresh session ≤ 300 tokens.
@@ -81,7 +81,7 @@ Acceptance: local install works per S2; `ug doctor` passes on purge-squad; idle 
 ### T5. plugin-shell: hook dispatcher
 - `hooks/hooks.json` routes every event to `ug hook <event>`; `ug hook` reads the JSON payload
   from stdin, dispatches to registered handlers, and fails open: any exception or > 2 s runtime
-  → exit 0, no output, one line to `Library/unitygraph/hook-errors.log`.
+  → exit 0, no output, one line to `Library/ungrep/hook-errors.log`.
 - No handlers yet besides a no-op; each handler has its config switch.
 Acceptance: golden tests feeding recorded hook payloads (PreToolUse Grep/Read/Edit, PostToolUse,
 Stop); a throwing handler still exits 0 silently; cold `ug hook` start ≤ 150 ms on Windows
@@ -91,7 +91,7 @@ Stop); a throwing handler still exits 0 silently; cold `ug hook` start ≤ 150 m
 - Implement `SPEC-graph-core.md`: schema v1, keys, kind validation, `ReplaceFile`, `RemoveFile`,
   `BulkWriter`, `GetNode`, `FindByName` (FTS5), `EdgesFrom`/`EdgesTo`, `unresolved` edges,
   version check and rebuild.
-Acceptance: the Testing section's unit tests pass; ≥ 80% line coverage on `UnityGraph.Core`.
+Acceptance: the Testing section's unit tests pass; ≥ 80% line coverage on `Ungrep.Core`.
 
 ### T7. graph-core: freshness and concurrency
 - `CheckFreshness` (size/mtime then SHA-256), write lock, `dirty.txt`, `graph.db.new` swap.
@@ -156,7 +156,7 @@ A1 spec ──> A2 YAML + meta reader ──> A3 file indexer + fixture ──> 
 `specs/SPEC-asset-index.md`; graph-core's `instance_of` row refined (script asset, not type).
 
 ### A2. asset-index: readers
-- `UnityYaml` line reader and `MetaFile`; new project `src/UnityGraph.Assets`.
+- `UnityYaml` line reader and `MetaFile`; new project `src/Ungrep.Assets`.
 Acceptance: reader table test passes, including the unsupported-construct rows.
 
 ### A3. asset-index: file indexer
@@ -184,12 +184,12 @@ E1 spec ──> E2 bridge package + BridgeHost ──> E3 client + Editor.log �
 `specs/SPEC-editor-link.md`.
 
 ### E2. editor-link: bridge package
-- `unity/com.unitygraph.bridge`: listener, discovery file, token, main-thread queue, status,
+- `unity/com.ungrep.bridge`: listener, discovery file, token, main-thread queue, status,
   refresh, compile capture, console buffer, tests, run. `fixtures/BridgeHost` loads it.
 Acceptance: EditMode tests pass in batch mode on Unity 6000.3.14f1.
 
 ### E3. editor-link: client and Editor.log
-- `src/UnityGraph.EditorLink`: discovery, requests, compile flow with reload wait and deadline,
+- `src/Ungrep.EditorLink`: discovery, requests, compile flow with reload wait and deadline,
   `Editor.log` reader with markers recorded from BridgeHost runs.
 Acceptance: fake-bridge and log golden tests; EditorLink coverage ≥ 80%.
 
@@ -204,7 +204,7 @@ only and the open point stays open.
 ## Editor-ops (spec: `specs/SPEC-editor-ops.md`)
 
 Added 2026-09-30 by the user: `ug` should cover what people use a Unity MCP server for, so
-unitygraph is the one plugin a Unity developer needs. Built before `unity-loop`.
+ungrep is the one plugin a Unity developer needs. Built before `unity-loop`.
 
 ```
 O1 spec ──> O2 addressing, scenes, play ──> O3 tree + inspect ──> O4 edits ──> O5 CLI + end to end

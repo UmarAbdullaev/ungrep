@@ -1,0 +1,27 @@
+{
+    "name": "Ungrep.Bridge.Editor.Ugui",
+    "rootNamespace": "Ungrep.Bridge",
+    "references": [
+        "Ungrep.Bridge.Editor",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UG_UGUI"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.ugui",
+            "expression": "1.0.0",
+            "define": "UG_UGUI"
+        }
+    ],
+    "noEngineReferences": false
+}

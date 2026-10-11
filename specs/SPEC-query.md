@@ -1,6 +1,6 @@
 # Spec: query
 
-Part of unitygraph (see `../SPEC.md`). Status: **draft** (2026-09-29). Reads the store described
+Part of ungrep (see `../SPEC.md`). Status: **draft** (2026-09-29). Reads the store described
 in `SPEC-graph-core.md`, kept fresh by `SPEC-code-index.md`.
 
 ## Objective
@@ -27,7 +27,7 @@ Out (later modules): `batch` (editor-ops has `ug batch` for editor steps); `--js
 ## Commands
 
 All take `--project <dir>` (default: current folder) and `--budget <tokens>` (200 to 8000;
-default `answerBudget` from `.claude/unitygraph.json`, 1,200). Plain text, one fact per line,
+default `answerBudget` from `.claude/ungrep.json`, 1,200). Plain text, one fact per line,
 paths project-relative with `/`. Exit 0 for any answer including "nothing found"; 1 only when
 there is no Unity project, the config is invalid, or no graph can be built.
 
@@ -192,7 +192,7 @@ are cut at 8 items with `(+N)`.
 `--members` adds one line per member, by file then line: `    <name>  <kind>  <line>  <sig or
 type>  <flags>` (flags: access unless private, static, abstract, virtual, override, const,
 readonly, serialized, message, `[entry]`), and the `more` line becomes `ug refs <symbol>`.
-All golden answers: `tests/UnityGraph.Query.Tests/golden/`.
+All golden answers: `tests/Ungrep.Query.Tests/golden/`.
 
 For a member:
 
@@ -425,7 +425,7 @@ Before answering, the query brings the graph up to date through the CLI's `Graph
 then assets; design rule 5: a stale answer is worse than grep). A new graph is built there, and the answer starts
 with one line `indexed N files in S s`. If another writer holds the lock (1 s timeout), the
 query answers from the graph as it is and ends with `note: graph busy, edits from the last
-seconds may be missing`. `code-index` or `query` off in config: `code-index or query is off in .claude/unitygraph.json;
+seconds may be missing`. `code-index` or `query` off in config: `code-index or query is off in .claude/ungrep.json;
 nothing to query`. No `.csproj` files: the "Regenerate project files" hint; asset answers still
 need code-index on.
 
@@ -499,7 +499,7 @@ Defaults keep their size. Every query command gains two flags:
 
 ## Code
 
-`src/UnityGraph.Query`: `SymbolResolver` (text → keys), `Answer` (budgeted line builder),
+`src/Ungrep.Query`: `SymbolResolver` (text → keys), `Answer` (budgeted line builder),
 `QueryEngine` (`Find`, `Refs`, `Explain`, `Outline`, `Impact` over an open `GraphStore`, returning
 text or, for `Outline` and `Impact`, JSON). The CLI (`QueryCommands`) opens the project, freshens
 the graph and prints. The engine never writes.

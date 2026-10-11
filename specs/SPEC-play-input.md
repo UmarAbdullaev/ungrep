@@ -1,6 +1,6 @@
 # Spec: play-input
 
-Part of unitygraph (see `../SPEC.md`, module table). Status: **draft** (2026-10-01; UI Toolkit added 2026-10-11, U2). Builds on
+Part of ungrep (see `../SPEC.md`, module table). Status: **draft** (2026-10-01; UI Toolkit added 2026-10-11, U2). Builds on
 `editor-link` (bridge, `BridgeClient`), `editor-ops` (object addresses, play mode, `ug shot`,
 `ug batch`, `SPEC-editor-ops.md`) and `unity-loop` (`ug console`, the console buffer,
 `SPEC-unity-loop.md`). Closes what the Unity MCP servers' `manage_playmode`, `simulate_ui_input`
@@ -46,7 +46,7 @@ Out:
 All take `--project <dir>`. Exit 0 for any answer, 1 only for no Unity project, a malformed
 argument (`--hold` out of range, `x,y` not two numbers) or an invalid config. Plain text. Every
 answer is **at most 6 lines** (`ug ui` at most 42), as in editor-ops. The module switch is
-`play-input` (`play-input is off in .claude/unitygraph.json`).
+`play-input` (`play-input is off in .claude/ungrep.json`).
 
 Common refusals, one line, in this order:
 
@@ -209,7 +209,7 @@ Parts, in this order, joined with `; `, left out when empty; with none: `nothing
   unloaded).
 - **objects**: `changed Player (moved), Door (inactive), Bullet#3 (new), 2 gone`: game objects of
   the loaded scenes compared by instance id on active state, parent, name and world position (moved
-  = more than 0.01); at most 3 named, then `+N more (Library/unitygraph/digest.txt)` (C1). Component values are not compared
+  = more than 0.01); at most 3 named, then `+N more (Library/ungrep/digest.txt)` (C1). Component values are not compared
   (`ug inspect` reads them). Above 20,000 objects the part is `objects not compared (over 20000, ...)` (C1).
 - **play**: `play stopped` when the game left play mode meanwhile (a script quit, an exception
   stopped it): the answer ends there. From bridge 0.13.0, `paused at the first error #4105 (frame
@@ -515,7 +515,7 @@ their size; the new flags need bridge 0.9.0 and are refused by name on an older 
   at 30 characters). Its 40-line cap is dropped: the answer has at most 16 lines. A `--value`
   refusal lists every option (`has no option Nope (options: ...)`, uGUI dropdowns too).
 - **Digest.** Still 3 named changed objects in the `  now:` line; past them `+N more` becomes
-  `+N more (Library/unitygraph/digest.txt)`, a file with every change, one per line (`Level/Door
+  `+N more (Library/ungrep/digest.txt)`, a file with every change, one per line (`Level/Door
   (inactive)`, a gone object by its last name: `Bullet (gone)`), written by that action when it
   names more (a later one that names more overwrites it); `+N more (digest file not written:
   <reason>)` when it cannot be written. Still 2 new error rows;
@@ -550,9 +550,9 @@ the action's length plus 10 s.
 | `/input/step?frames=` | Frame steps while paused, then the digest. |
 
 Three assemblies, because the first two compile only where their package is present (as
-`UnityGraph.Bridge.Editor.TestRuns` does for the test framework): `UnityGraph.Bridge.Editor` has the
-requests, the action queue, the digest and the refusals; `UnityGraph.Bridge.Editor.Ugui`
-(`versionDefines`: `com.unity.ugui` gives `UG_UGUI`) lists and clicks; `UnityGraph.Bridge.Editor.InputSystem`
+`Ungrep.Bridge.Editor.TestRuns` does for the test framework): `Ungrep.Bridge.Editor` has the
+requests, the action queue, the digest and the refusals; `Ungrep.Bridge.Editor.Ugui`
+(`versionDefines`: `com.unity.ugui` gives `UG_UGUI`) lists and clicks; `Ungrep.Bridge.Editor.InputSystem`
 (`com.unity.inputsystem` gives `UG_INPUT_SYSTEM`) drives devices. Each registers an interface the
 core calls (`IUiInput`, `IDeviceInput`); when one is missing the core answers the refusal. The
 requests refuse unless `ENABLE_INPUT_SYSTEM` is also defined (Project Settings,
@@ -579,7 +579,7 @@ shot (`bridge 0.6.0 is too old for ug nav: run ug bridge install again`). `ug ui
 | `/asset/create?path=&type=` | `.uxml`, `.uss`, `.tss`. |
 
 UI Toolkit is part of the engine (`UnityEngine.UIElementsModule`), so its code lives in the core
-assembly `UnityGraph.Bridge.Editor` (no package, no `versionDefines`); the three internal methods
+assembly `Ungrep.Bridge.Editor` (no package, no `versionDefines`); the three internal methods
 are reached by reflection (Spike). The uGUI assembly keeps its part behind `IUiInput`, which gains
 the items for the merged list and `Nav`.
 
@@ -615,11 +615,11 @@ the items for the merged list and `Nav`.
 
 Written once, after I4 (the build order of the task: no tests while building).
 
-- **CLI** (`tests/UnityGraph.Cli.Tests`, fake bridge): each command's request path and query,
+- **CLI** (`tests/Ungrep.Cli.Tests`, fake bridge): each command's request path and query,
   argument checks (hold range, `x,y`, stick range, `--step` with `--for`), answers and refusals
   printed as the bridge sends them, the old-bridge answer, module off, unreachable, `--shot`
   appending the `/shot` answer, a step of each command inside `ug batch` with a refusal stopping it.
-- **Client** (`UnityGraph.EditorLink.Tests`): `HasPlayInput` for 0.3.0 and 0.4.0, the long timeout.
+- **Client** (`Ungrep.EditorLink.Tests`): `HasPlayInput` for 0.3.0 and 0.4.0, the long timeout.
 - **Bridge** (EditMode in `fixtures/BridgeHost`): digest (new error, scene change, moved and new and
   gone objects, nothing changed, over the cap), the action queue (release after the hold and two
   frames, one at a time, cancel on play stop), key and button name parsing and near names, the

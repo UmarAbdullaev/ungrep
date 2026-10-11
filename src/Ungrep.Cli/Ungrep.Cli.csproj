@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ug</AssemblyName>
+    <RootNamespace>Ungrep.Cli</RootNamespace>
+    <RollForward>Major</RollForward>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- dist/ug: the launchers start ug.dll on dotnet, so no apphost, and no API docs. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <UseAppHost>false</UseAppHost>
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ungrep.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ungrep.Assets\Ungrep.Assets.csproj" />
+    <ProjectReference Include="..\Ungrep.Bench\Ungrep.Bench.csproj" />
+    <ProjectReference Include="..\Ungrep.Code\Ungrep.Code.csproj" />
+    <ProjectReference Include="..\Ungrep.Core\Ungrep.Core.csproj" />
+    <ProjectReference Include="..\Ungrep.EditorLink\Ungrep.EditorLink.csproj" />
+    <ProjectReference Include="..\Ungrep.Stats\Ungrep.Stats.csproj" />
+    <ProjectReference Include="..\Ungrep.Hooks\Ungrep.Hooks.csproj" />
+    <ProjectReference Include="..\Ungrep.Query\Ungrep.Query.csproj" />
+    <ProjectReference Include="..\Ungrep.Viewer\Ungrep.Viewer.csproj" />
+  </ItemGroup>
+
+  <!-- SQLitePCLRaw ships e_sqlite3 for ~22 platforms; dist/ug keeps the desktop ones. -->
+  <Target Name="KeepDesktopSqliteNatives" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_UgOtherNative Include="@(ResolvedFileToPublish)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '^runtimes[\\/](?!(win-x64|win-arm64|osx-x64|osx-arm64|linux-x64|linux-arm64)[\\/])'))" />
+      <ResolvedFileToPublish Remove="@(_UgOtherNative)" />
+    </ItemGroup>
+  </Target>
+</Project>

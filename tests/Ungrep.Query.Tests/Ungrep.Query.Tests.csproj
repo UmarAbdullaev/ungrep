@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ungrep.Query\Ungrep.Query.csproj" />
+    <ProjectReference Include="..\..\src\Ungrep.Code\Ungrep.Code.csproj" />
+    <ProjectReference Include="..\..\src\Ungrep.Assets\Ungrep.Assets.csproj" />
+  </ItemGroup>
+</Project>

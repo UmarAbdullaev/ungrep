@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace UnityGraph.Tests;
+namespace Ungrep.Tests;
 
 /// <summary>
 /// Golden-file assertion: output is compared with a committed file,
@@ -50,13 +50,13 @@ public static class Golden
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "unitygraph.sln")))
+            if (File.Exists(Path.Combine(dir.FullName, "ungrep.sln")))
             {
                 return dir.FullName;
             }
         }
 
-        throw new InvalidOperationException("unitygraph.sln not found above " + AppContext.BaseDirectory);
+        throw new InvalidOperationException("ungrep.sln not found above " + AppContext.BaseDirectory);
     }
 
     /// <summary>The test project folder has the test assembly's name.</summary>

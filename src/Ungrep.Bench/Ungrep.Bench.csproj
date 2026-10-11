@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Ungrep.Hooks\Ungrep.Hooks.csproj" />
+    <ProjectReference Include="..\Ungrep.Stats\Ungrep.Stats.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ungrep.Bench.Tests" />
+  </ItemGroup>
+</Project>

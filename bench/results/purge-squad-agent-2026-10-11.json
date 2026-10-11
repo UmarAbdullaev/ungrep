@@ -9,7 +9,7 @@
     "grep",
     "codegraph",
     "graphify",
-    "unitygraph"
+    "ungrep"
   ],
   "questions": [
     {
@@ -91,7 +91,7 @@
           ]
         },
         {
-          "arm": "unitygraph",
+          "arm": "ungrep",
           "ran": true,
           "found": 0,
           "of": 0,

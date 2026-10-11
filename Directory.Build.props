@@ -33,6 +33,6 @@
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <Compile Include="$(MSBuildThisFileDirectory)tests\Shared\Golden.cs" Link="Golden.cs" />
     <Using Include="Xunit" />
-    <Using Include="UnityGraph.Tests" />
+    <Using Include="Ungrep.Tests" />
   </ItemGroup>
 </Project>

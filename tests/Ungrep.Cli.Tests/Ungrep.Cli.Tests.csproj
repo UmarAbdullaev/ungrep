@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ungrep.Cli\Ungrep.Cli.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Ungrep.Stats.Tests\Fixtures\**" LinkBase="Fixtures" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Ungrep.EditorLink.Tests\Fixtures\logs\**" LinkBase="Fixtures\logs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\Ungrep.EditorLink.Tests\FakeBridge.cs" Link="FakeBridge.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,27 @@
+{
+    "name": "Ungrep.Bridge.Editor.Urp",
+    "rootNamespace": "Ungrep.Bridge",
+    "references": [
+        "Ungrep.Bridge.Editor",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UG_URP"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "12.0.0",
+            "define": "UG_URP"
+        }
+    ],
+    "noEngineReferences": false
+}
