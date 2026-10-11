@@ -11,7 +11,8 @@ namespace UnityGraph.Bridge
     /// <summary>
     /// Object addresses (SPEC-editor-ops, Addressing objects): `Player/Model/Hand` in the loaded
     /// scenes, `Enemy#2` for the second sibling of that name, `Main:Player` in one scene,
-    /// `Assets/X.prefab` and `Assets/X.prefab:Child` in a prefab asset, `Assets/Y.asset` for an asset.
+    /// `Assets/X.prefab` and `Assets/X.prefab:Child` in a prefab asset, `Assets/Y.asset` for an asset;
+    /// `Player:Rigidbody` for a component where one is taken.
     /// </summary>
     internal static class Addresses
     {
@@ -19,6 +20,7 @@ namespace UnityGraph.Bridge
 
         private const int MaxCandidates = 10;
         private const int MaxNear = 5;
+        private const string Ambiguous = "ambiguous: ";
 
         // While an edit has a prefab asset's contents loaded: its root and path, so addresses
         // inside name the asset (`Assets/X.prefab:Child`) and answers say the asset is written.
@@ -79,6 +81,141 @@ namespace UnityGraph.Bridge
             return Walk(roots, path, where, out error);
         }
 
+        /// <summary>What <see cref="FindObject"/> does, as <see cref="FindObjectOrComponent(string, Finder, out string)"/> takes it.</summary>
+        public delegate UnityEngine.Object Finder(string address, out string error);
+
+        /// <summary>
+        /// An object address or a component address (`Player:Rigidbody`, `Main:Player:Rigidbody`,
+        /// `Assets/X.prefab:Barrel:Rigidbody`), read both ways (SPEC-editor-ops, Addressing objects):
+        /// the object the whole address names, or the component after the last `:` of the object
+        /// before it. When both readings match, null and an `ambiguous:` error with a form for each.
+        /// </summary>
+        public static UnityEngine.Object FindObjectOrComponent(string address, out string error) =>
+            FindObjectOrComponent(address, FindObject, out error);
+
+        /// <inheritdoc cref="FindObjectOrComponent(string, out string)"/>
+        public static UnityEngine.Object FindObjectOrComponent(string address, Finder find, out string error)
+        {
+            UnityEngine.Object found = find(address, out string objectError);
+            if (!SplitComponent(address, out string ownerAddress, out string name))
+            {
+                error = objectError;
+                return found;
+            }
+
+            // An owner named by several objects is a component reading that finds several, when a
+            // component type has the name.
+            var owner = find(ownerAddress, out string ownerError) as GameObject;
+            if (owner == null && !(IsAmbiguous(ownerError) && IsComponentType(name)))
+            {
+                error = objectError;
+                return found;
+            }
+
+            string componentError = ownerError;
+            Component component = owner == null ? null : Component(owner, name, out componentError);
+            bool objectMatches = found != null || IsAmbiguous(objectError);
+            bool componentMatches = component != null || IsAmbiguous(componentError);
+            if (objectMatches && componentMatches)
+            {
+                error = "ambiguous: " + address.Trim() + " is the object " + ObjectForm(address) + " or "
+                    + (owner != null ? "the component " + ComponentForm(owner, name) : "a component of " + ownerError.Substring(Ambiguous.Length));
+                return null;
+            }
+
+            if (objectMatches || componentMatches)
+            {
+                error = objectMatches ? objectError : componentError;
+                return objectMatches ? found : component;
+            }
+
+            // Neither: the object reading's miss counts too when it looked inside a scene or prefab named so.
+            bool inside = ownerAddress.IndexOf(':') < 0
+                && (ownerAddress.EndsWith(".prefab", StringComparison.Ordinal) || LoadedScenes().Any(s => s.name == ownerAddress));
+            error = inside ? objectError + "; " + componentError : componentError;
+            return null;
+        }
+
+        /// <summary>Splits `Level/Player:Rigidbody` at the last `:` into the object's address and the component.</summary>
+        public static bool SplitComponent(string address, out string owner, out string component)
+        {
+            string text = address?.Trim() ?? "";
+            int colon = text.LastIndexOf(':');
+            bool split = colon > 0 && colon < text.Length - 1;
+            owner = split ? text.Substring(0, colon) : null;
+            component = split ? text.Substring(colon + 1).Trim() : null;
+            return split;
+        }
+
+        internal static bool IsAmbiguous(string error) => error != null && error.StartsWith(Ambiguous, StringComparison.Ordinal);
+
+        // `Rigidbody`, `AudioSource#2`: a component type's name, as Component matches it.
+        private static bool IsComponentType(string name)
+        {
+            ParseSegment(name, out string type, out _);
+            return TypeCache.GetTypesDerivedFrom<Component>().Any(t => string.Equals(t.Name, type, StringComparison.OrdinalIgnoreCase) || t.FullName == type);
+        }
+
+        // `Main:/AudioSource`: after a `/` nothing up to the last `:` can be a component type.
+        private static string ObjectForm(string address)
+        {
+            string text = address.Trim();
+            int colon = text.IndexOf(':');
+            return text.Substring(0, colon + 1) + "/" + text.Substring(colon + 1).TrimStart('/');
+        }
+
+        // `Main:Main:AudioSource`, `Assets/X.prefab::AudioSource`: with the scene or the prefab's
+        // empty path in front, the object reading looks for one object named `Main:AudioSource`.
+        private static string ComponentForm(GameObject owner, string name)
+        {
+            string asset = ContentsPath(owner) ?? (EditorUtility.IsPersistent(owner) ? AssetDatabase.GetAssetPath(owner) : null);
+            if (asset == null)
+            {
+                return owner.scene.name + ":" + string.Join("/", Segments(owner)) + ":" + name;
+            }
+
+            return owner.transform.parent == null ? asset + "::" + name : Of(owner) + ":" + name;
+        }
+
+        // Whether `Main:name` reads as a component of a root named `Main` (one; or several, when a
+        // component type has the name), as FindObjectOrComponent reads it.
+        private static bool RootHolds(string owner, string name)
+        {
+            List<GameObject> owners = Picked(LoadedScenes().SelectMany(s => s.GetRootGameObjects()), owner);
+            return owners.Count == 1 ? Holds(owners[0], name) : owners.Count > 1 && IsComponentType(name);
+        }
+
+        // Whether Component finds `name` (one or several) on `target`, without building its answers:
+        // they print addresses, and these checks run while printing one.
+        private static bool Holds(GameObject target, string name)
+        {
+            ParseSegment(name.Trim(), out string type, out int index);
+            int count = OfType(target.GetComponents<Component>(), type).Count;
+            return count > 0 && index <= count;
+        }
+
+        // The objects a path segment names in `level` (`Enemy#2` one of them), as Walk picks them.
+        private static List<GameObject> Picked(IEnumerable<GameObject> level, string segment)
+        {
+            ParseSegment(segment, out string name, out int index);
+            List<GameObject> matches = Named(level.ToList(), name);
+            return index == 0 ? matches : index <= matches.Count ? new List<GameObject> { matches[index - 1] } : new List<GameObject>();
+        }
+
+        // The objects named `name`, ignoring case when none has it exactly.
+        private static List<GameObject> Named(IList<GameObject> level, string name)
+        {
+            List<GameObject> matches = level.Where(g => g.name == name).ToList();
+            return matches.Count > 0 ? matches : level.Where(g => string.Equals(g.name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        // The components of a type: by name or full name, ignoring case when none has it exactly.
+        private static List<Component> OfType(Component[] all, string type)
+        {
+            List<Component> matches = all.Where(c => c != null && (c.GetType().Name == type || c.GetType().FullName == type)).ToList();
+            return matches.Count > 0 ? matches : all.Where(c => c != null && string.Equals(c.GetType().Name, type, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
         /// <summary>The address to show for an object: the shortest form <see cref="Find"/> resolves back to it.</summary>
         public static string Of(GameObject target)
         {
@@ -87,22 +224,47 @@ namespace UnityGraph.Bridge
                 return "null";
             }
 
-            var segments = new List<string>();
-            for (Transform t = target.transform; t != null; t = t.parent)
-            {
-                segments.Add(Segment(t.gameObject));
-            }
-
-            segments.Reverse();
+            // `Main:/Camera` and `Assets/X.prefab:/Camera` where the form without `/` would also read
+            // as the Camera of an object `Main` or of the prefab's root.
+            List<string> segments = Segments(target);
             string contents = ContentsPath(target);
             if (contents != null || EditorUtility.IsPersistent(target))
             {
                 string asset = contents ?? AssetDatabase.GetAssetPath(target);
-                return segments.Count == 1 ? asset : asset + ":" + string.Join("/", segments.Skip(1));
+                string inner = string.Join("/", segments.Skip(1));
+                return segments.Count == 1 ? asset
+                    : asset + ":" + (segments.Count == 2 && Holds(target.transform.root.gameObject, inner) ? "/" : "") + inner;
             }
 
             string path = string.Join("/", segments);
-            return SceneManager.sceneCount > 1 && target.scene.IsValid() ? target.scene.name + ":" + path : path;
+            if (SceneManager.sceneCount <= 1 || !target.scene.IsValid())
+            {
+                return path;
+            }
+
+            return target.scene.name + ":" + (segments.Count == 1 && RootHolds(target.scene.name, path) ? "/" : "") + path;
+        }
+
+        /// <summary>
+        /// The address to show for a component: `Player:Rigidbody`, or `Main:Main:Rigidbody` and
+        /// `Assets/X.prefab::Rigidbody` where the short form would also name an object.
+        /// </summary>
+        public static string Of(Component component)
+        {
+            if (component == null)
+            {
+                return "null";
+            }
+
+            // The object reading of `address:name` looks among a prefab root's children, or among the
+            // roots of a loaded scene named as the object; nowhere else without a `:` in a name.
+            GameObject owner = component.gameObject;
+            string name = ComponentName(component);
+            string address = Of(owner);
+            IEnumerable<GameObject> level = owner.transform.parent != null ? Enumerable.Empty<GameObject>()
+                : address.EndsWith(".prefab", StringComparison.Ordinal) ? Children(owner)
+                : LoadedScenes().Where(s => s.name == address).SelectMany(s => s.GetRootGameObjects());
+            return Picked(level, name).Count > 0 ? ComponentForm(owner, name) : address + ":" + name;
         }
 
         /// <summary>Loads a prefab asset's contents for an edit; <see cref="UnloadContents"/> ends it.</summary>
@@ -157,12 +319,7 @@ namespace UnityGraph.Bridge
             foreach (string segment in segments)
             {
                 ParseSegment(segment, out string name, out int index);
-                List<GameObject> matches = level.Where(g => g.name == name).ToList();
-                if (matches.Count == 0)
-                {
-                    matches = level.Where(g => string.Equals(g.name, name, StringComparison.OrdinalIgnoreCase)).ToList();
-                }
-
+                List<GameObject> matches = Named(level, name);
                 if (matches.Count == 0)
                 {
                     error = "not found: " + segment + " in " + where + Near(name, level.Select(g => g.name));
@@ -266,12 +423,7 @@ namespace UnityGraph.Bridge
 
             ParseSegment(name.Trim(), out string type, out int index);
             Component[] all = target.GetComponents<Component>();
-            List<Component> matches = all.Where(c => c != null && (c.GetType().Name == type || c.GetType().FullName == type)).ToList();
-            if (matches.Count == 0)
-            {
-                matches = all.Where(c => c != null && string.Equals(c.GetType().Name, type, StringComparison.OrdinalIgnoreCase)).ToList();
-            }
-
+            List<Component> matches = OfType(all, type);
             if (matches.Count == 0)
             {
                 error = Of(target) + " has no " + type + " (has: " + string.Join(", ", all.Select(ComponentName)) + ")";
@@ -317,6 +469,19 @@ namespace UnityGraph.Bridge
                 name = segment.Substring(0, hash);
                 index = n;
             }
+        }
+
+        // `Level`, `Enemy#2`: the segments from the root down to the object.
+        private static List<string> Segments(GameObject target)
+        {
+            var segments = new List<string>();
+            for (Transform t = target.transform; t != null; t = t.parent)
+            {
+                segments.Add(Segment(t.gameObject));
+            }
+
+            segments.Reverse();
+            return segments;
         }
 
         // `Enemy#2` when the parent (or scene root) holds more than one `Enemy`.

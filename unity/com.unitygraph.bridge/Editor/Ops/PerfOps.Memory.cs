@@ -100,16 +100,10 @@ namespace UnityGraph.Bridge
                 return Answer.Lines(lines);
             }
 
-            Object found = Addresses.FindObject(address, out string error);
+            Object found = Addresses.FindObjectOrComponent(address, out string error);
             if (found == null)
             {
-                int colon = address.LastIndexOf(':');
-                GameObject holder = colon > 0 ? Addresses.Find(address.Substring(0, colon), out _) : null;
-                found = holder == null ? null : Addresses.Component(holder, address.Substring(colon + 1), out _);
-                if (found == null)
-                {
-                    return Answer.Error(error);
-                }
+                return Answer.Error(error);
             }
 
             if (!(found is GameObject target))
