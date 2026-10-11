@@ -1,0 +1,13 @@
+{
+  "name": "ungrep",
+  "description": "ungrep: Unity project graph and editor bridge for Claude Code.",
+  "owner": { "name": "Umar" },
+  "plugins": [
+    {
+      "name": "ungrep",
+      "source": "./",
+      "description": "Who calls, uses or breaks what in a Unity project, in one call with file:line; plus an editor bridge, guard hooks and token stats.",
+      "version": "0.9.0"
+    }
+  ]
+}
