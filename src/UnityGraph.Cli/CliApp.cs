@@ -19,6 +19,7 @@ internal static class CliApp
             DoctorCommand.Create(runtime),
             IndexCommand.Create(),
             StatsCommand.Create(claudeConfigDir),
+            ViewCommand.Create(),
         };
         foreach (Command command in QueryCommands.Create().Concat(EditorCommands.Create(editorLog)))
         {

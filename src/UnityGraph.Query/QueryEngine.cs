@@ -375,6 +375,23 @@ public sealed partial class QueryEngine
         return paren < 0 ? [] : In(method.Key[..paren]).Where(e => e.Kind == EdgeKind.EventCalls).ToList();
     }
 
+    /// <summary>
+    /// The nodes <paramref name="text"/> names as one symbol, or null with <paramref name="answer"/>
+    /// set to what `ug explain` says for an unknown or ambiguous symbol, naming `ug <paramref name="verb"/>`.
+    /// </summary>
+    public IReadOnlyList<Node>? Resolve(string verb, string text, int budget, out string answer)
+    {
+        Answer unresolved = Start(budget);
+        if (Resolved(verb, text, unresolved, out IReadOnlyList<Node> nodes))
+        {
+            answer = "";
+            return nodes;
+        }
+
+        answer = unresolved.Finish($"ug {verb} {Names.Quote(text)}{AllFlag}");
+        return null;
+    }
+
     private bool Resolved(string verb, string text, Answer answer, out IReadOnlyList<Node> nodes)
     {
         Resolution resolution = SymbolResolver.Resolve(_store, text, All);
