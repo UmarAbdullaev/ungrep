@@ -139,6 +139,6 @@ nothing MCP for Unity can do is left out for cost reasons.
 - [x] R3 README, CHANGELOG, LICENSE (MIT), THIRD_PARTY_NOTICES
 - [x] R4 `dist/ug` trimmed to 23 MB (no apphost, no docs, English resources); CI on Windows, macOS and Linux with a launcher step
 - [x] R5 bridge after a plugin update: `--copy` first in `ug bridge install`, `ug doctor` bridge line
-- [ ] R6 `build/package.sh`: payload, `claude plugin validate --strict`, `release` branch commit
-- [ ] R7 clean install from the release branch in a fresh config dir
+- [x] R6 `build/package.sh`: payload, `claude plugin validate --strict`, `release` branch commit (done 2026-10-11: 24 MB, plugin, marketplace and skills validate strict; local `release` 5cba0af, built from main 3c17aca, 259 files, `bin/ug` 100755)
+- [x] R7 clean install from the release branch in a fresh config dir (done 2026-10-11: `url` source on the local repo, ref `release`, installed to `plugins/cache/<m>/unitygraph/0.9.0`; from there `ug --version`, `refs`, `doctor` (cache link warns, `--copy` ok). Longest payload path 107 characters: a Windows cache prefix over ~150 hits MAX_PATH unless git `core.longpaths`; a usual `C:Users<name>.claude` prefix is ~71. Live session (user's yes, 1 run, $0.14, claude-opus-5-5, `--plugin-dir` on the installed folder): skill listed and loaded, `ug refs` answered, PreToolUse Bash and Edit, PostToolUse Edit (reindexed: the event moved to :16) and Stop ran, exit 0, answer right)
 - [ ] R8 GitHub repo, push `main` and `release`, `release` as default branch, tag `v0.9.0` (user's yes)
