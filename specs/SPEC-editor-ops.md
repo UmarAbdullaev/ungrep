@@ -834,6 +834,82 @@ calls). Editor work was 36.8% of context:
 - The rule does not point to D. On these numbers, A holds over B, C and D.
 - The `claude -p` runs were not made; they are open on the user's yes. The choice is the user's.
 
+### Rooms (2026-10-11)
+
+The user's follow-up: the same behaviour on every leg, playing a couple of rooms to completion.
+
+**Setup.**
+
+- Each run starts in edit mode with `Boot` open and goes on to two cleared rooms:
+  1. Enter play mode and click `DEPLOY` on the galaxy map.
+  2. Every 3 s, read the run's state: room, rooms cleared, gate, HP, level-up pick open, run
+     ended, enemies.
+  3. If the pick is open, click the first boon card. If the gate is open, walk into it.
+  4. Stop once two rooms are cleared.
+- A script drives the same policy on every leg, through that leg's own calls:
+  - `ug`: `play`, `click`, `press W --hold 4.5`, `eval`, `stop`.
+  - `unity command` and `unity-editor-mcp`: `editor_play`, then `editor_status` polled until
+    playing; `eval` for the `DEPLOY` click, the card click and the gate walk (RunDirector's
+    `Player.WalkToAsync`); `editor_stop`.
+  - MCP for Unity: `manage_editor`, `editor/state` polled, `execute_code`.
+- The player fires on its own; standing still cleared every room.
+- A room clear writes the game's save (`profile.json` under LocalLow), so each run started from a
+  backed-up copy of it, and the copy was put back after. purge-squad's `git status` was unchanged
+  after every run.
+- Three runs per leg in each poll form. The fights are random, so poll counts differ from run to
+  run.
+
+**Poll forms.**
+
+- Inline: the state snippet (about 700 bytes) is sent with every poll.
+- File: the cheapest repeat each leg has. The snippet is written once to `Temp/state.cs`, then
+  read with `ug eval --file` on `ug` and `eval_file` on the Pipeline legs. MCP for Unity has no
+  file form: it runs `execute_code` once, calls `get_history` once for the index, then
+  `replay`s.
+
+Means of 3 runs, calls / tokens / wall seconds. Every one of the 24 runs cleared 2 rooms, and no
+player died.
+
+| poll form | `ug` | `unity-editor-mcp` | `unity command` | MCP for Unity |
+|---|---|---|---|---|
+| inline | 18.0 / 1,385 / 43.3 | 30.0 / 2,729 / 43.3 | 25.3 / 4,383 / 52.7 | 31.3 / 3,802 / 50.0 |
+| file | 23.0 / 496 / 56.0 | 31.3 / 1,038 / 46.0 | 26.0 / 1,470 / 55.0 | 31.0 / 2,286 / 48.3 |
+
+Tokens per move, file form, in the order `ug` / `unity-editor-mcp` / `unity command` / MCP for
+Unity:
+
+- one poll (the sleep and the state read): 38 / 47 / 76 / 87;
+- play until playing: 9 / 105 / 121 / 488;
+- stop: 13 / 71 / 120 / 436;
+- card click: 66 / 105 / 208 / 118;
+- gate walk: 49 / 77 / 147 / 89.
+
+With idle cost, file form:
+
+- `ug`: 1,121.
+- `unity-editor-mcp`: 2,837, which adds 1,509 for deferred names and 290 for the 5 schemas used.
+- `unity command`: 10,613.
+- MCP for Unity: 3,545, or 7,179 with its skill.
+
+**Findings.**
+
+- `ug` used 52% fewer tokens than the best other leg, `unity-editor-mcp`, in the file form, 49%
+  fewer inline, and 60% fewer with idle cost.
+- No leg reads room progress without an eval, `ug` included: the room count is game state, and
+  `ug ui` shows only the panels.
+- `ug eval` took a median 1.33 s on every call, the same file included, because it compiles each
+  time. Pipeline's `eval` takes 18 ms and MCP for Unity's `replay` takes 7 ms.
+  - Tool time per run: `ug` 27.0 s, `unity-editor-mcp` 8.9 s, MCP for Unity 13.1 s,
+    `unity command` 23.8 s. The `unity` process takes about 0.9 s to start on every call.
+  - Wall time is mostly the fights, and the differences between legs are within the
+    run-to-run spread (39-62 s).
+- `ug press W` runs into the gate. `WalkToAsync` walks slower, so the eval legs often sent the
+  walk twice.
+- `unity command`'s answers echo the parameters, so an inline poll there costs twice what it
+  costs on the other legs.
+- MCP for Unity: each `editor/state` read is 1.6 KB, and the first read after entering play fails
+  after 6 s.
+
 ## Testing
 
 - EditMode tests in the package (BridgeHost, batch mode): addressing (paths, `#n`, scene prefix,
