@@ -23,13 +23,14 @@ public sealed record CategoryTotals(int Calls, double ContextTokens);
 
 /// <summary>
 /// One transcript file: context tokens per main-thread model turn (input + cache read + cache
-/// write) and where they went.
+/// write), where they went, and the chores handed to the worker subagent.
 /// </summary>
 public sealed record SessionStats(
     string Id,
     IReadOnlyList<long> TurnContext,
     IReadOnlyList<int> CompactionTurns,
-    IReadOnlyDictionary<string, CategoryTotals> Categories)
+    IReadOnlyDictionary<string, CategoryTotals> Categories,
+    WorkerTotals Worker)
 {
     public long ContextTokens => TurnContext.Sum();
 }
@@ -45,6 +46,7 @@ public sealed class UsageStats
         Turns = sessions.Sum(s => s.TurnContext.Count);
         ContextTokens = sessions.Sum(s => s.ContextTokens);
         Compactions = sessions.Sum(s => s.CompactionTurns.Count);
+        Worker = sessions.Aggregate(WorkerTotals.None, (sum, s) => sum.Add(s.Worker));
 
         var firstTurns = sessions.Select(s => s.TurnContext[0]).Order().ToList();
         FirstTurnMedian = firstTurns.Count == 0 ? 0 : firstTurns[firstTurns.Count / 2];
@@ -75,6 +77,8 @@ public sealed class UsageStats
     public long FirstTurnMedian { get; }
 
     public IReadOnlyDictionary<string, CategoryTotals> Categories { get; }
+
+    public WorkerTotals Worker { get; }
 }
 
 /// <summary>
@@ -98,7 +102,9 @@ public static class TranscriptAnalyzer
         var files = Directory.GetFiles(transcriptDirectory, "*.jsonl").Order(StringComparer.Ordinal);
         foreach (string file in files)
         {
-            SessionStats? session = AnalyzeSession(Path.GetFileNameWithoutExtension(file), ReadLines(file), window);
+            string id = Path.GetFileNameWithoutExtension(file);
+            string workers = Path.Combine(transcriptDirectory, id, "subagents");
+            SessionStats? session = AnalyzeSession(id, ReadLines(file), window, agentId => WorkerTranscript(workers, agentId));
             if (session is not null)
             {
                 sessions.Add(session);
@@ -108,14 +114,22 @@ public static class TranscriptAnalyzer
         return new UsageStats(sessions);
     }
 
-    /// <summary>Returns null when no model turn falls inside the window.</summary>
-    public static SessionStats? AnalyzeSession(string id, IEnumerable<string> lines, TimeWindow window)
+    /// <summary>
+    /// Returns null when no model turn falls inside the window. <c>workerTranscript</c> gives a
+    /// worker's own transcript by agent id, or null when it is gone.
+    /// </summary>
+    public static SessionStats? AnalyzeSession(
+        string id,
+        IEnumerable<string> lines,
+        TimeWindow window,
+        Func<string, IEnumerable<string>?>? workerTranscript = null)
     {
         var turns = new List<long>();
         var seenMessages = new HashSet<string>(StringComparer.Ordinal);
         var pending = new List<string>();
         var calls = new Dictionary<string, int>(StringComparer.Ordinal);
         var context = new Dictionary<string, double>(StringComparer.Ordinal);
+        var worker = new WorkerDelegations();
 
         foreach (string line in lines)
         {
@@ -131,6 +145,12 @@ public static class TranscriptAnalyzer
             }
 
             JsonElement entry = doc.RootElement;
+            if (IsMainThread(entry, "user"))
+            {
+                worker.Read(entry);
+                continue;
+            }
+
             if (!IsAssistantTurn(entry, window, out JsonElement message, out JsonElement content))
             {
                 continue;
@@ -176,6 +196,13 @@ public static class TranscriptAnalyzer
                     ? n.GetString()!
                     : "";
                 block.TryGetProperty("input", out JsonElement input);
+                if (WorkerDelegations.IsWorker(name, input)
+                    && block.TryGetProperty("id", out JsonElement callId)
+                    && callId.ValueKind == JsonValueKind.String)
+                {
+                    worker.Started(callId.GetString()!);
+                }
+
                 string category = Categorizer.Categorize(name, input);
                 pending.Add(category);
                 calls[category] = calls.GetValueOrDefault(category) + 1;
@@ -202,7 +229,50 @@ public static class TranscriptAnalyzer
             categories[category] = new CategoryTotals(count, context.GetValueOrDefault(category));
         }
 
-        return new SessionStats(id, turns, compactions, categories);
+        return new SessionStats(
+            id,
+            turns,
+            compactions,
+            categories,
+            worker.Totals(agentId => workerTranscript?.Invoke(agentId) is { } workerLines ? WorkerContext(workerLines) : 0));
+    }
+
+    /// <summary>
+    /// What a worker read over its turns, summed like the main thread's context. Every entry of a
+    /// worker's transcript is a sidechain entry; a delegation started inside the window counts whole.
+    /// </summary>
+    public static long WorkerContext(IEnumerable<string> lines)
+    {
+        long sum = 0;
+        var seenMessages = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            using JsonDocument? doc = TryParse(line);
+            if (doc is null
+                || doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("type", out JsonElement type)
+                || !type.ValueEquals("assistant")
+                || !doc.RootElement.TryGetProperty("message", out JsonElement message)
+                || message.ValueKind != JsonValueKind.Object
+                || !message.TryGetProperty("usage", out JsonElement usage)
+                || !message.TryGetProperty("id", out JsonElement idElement)
+                || idElement.ValueKind != JsonValueKind.String
+                || !seenMessages.Add(idElement.GetString()!))
+            {
+                continue;
+            }
+
+            sum += Tokens(usage, "input_tokens")
+                + Tokens(usage, "cache_read_input_tokens")
+                + Tokens(usage, "cache_creation_input_tokens");
+        }
+
+        return sum;
     }
 
     private static bool IsAssistantTurn(JsonElement entry, TimeWindow window, out JsonElement message, out JsonElement content)
@@ -210,15 +280,7 @@ public static class TranscriptAnalyzer
         message = default;
         content = default;
 
-        // Subagent turns run in their own context; they are not the main thread's cost.
-        if (entry.TryGetProperty("isSidechain", out JsonElement sidechain) && sidechain.ValueKind == JsonValueKind.True)
-        {
-            return false;
-        }
-
-        if (!entry.TryGetProperty("type", out JsonElement type)
-            || type.ValueKind != JsonValueKind.String
-            || !type.ValueEquals("assistant"))
+        if (!IsMainThread(entry, "assistant"))
         {
             return false;
         }
@@ -236,6 +298,13 @@ public static class TranscriptAnalyzer
             && message.TryGetProperty("content", out content)
             && content.ValueKind == JsonValueKind.Array;
     }
+
+    /// <summary>Subagent turns run in their own context; they are not the main thread's cost.</summary>
+    private static bool IsMainThread(JsonElement entry, string type) =>
+        !(entry.TryGetProperty("isSidechain", out JsonElement sidechain) && sidechain.ValueKind == JsonValueKind.True)
+        && entry.TryGetProperty("type", out JsonElement t)
+        && t.ValueKind == JsonValueKind.String
+        && t.ValueEquals(type);
 
     private static long Tokens(JsonElement usage, string property) =>
         usage.ValueKind == JsonValueKind.Object
@@ -255,6 +324,21 @@ public static class TranscriptAnalyzer
             // A session still being written can end in a partial line.
             return null;
         }
+    }
+
+    /// <summary>
+    /// `&lt;session&gt;/subagents/agent-&lt;id&gt;.jsonl`. The id comes from the transcript, so anything but
+    /// letters, digits, `-` and `_` is not looked up.
+    /// </summary>
+    private static IEnumerable<string>? WorkerTranscript(string directory, string agentId)
+    {
+        if (agentId.Length == 0 || !agentId.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+        {
+            return null;
+        }
+
+        string path = Path.Combine(directory, "agent-" + agentId + ".jsonl");
+        return File.Exists(path) ? ReadLines(path) : null;
     }
 
     /// <summary>Claude Code may be appending to the file; share it rather than lock it.</summary>

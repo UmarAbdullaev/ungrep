@@ -25,6 +25,14 @@
       "contextTokens": 7002
     }
   ],
+  "worker": {
+    "delegations": 0,
+    "short": 0,
+    "overBudget": 0,
+    "noResult": 0,
+    "verdictTokens": 0,
+    "contextTokens": 0
+  },
   "toolCalls": 3,
   "chargedContextTokens": 26004
 }

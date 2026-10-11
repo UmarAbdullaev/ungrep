@@ -4,9 +4,9 @@ using System.Text;
 namespace UnityGraph.Stats;
 
 /// <summary>
-/// Plain-text `ug stats` report, written for Claude and people alike: a summary line, then where
-/// the context went by category, with deltas when a baseline report is given. Stays under 30
-/// lines whatever the transcripts hold.
+/// Plain-text `ug stats` report, written for Claude and people alike: a summary line, worker
+/// delegations when there were any, then where the context went by category, with deltas when a
+/// baseline report is given. Stays under 30 lines whatever the transcripts hold.
 /// </summary>
 public static class StatsText
 {
@@ -42,10 +42,39 @@ public static class StatsText
             .Append(Invariant($" | tool calls {report.ToolCalls:N0}{PercentDelta(report.ToolCalls, baseline?.ToolCalls)}"))
             .Append('\n');
         text.Append(Invariant($"context charged to tool calls {Tokens(report.ChargedContextTokens)} ({Share(report.ChargedContextTokens, report.ContextTokens)})"))
-            .Append("\n\n");
+            .Append('\n');
+        AppendWorker(text, report.Worker ?? WorkerTotals.None, baseline?.Worker);
+        text.Append('\n');
 
         AppendCategories(text, report, baseline);
         return text.ToString();
+    }
+
+    /// <summary>
+    /// One line, only when this report or its baseline has delegations: the 3-step rule, what the
+    /// workers read in their own context, and the verdict budget of SPEC-worker-agent.
+    /// </summary>
+    private static void AppendWorker(StringBuilder text, WorkerTotals worker, WorkerTotals? before)
+    {
+        if (worker.Delegations == 0 && (before?.Delegations ?? 0) == 0)
+        {
+            return;
+        }
+
+        text.Append(Invariant($"{WorkerDelegations.AgentName} {worker.Delegations} delegations{CountDelta(worker.Delegations, before?.Delegations)}"))
+            .Append(Invariant($" | {worker.Short} short (under {WorkerDelegations.ShortBelow} tool calls)"))
+            .Append(Invariant($" | worker context {Tokens(worker.ContextTokens)}{PercentDelta(worker.ContextTokens, before?.ContextTokens)}"));
+        if (worker.Finished > 0)
+        {
+            text.Append(Invariant($" | verdict avg {worker.VerdictTokens / worker.Finished} tokens, {worker.OverBudget} over {WorkerDelegations.VerdictBudget}"));
+        }
+
+        if (worker.NoResult > 0)
+        {
+            text.Append(Invariant($" | {worker.NoResult} without a result"));
+        }
+
+        text.Append('\n');
     }
 
     private static void AppendCategories(StringBuilder text, StatsReport report, StatsReport? baseline)

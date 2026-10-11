@@ -46,7 +46,7 @@ internal static partial class EditorCommands
     // editorLog: the Editor.log to fall back on; null means Unity's default place. Tests only.
     public static IEnumerable<Command> Create(string? editorLog)
     {
-        yield return Command("status", "The editor's state and last compile, through the bridge.", [], (root, _) => Status(root));
+        yield return Command("status", "The editor's state and last compile, through the bridge.", [], (root, config, _) => Status(root, config));
 
         var warnings = new Option<bool>("--warnings") { Description = "List warnings too, not only their count." };
         var timeout = new Option<int>("--timeout") { Description = "Seconds to wait for Unity. Default: 60.", DefaultValueFactory = _ => 60 };
@@ -69,7 +69,19 @@ internal static partial class EditorCommands
         yield return Batch();
     }
 
-    public static (int ExitCode, string Text) Status(string root)
+    /// <summary>
+    /// The editor's state. The worker subagent starts with this call, so a `worker-agent: false`
+    /// switch is said here, and only when it is off (SPEC-worker-agent, Switch).
+    /// </summary>
+    public static (int ExitCode, string Text) Status(string root, UnityGraphConfig config)
+    {
+        (int exitCode, string text) = EditorStatus(root);
+        return config.IsEnabled("worker-agent")
+            ? (exitCode, text)
+            : (exitCode, text + "worker-agent is off in " + UnityGraphConfig.RelativePath + ": chores run inline, not in unity-worker\n");
+    }
+
+    private static (int ExitCode, string Text) EditorStatus(string root)
     {
         BridgeConnection connection = BridgeClient.Connect(root, ProcessCheck);
         if (connection.Client == null)

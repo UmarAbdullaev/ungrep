@@ -20,7 +20,7 @@ public sealed class SkillBudgetTests
         Assert.True(tokens <= Budget, $"skills/unity/SKILL.md body is {tokens} tokens ({bytes} bytes / 4), over the {Budget} budget");
     }
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {

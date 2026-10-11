@@ -10,7 +10,8 @@ public sealed record CategoryRow(string Name, int Calls, long ContextTokens);
 
 /// <summary>
 /// What `ug stats --json` writes and `--baseline` reads back. Aggregates only: no paths, session
-/// ids, prompts or code, so a report can be kept in a repository or shared.
+/// ids, prompts or code, so a report can be kept in a repository or shared. `Worker` is null in a
+/// report written before worker delegations were counted.
 /// </summary>
 public sealed record StatsReport(
     int Version,
@@ -22,7 +23,8 @@ public sealed record StatsReport(
     long ContextTokens,
     int Compactions,
     long FirstTurnMedian,
-    IReadOnlyList<CategoryRow> Categories)
+    IReadOnlyList<CategoryRow> Categories,
+    WorkerTotals? Worker = null)
 {
     public const int CurrentVersion = 1;
 
@@ -55,7 +57,8 @@ public sealed record StatsReport(
             stats.ContextTokens,
             stats.Compactions,
             stats.FirstTurnMedian,
-            categories);
+            categories,
+            stats.Worker);
     }
 
     /// <summary>Indented JSON with '\n' line endings on every OS.</summary>

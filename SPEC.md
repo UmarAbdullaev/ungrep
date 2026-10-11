@@ -71,7 +71,9 @@ sessions, are excluded), so `ug stats --until 2026-09-28T11:00Z` reproduces it.
 
 Simulation assumptions: the worker starts at ~15k context and returns a verdict of at most 800
 tokens; compacted outputs are half their size; "realistic" means a navigation streak takes 2
-calls. Module `bench` replaces these estimates with measurements.
+calls. Module `bench` replaces these estimates with measurements. Measured in W1's dry run
+(`specs/SPEC-worker-agent.md`): a worker starts at ~34k context, and verdicts came to 486 and 738
+tokens.
 
 ## Design rules
 
@@ -103,8 +105,8 @@ measures each one, and `bench` fails a release that breaks one.
 
 | Overhead | Budget | Why it stays small |
 | --- | --- | --- |
-| Skill and agent descriptions, loaded every session | ≤ 300 tokens | ~0.1% of context on purge-squad's sessions |
-| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 596, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
+| Skill and agent descriptions, loaded every session | ≤ 300 tokens (measured: 104, bytes / 4) | ~0.1% of context on purge-squad's sessions |
+| `unity` skill body, loaded when first used | ≤ 600 tokens (measured: 599, bytes / 4); long recipes live in files beside it, read on demand | once per session, not per turn; option lists stay in `ug <cmd> --help` |
 | Compile gate | 0 tokens when clean; ≤ 20 lines on errors | replaces 3–4 turns of recompile, wait and console |
 | Worker delegation | only chores of 3 or more steps; verdict ≤ 800 tokens | a 1-step chore costs more delegated than done inline |
 | Index builds and updates | 0 tokens: deterministic, no LLM | unlike Graphify's LLM extraction |
@@ -115,7 +117,8 @@ Ways the plugin could end up costing more, and the check for each:
   `bench` measures the redo rate.
 - A worker verdict missing a detail makes the main thread repeat the chore: verdicts carry
   evidence anchors (`file:line`, object paths); redo rate measured.
-- One-step chores delegated anyway: the 3-step rule; `stats` counts short delegations.
+- One-step chores delegated anyway: the 3-step rule; `stats` counts short delegations and what
+  the workers read in their own context.
 - Hooks firing on the wrong calls: narrow triggers, replay tests on recorded transcripts,
   false-trigger count in `stats`.
 
@@ -227,7 +230,7 @@ Standing assumptions:
 | `unity-loop` | Compile gate (edit tracking + Stop hook, silent when clean); compact `ug console`, `ug test`, `ug log` (digest of the last play session). | `editor-link` |
 | `play-input` | Play the game through the bridge: `ug ui` (interactable uGUI and UI Toolkit elements with positions), `ug click`, `ug nav`, `ug press`, `ug stick`, `ug tap`, `ug swipe`, `ug wait`, `ug play --step`; a one-line digest after each action; play mode only, nothing saved, held input released when play stops. UI Toolkit (U2): `ug tree --ui`, element addresses in `ug inspect`/`ug set`, panels in `ug shot`. | `editor-ops`, `unity-loop` |
 | `guards` | Hooks: serialized field renamed or removed (with the number of assets holding data), `[SerializeReference]` types moved, `.meta`-safe `mv`/`cp`/`rm`, edits to vendored folders, configurable runtime-lookup lint. | `code-index`, `asset-index`, `plugin-shell` |
-| `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract. | `query`, `unity-loop`, `editor-link` |
+| `worker-agent` | Unity worker subagent, delegation rules in the skill, verdict contract (`specs/SPEC-worker-agent.md`). | `query`, `unity-loop`, `editor-link` |
 | `viewer` | `ug view`: self-contained HTML graph for people; nodes coloured by kind, `exact` edges solid and `heuristic` dashed, filter and search. 0 tokens to Claude. | `query` |
 | `bench` | Question suites on purge-squad and 2–3 open Unity projects; arms: grep baseline, codegraph, Graphify, unitygraph; scores calls, tokens and correctness. | `stats`, all feature modules |
 
