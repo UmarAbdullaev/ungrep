@@ -129,6 +129,19 @@ public sealed class SuiteTests
         Assert.Equal(["navigation", "asset", "chore"], suite.Questions.Select(q => q.Kind).Distinct());
     }
 
+    [Theory]
+    [InlineData("`C2_Central.asset` (the Swarm Central) never uses it, because its wave table is melee-only.", false)]
+    [InlineData("The one node without it is `C2_Central`, the Swarm Central.", false)]
+    [InlineData("`C2_Central.asset` is the only node that doesn't use it.", false)]
+    [InlineData("C1_Central, C2_Central and C3_Central each spawn it. No other assets do.", true)]
+    [InlineData("- `Assets/Data/Nodes/C2_Central.asset:68-265` (20)", true)]
+    public void A5_takes_C2_Central_named_as_excluded_and_not_as_a_spawner(string answer, bool unwanted)
+    {
+        Suite suite = Suite.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "bench", "suites", "purge-squad.json")));
+
+        Assert.Equal(unwanted, Scoring.Unwanted(suite.Questions.Single(q => q.Id == "A5").Key, answer).Count > 0);
+    }
+
     internal static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
