@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using UnityGraph.EditorLink;
@@ -20,16 +21,65 @@ public sealed partial class EditorEndToEndTests : IDisposable
     {
         EditorCommands.DocsFetchOverride = null;
         EditorCommands.DocsCacheOverride = null;
-        if (_unity is { HasExited: false })
+        if (_unity is not null)
         {
-            _unity.Kill(entireProcessTree: true);
-            _unity.WaitForExit(30_000);
+            if (!_unity.HasExited)
+            {
+                _unity.Kill(entireProcessTree: true);
+                _unity.WaitForExit(30_000);
+            }
+
+            _unity.Dispose();
+            KillLeftovers();
         }
 
-        _unity?.Dispose();
-        if (Directory.Exists(_root))
+        // A killed process can hold its files a moment after it exits.
+        for (int attempt = 1; Directory.Exists(_root); attempt++)
         {
-            Directory.Delete(_root, recursive: true);
+            try
+            {
+                Directory.Delete(_root, recursive: true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < 10)
+            {
+                Thread.Sleep(1000);
+            }
+        }
+    }
+
+    // Unity's AssetImportWorkers can outlive the editor the test kills and keep Library/ArtifactDB
+    // open. Kill every process whose command line names this copy's folder; editors of other
+    // projects never name it.
+    private void KillLeftovers()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string query = "Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '%" + Path.GetFileName(_root) + "%'\""
+            + " | Where-Object ProcessId -ne $PID | ForEach-Object ProcessId";
+        var info = new ProcessStartInfo("powershell.exe") { RedirectStandardOutput = true, UseShellExecute = false };
+        foreach (string arg in new[] { "-NoProfile", "-NonInteractive", "-Command", query })
+        {
+            info.ArgumentList.Add(arg);
+        }
+
+        using Process search = Process.Start(info)!;
+        string[] pids = search.StandardOutput.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        search.WaitForExit();
+        foreach (string pid in pids)
+        {
+            try
+            {
+                using Process leftover = Process.GetProcessById(int.Parse(pid, CultureInfo.InvariantCulture));
+                leftover.Kill(entireProcessTree: true);
+                leftover.WaitForExit(30_000);
+            }
+            catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception)
+            {
+                // It exited on its own between the search and the kill.
+            }
         }
     }
 
