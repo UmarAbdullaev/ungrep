@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -417,7 +416,7 @@ namespace UnityGraph.Bridge
 
         public static Reply UndoLast(bool redo)
         {
-            bool known = Records(out List<string> undos, out List<string> redos);
+            bool known = Answer.UndoRecords(out List<string> undos, out List<string> redos);
             List<string> records = redo ? redos : undos;
             if (known && records.Count == 0)
             {
@@ -956,33 +955,5 @@ namespace UnityGraph.Bridge
         }
 
         private static string Bool(bool value) => value ? "true" : "false";
-
-        // Unity keeps the undo and redo names internally (Edit > Undo shows them); read them by
-        // reflection, and fall back to nameless answers when that method is gone.
-        private static bool Records(out List<string> undos, out List<string> redos)
-        {
-            undos = new List<string>();
-            redos = new List<string>();
-            MethodInfo method = typeof(Undo).GetMethod(
-                "GetRecords",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
-                null,
-                new[] { typeof(List<string>), typeof(List<string>) },
-                null);
-            if (method == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                method.Invoke(null, new object[] { undos, redos });
-                return true;
-            }
-            catch (TargetInvocationException)
-            {
-                return false;
-            }
-        }
     }
 }

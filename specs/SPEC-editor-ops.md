@@ -656,7 +656,9 @@ Boot has already started loading GalaxyMap), and an error scrolls past while the
 1. **Undo.** Every edit goes through Unity's Undo (`RegisterCreatedObjectUndo`,
    `DestroyObjectImmediate`, `SetTransformParent`, `AddComponent`, `ApplyModifiedProperties`),
    one undo group per request named `ug <command>`, so Ctrl+Z in the editor reverts it.
-   One exception (U2): `ug set` on a UI Toolkit element changes a live `VisualElement`, which is
+   A request that records nothing (a refusal, a field set to its own value, an object already
+   active, a prefab asset written at once) leaves no group: `ug undo` names and reverts the edit
+   before it. One exception (U2): `ug set` on a UI Toolkit element changes a live `VisualElement`, which is
    not a Unity object and has no Undo; nothing is saved or marked dirty, the document rebuilds the
    element from its UXML on its next enable, and the answer says `live element only: not saved,
    no undo` (SPEC-play-input, UI Toolkit).

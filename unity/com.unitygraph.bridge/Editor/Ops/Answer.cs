@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -53,12 +54,12 @@ namespace UnityGraph.Bridge
 
         /// <summary>
         /// Runs an edit as one undo group named `ug <name>`, so one Ctrl+Z in the editor reverts it. An
-        /// error reverts what the edit recorded and gives the empty group back the previous name: an empty
-        /// group still lists under its name, so ug undo would print it and undo the edit before.
+        /// error reverts what the edit recorded. A group left with no records (an error, or an edit that
+        /// changed nothing, like a field set to its value) still lists under its name, so ug undo would
+        /// print it and undo the edit before: a new group drops it, and the last recorded name is back.
         /// </summary>
         public static Reply Undoable(string name, Func<Reply> edit)
         {
-            string previous = Undo.GetCurrentGroupName();
             Undo.IncrementCurrentGroup();
             int group = Undo.GetCurrentGroup();
             GroupName = "ug " + name;
@@ -71,18 +72,63 @@ namespace UnityGraph.Bridge
             }
             finally
             {
-                if (reply == null || IsError(reply))
+                bool failed = reply == null || IsError(reply);
+                if (failed)
                 {
                     Undo.RevertAllInCurrentGroup();
-                    Undo.SetCurrentGroupName(previous);
                 }
 
+                Undo.FlushUndoRecordObjects();
                 Undo.CollapseUndoOperations(group);
+                if (failed || RecordedNothing())
+                {
+                    Undo.IncrementCurrentGroup();
+                }
             }
         }
 
         /// <summary>The running edit's undo group name; Undo records use it so Edit > Undo shows the command.</summary>
         public static string GroupName { get; private set; } = "ug edit";
+
+        // Unity keeps the undo and redo names internally (Edit > Undo shows them); read them by
+        // reflection, and fall back to nameless answers when that method is gone.
+        public static bool UndoRecords(out List<string> undos, out List<string> redos)
+        {
+            undos = new List<string>();
+            redos = new List<string>();
+            MethodInfo method = typeof(Undo).GetMethod(
+                "GetRecords",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(List<string>), typeof(List<string>) },
+                null);
+            if (method == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                method.Invoke(null, new object[] { undos, redos });
+                return true;
+            }
+            catch (TargetInvocationException)
+            {
+                return false;
+            }
+        }
+
+        // The undo records list each group's name, then its records' names; the current group with no
+        // records lists its name alone. So under a name no record has, that name last means no records.
+        private static bool RecordedNothing()
+        {
+            const string probe = "ug: no records?";
+            string name = Undo.GetCurrentGroupName();
+            Undo.SetCurrentGroupName(probe);
+            bool none = UndoRecords(out List<string> undos, out _) && undos.Count > 0 && undos[undos.Count - 1] == probe;
+            Undo.SetCurrentGroupName(name);
+            return none;
+        }
 
         /// <summary>What happens to an edit of this object: unsaved in its scene, lost after play, or written.</summary>
         public static string Unsaved(GameObject target)

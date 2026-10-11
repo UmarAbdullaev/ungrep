@@ -192,6 +192,25 @@ namespace UnityGraph.Bridge.Tests
         }
 
         [Test]
+        public void An_edit_that_records_nothing_leaves_the_undo_history_and_its_names_as_they_were()
+        {
+            Undo.ClearAll();
+            Assert.AreEqual(Lines("Level/Player  UgProbe.speed  5 -> 5" + Unsaved), Ask("/set", "object", "Level/Player", "field", "speed", "value", "5"));
+            Assert.AreEqual(Lines("nothing to undo"), Ask("/undo"));
+
+            Ask("/object/rename", "object", "Level/Player", "name", "Hero");
+            Assert.AreEqual(Lines("Level/Hero  UgProbe.speed  5 -> 5" + Unsaved), Ask("/set", "object", "Level/Hero", "field", "speed", "value", "5"));
+            Assert.AreEqual(Lines("Level/Hero  active true -> true" + Unsaved), Ask("/object/active", "object", "Level/Hero", "value", "true"));
+            Assert.AreEqual(
+                Lines(PrefabPath + ":Barrel  Transform.localPosition  0, 0, 0 -> 0, 1, 0" + Written),
+                Ask("/set", "object", PrefabPath + ":Barrel", "field", "position", "value", "0,1,0"));
+
+            Assert.AreEqual(Lines("undid ug object rename"), Ask("/undo"));
+            Assert.AreEqual("Player", Find("Level/Player").name);
+            Assert.AreEqual(Lines("redid ug object rename"), Ask("/redo"));
+        }
+
+        [Test]
         public void Undo_redo_and_selection()
         {
             Ask("/object/rename", "object", "Level/Player", "name", "Hero");
