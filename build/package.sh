@@ -62,7 +62,7 @@ EOF
 # Stored byte for byte on the release branch: no line-ending conversion of the build or launchers.
 printf '%s\n' '* -text' > "$out/.gitattributes"
 
-dotnet publish src/Ungrep.Cli -c Release -o "$out/dist/ug" -nologo -v quiet
+dotnet publish src/Ungrep.Cli -c Release -o "$out/dist/ug" -p:UgPackage=true -nologo -v quiet
 
 "$out/bin/ug" --version >/dev/null
 echo "package: ungrep $version in ${out#"$repo"/} ($(du -sh "$out" | cut -f1))"
