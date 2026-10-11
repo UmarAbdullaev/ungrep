@@ -278,7 +278,7 @@ Dogfood       claude plugin marketplace add D:\Projects\unitygraph
 One session   claude --plugin-dir D:\Projects\unitygraph
 Validate      claude plugin validate .claude-plugin/marketplace.json
 Stats         ug stats --project D:\Projects\Unity\purge-squad --since 2026-09-01
-Bench         ug bench run bench/suites/purge-squad.yaml --arm unitygraph
+Bench         ug bench run bench/suites/purge-squad.json --arm unitygraph
 ```
 
 `<Unity>` is the installed editor's executable.

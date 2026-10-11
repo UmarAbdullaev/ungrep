@@ -1,0 +1,14 @@
+bench tiny  script  commit abc1234 (HEAD def5678)
+warning: the keys hold for abc1234; the project is at def5678
+question       grep                      other  unitygraph
+Q1 navigation  2 / 27 / 0.3 ok           -      1 / 12 / 0.3 ok
+C1 chore       3 / 22 / 0.2 ok redo 2 *  -      1 / 6 / 0.1 ok
+- other C1: needs index
+- other Q1: no steps
+* shared steps, run once: pipe
+totals over 2 questions every arm ran (other ran none)
+            calls  tokens  seconds  correct  redo
+grep            5      48      0.5      2/2     2
+unitygraph      2      18      0.4      2/2     0
+unitygraph vs grep: calls -60%, tokens -62%
+idle tokens (always + on use)  grep 13 + 17  other 0 + 0  unitygraph 9 + 2

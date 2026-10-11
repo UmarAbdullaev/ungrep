@@ -1,0 +1,2626 @@
+{
+  "version": 1,
+  "suite": "purge-squad",
+  "mode": "script",
+  "date": "2026-10-11",
+  "commit": "9ce9995",
+  "head": "9ce9995",
+  "arms": [
+    "grep",
+    "codegraph",
+    "graphify",
+    "unitygraph"
+  ],
+  "questions": [
+    {
+      "id": "N1",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep -rn \"class RunDirector\" Assets --include=*.cs",
+              "requestBytes": 50,
+              "answerBytes": 78,
+              "seconds": 0.45,
+              "exit": 0
+            },
+            {
+              "label": "grep -nE \"void (Awake|Start|OnEnable|OnDisable|Update|FixedUpdate|LateUpdate|OnDestroy|OnValidate|Reset|OnApplication\\w+|OnTrigger\\w+|OnCollision\\w+)\\s*\\(\" Assets/Scripts/Run/RunDirector.cs",
+              "requestBytes": 189,
+              "answerBytes": 122,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"RunDirector\"}",
+              "requestBytes": 56,
+              "answerBytes": 25009,
+              "seconds": 1.16,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "graphify query \"Where is the class RunDirector defined, and which Unity messages (Awake, Start, OnEnable, ...) does it implement?\"",
+              "requestBytes": 130,
+              "answerBytes": 6528,
+              "seconds": 1.83,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "ug explain RunDirector",
+              "requestBytes": 22,
+              "answerBytes": 689,
+              "seconds": 0.46,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N2",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 8,
+          "of": 8,
+          "steps": [
+            {
+              "label": "grep -rn \"TrySpend(\" Assets --include=*.cs",
+              "requestBytes": 42,
+              "answerBytes": 1197,
+              "seconds": 0.44,
+              "exit": 0
+            },
+            {
+              "label": "grep -nE \"^\\s*(public|private|internal|protected)?\\s*(static\\s+)?\\w+\\s+\\w+\\s*\\(\" Assets/Scripts/Economy/Fabrication.cs Assets/Tests/EditMode/WalletTests.cs",
+              "requestBytes": 155,
+              "answerBytes": 1491,
+              "seconds": 0.05,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "found": 8,
+          "of": 8,
+          "steps": [
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"Wallet.TrySpend\"}",
+              "requestBytes": 60,
+              "answerBytes": 25016,
+              "seconds": 0.6,
+              "exit": 0
+            },
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"Fabrication.TryFabricate\"}",
+              "requestBytes": 69,
+              "answerBytes": 21988,
+              "seconds": 0.56,
+              "exit": 0,
+              "redo": "the first answer named the caller, not its line"
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "found": 8,
+          "of": 8,
+          "steps": [
+            {
+              "label": "graphify query \"Which methods call Wallet.TrySpend (either overload)?\"",
+              "requestBytes": 70,
+              "answerBytes": 1861,
+              "seconds": 1.67,
+              "exit": 0
+            },
+            {
+              "label": "grep -rn \"TrySpend(\" Assets --include=*.cs",
+              "requestBytes": 42,
+              "answerBytes": 1197,
+              "seconds": 0.45,
+              "exit": 0,
+              "redo": "the graph holds no caller of .TrySpend()"
+            },
+            {
+              "label": "grep -nE \"^\\s*(public|private|internal|protected)?\\s*(static\\s+)?\\w+\\s+\\w+\\s*\\(\" Assets/Scripts/Economy/Fabrication.cs Assets/Tests/EditMode/WalletTests.cs",
+              "requestBytes": 155,
+              "answerBytes": 1491,
+              "seconds": 0.06,
+              "exit": 0,
+              "redo": "the graph holds no caller of .TrySpend()"
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 8,
+          "of": 8,
+          "steps": [
+            {
+              "label": "ug refs Wallet.TrySpend",
+              "requestBytes": 23,
+              "answerBytes": 1445,
+              "seconds": 0.45,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N3",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 4,
+          "of": 4,
+          "steps": [
+            {
+              "label": "grep -rnw \"Died\" Assets --include=*.cs",
+              "requestBytes": 38,
+              "answerBytes": 820,
+              "seconds": 0.49,
+              "exit": 0
+            },
+            {
+              "label": "grep -nE \"void \\w+\\s*\\(\" Assets/Scripts/Combat/Enemy.cs Assets/Scripts/Combat/PlayerCharacter.cs Assets/Scripts/Run/RunDirector.cs",
+              "requestBytes": 130,
+              "answerBytes": 2858,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "found": 4,
+          "of": 4,
+          "steps": [
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"Health.Died\"}",
+              "requestBytes": 56,
+              "answerBytes": 25081,
+              "seconds": 0.16,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "found": 4,
+          "of": 4,
+          "steps": [
+            {
+              "label": "graphify query \"Which methods subscribe to the Health.Died event?\"",
+              "requestBytes": 66,
+              "answerBytes": 6503,
+              "seconds": 1.62,
+              "exit": 0
+            },
+            {
+              "label": "grep -rnw \"Died\" Assets --include=*.cs",
+              "requestBytes": 38,
+              "answerBytes": 820,
+              "seconds": 0.45,
+              "exit": 0,
+              "redo": "the graph has no Died event, only OnDied methods"
+            },
+            {
+              "label": "grep -nE \"void \\w+\\s*\\(\" Assets/Scripts/Combat/Enemy.cs Assets/Scripts/Combat/PlayerCharacter.cs Assets/Scripts/Run/RunDirector.cs",
+              "requestBytes": 130,
+              "answerBytes": 2858,
+              "seconds": 0.04,
+              "exit": 0,
+              "redo": "the graph has no Died event, only OnDied methods"
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 4,
+          "of": 4,
+          "steps": [
+            {
+              "label": "ug refs Health.Died",
+              "requestBytes": 19,
+              "answerBytes": 562,
+              "seconds": 0.39,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N4",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "grep -rnw \"IPartRule\" Assets --include=*.cs",
+              "requestBytes": 43,
+              "answerBytes": 487,
+              "seconds": 0.43,
+              "exit": 0
+            },
+            {
+              "label": "grep -rnE \"(class|struct)\\s+\\w+[^{]*:[^{]*\\b(IPartRule|IPayload|IEmitter|ITrigger)\\b\" Assets --include=*.cs",
+              "requestBytes": 107,
+              "answerBytes": 246,
+              "seconds": 0.43,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"IPartRule\"}",
+              "requestBytes": 54,
+              "answerBytes": 24943,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"StraightPayload SimpleEmitter OnKillVolleyTrigger\"}",
+              "requestBytes": 94,
+              "answerBytes": 17430,
+              "seconds": 0.16,
+              "exit": 0,
+              "redo": "the first answer named the classes, not their lines"
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "graphify query \"Which concrete classes implement IPartRule, directly or through an interface that extends it?\"",
+              "requestBytes": 110,
+              "answerBytes": 6501,
+              "seconds": 1.6,
+              "exit": 0
+            },
+            {
+              "label": "graphify affected \"IPartRule\"",
+              "requestBytes": 29,
+              "answerBytes": 2627,
+              "seconds": 0.79,
+              "exit": 0,
+              "redo": "the query's traversal missed the implementers"
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "ug refs IPartRule",
+              "requestBytes": 17,
+              "answerBytes": 487,
+              "seconds": 0.41,
+              "exit": 0
+            },
+            {
+              "label": "ug refs IPayload",
+              "requestBytes": 16,
+              "answerBytes": 1003,
+              "seconds": 0.39,
+              "exit": 0
+            },
+            {
+              "label": "ug refs IEmitter",
+              "requestBytes": 16,
+              "answerBytes": 655,
+              "seconds": 0.41,
+              "exit": 0
+            },
+            {
+              "label": "ug refs ITrigger",
+              "requestBytes": 16,
+              "answerBytes": 540,
+              "seconds": 0.4,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N5",
+      "kind": "navigation",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs",
+              "requestBytes": 49,
+              "answerBytes": 225,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta",
+              "requestBytes": 47,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset",
+              "requestBytes": 103,
+              "answerBytes": 220,
+              "seconds": 1.32,
+              "exit": 0
+            },
+            {
+              "label": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity",
+              "requestBytes": 236,
+              "answerBytes": 196,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "mcp codegraph codegraph_explore {\"query\":\"ProgressBar._value\"}",
+              "requestBytes": 63,
+              "answerBytes": 24980,
+              "seconds": 0.11,
+              "exit": 0
+            },
+            {
+              "label": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta",
+              "requestBytes": 47,
+              "answerBytes": 39,
+              "seconds": 0.03,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset",
+              "requestBytes": 103,
+              "answerBytes": 220,
+              "seconds": 1.31,
+              "exit": 0
+            },
+            {
+              "label": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity",
+              "requestBytes": 236,
+              "answerBytes": 196,
+              "seconds": 0.03,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "graphify query \"What breaks if the serialized field ProgressBar._value is renamed?\"",
+              "requestBytes": 83,
+              "answerBytes": 13126,
+              "seconds": 1.69,
+              "exit": 0
+            },
+            {
+              "label": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs",
+              "requestBytes": 49,
+              "answerBytes": 225,
+              "seconds": 0.03,
+              "exit": 0,
+              "redo": "the graph holds no field uses"
+            },
+            {
+              "label": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta",
+              "requestBytes": 47,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset",
+              "requestBytes": 103,
+              "answerBytes": 220,
+              "seconds": 1.31,
+              "exit": 0
+            },
+            {
+              "label": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity",
+              "requestBytes": 236,
+              "answerBytes": 196,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "ug impact ProgressBar._value",
+              "requestBytes": 28,
+              "answerBytes": 456,
+              "seconds": 0.4,
+              "exit": 0
+            },
+            {
+              "label": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs",
+              "requestBytes": 49,
+              "answerBytes": 225,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A1",
+      "kind": "asset",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta",
+              "requestBytes": 47,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 85,
+              "answerBytes": 220,
+              "seconds": 1.21,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "grep",
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta",
+              "requestBytes": 47,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 85,
+              "answerBytes": 220,
+              "seconds": 1.21,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "grep",
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta",
+              "requestBytes": 47,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 85,
+              "answerBytes": 220,
+              "seconds": 1.21,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 6,
+          "of": 6,
+          "steps": [
+            {
+              "label": "ug impact ProgressBar",
+              "requestBytes": 21,
+              "answerBytes": 1630,
+              "seconds": 0.4,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "kind": "asset",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep guid Assets/Prefabs/UI/ButtonPrimary.prefab.meta",
+              "requestBytes": 53,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl c4bb93726453a2e45977d1d160cb09f2 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 85,
+              "answerBytes": 211,
+              "seconds": 1.23,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "grep",
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep guid Assets/Prefabs/UI/ButtonPrimary.prefab.meta",
+              "requestBytes": 53,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl c4bb93726453a2e45977d1d160cb09f2 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 85,
+              "answerBytes": 211,
+              "seconds": 1.23,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "grep",
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep guid Assets/Prefabs/UI/ButtonPrimary.prefab.meta",
+              "requestBytes": 53,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl c4bb93726453a2e45977d1d160cb09f2 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 85,
+              "answerBytes": 211,
+              "seconds": 1.23,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "ug refs Assets/Prefabs/UI/ButtonPrimary.prefab",
+              "requestBytes": 46,
+              "answerBytes": 2525,
+              "seconds": 0.39,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "kind": "asset",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 12,
+          "of": 12,
+          "steps": [
+            {
+              "label": "grep guid Assets/Materials/Gun_Metal.mat.meta",
+              "requestBytes": 45,
+              "answerBytes": 39,
+              "seconds": 0.03,
+              "exit": 0
+            },
+            {
+              "label": "grep -rln 39f287a42b19a594a91e2edd041ed306 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 86,
+              "answerBytes": 337,
+              "seconds": 1.35,
+              "exit": 0
+            },
+            {
+              "label": "grep -rn -B20 39f287a42b19a594a91e2edd041ed306 Assets/Prefabs --include=*.prefab | grep m_GameObject",
+              "requestBytes": 100,
+              "answerBytes": 780,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(113781415653558998|2810758817136334446|5491663651673104656|6780681183313136275|2296644112916184566|4513111936334990472|5415552943172750737|4724468569595232565)$/ { f = FILENAME } f && /m_Name:/ { print f \": \" $0; f = \"\" }' Assets/Prefabs/Weapons/Parts/*.prefab",
+              "requestBytes": 268,
+              "answerBytes": 516,
+              "seconds": 0.05,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "grep",
+          "found": 12,
+          "of": 12,
+          "steps": [
+            {
+              "label": "grep guid Assets/Materials/Gun_Metal.mat.meta",
+              "requestBytes": 45,
+              "answerBytes": 39,
+              "seconds": 0.03,
+              "exit": 0
+            },
+            {
+              "label": "grep -rln 39f287a42b19a594a91e2edd041ed306 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 86,
+              "answerBytes": 337,
+              "seconds": 1.35,
+              "exit": 0
+            },
+            {
+              "label": "grep -rn -B20 39f287a42b19a594a91e2edd041ed306 Assets/Prefabs --include=*.prefab | grep m_GameObject",
+              "requestBytes": 100,
+              "answerBytes": 780,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(113781415653558998|2810758817136334446|5491663651673104656|6780681183313136275|2296644112916184566|4513111936334990472|5415552943172750737|4724468569595232565)$/ { f = FILENAME } f && /m_Name:/ { print f \": \" $0; f = \"\" }' Assets/Prefabs/Weapons/Parts/*.prefab",
+              "requestBytes": 268,
+              "answerBytes": 516,
+              "seconds": 0.05,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "grep",
+          "found": 12,
+          "of": 12,
+          "steps": [
+            {
+              "label": "grep guid Assets/Materials/Gun_Metal.mat.meta",
+              "requestBytes": 45,
+              "answerBytes": 39,
+              "seconds": 0.03,
+              "exit": 0
+            },
+            {
+              "label": "grep -rln 39f287a42b19a594a91e2edd041ed306 Assets --include=*.prefab --include=*.unity",
+              "requestBytes": 86,
+              "answerBytes": 337,
+              "seconds": 1.35,
+              "exit": 0
+            },
+            {
+              "label": "grep -rn -B20 39f287a42b19a594a91e2edd041ed306 Assets/Prefabs --include=*.prefab | grep m_GameObject",
+              "requestBytes": 100,
+              "answerBytes": 780,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(113781415653558998|2810758817136334446|5491663651673104656|6780681183313136275|2296644112916184566|4513111936334990472|5415552943172750737|4724468569595232565)$/ { f = FILENAME } f && /m_Name:/ { print f \": \" $0; f = \"\" }' Assets/Prefabs/Weapons/Parts/*.prefab",
+              "requestBytes": 268,
+              "answerBytes": 516,
+              "seconds": 0.05,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 12,
+          "of": 12,
+          "steps": [
+            {
+              "label": "ug refs Assets/Materials/Gun_Metal.mat",
+              "requestBytes": 38,
+              "answerBytes": 1059,
+              "seconds": 0.4,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "kind": "asset",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep guid Assets/Scripts/Run/RunDirector.cs.meta",
+              "requestBytes": 48,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 87,
+              "answerBytes": 685,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject",
+              "requestBytes": 169,
+              "answerBytes": 417,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta",
+              "requestBytes": 140,
+              "answerBytes": 119,
+              "seconds": 1.24,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 120,
+              "answerBytes": 47,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "grep",
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep guid Assets/Scripts/Run/RunDirector.cs.meta",
+              "requestBytes": 48,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 87,
+              "answerBytes": 685,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject",
+              "requestBytes": 169,
+              "answerBytes": 417,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta",
+              "requestBytes": 140,
+              "answerBytes": 119,
+              "seconds": 1.24,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 120,
+              "answerBytes": 47,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "grep",
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "grep guid Assets/Scripts/Run/RunDirector.cs.meta",
+              "requestBytes": 48,
+              "answerBytes": 39,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 87,
+              "answerBytes": 685,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject",
+              "requestBytes": 169,
+              "answerBytes": 417,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta",
+              "requestBytes": 140,
+              "answerBytes": 119,
+              "seconds": 1.24,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 120,
+              "answerBytes": 47,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 5,
+          "of": 5,
+          "steps": [
+            {
+              "label": "ug explain RunDirector",
+              "requestBytes": 22,
+              "answerBytes": 689,
+              "seconds": 0.4,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 87,
+              "answerBytes": 685,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject",
+              "requestBytes": 169,
+              "answerBytes": 417,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta",
+              "requestBytes": 140,
+              "answerBytes": 119,
+              "seconds": 1.16,
+              "exit": 0
+            },
+            {
+              "label": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity",
+              "requestBytes": 120,
+              "answerBytes": 47,
+              "seconds": 0.04,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A5",
+      "kind": "asset",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "found": 11,
+          "of": 11,
+          "steps": [
+            {
+              "label": "grep guid Assets/Prefabs/Enemies/Enemy_Shooter.prefab.meta",
+              "requestBytes": 58,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity",
+              "requestBytes": 103,
+              "answerBytes": 358,
+              "seconds": 1.33,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "grep",
+          "found": 11,
+          "of": 11,
+          "steps": [
+            {
+              "label": "grep guid Assets/Prefabs/Enemies/Enemy_Shooter.prefab.meta",
+              "requestBytes": 58,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity",
+              "requestBytes": 103,
+              "answerBytes": 358,
+              "seconds": 1.33,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "grep",
+          "found": 11,
+          "of": 11,
+          "steps": [
+            {
+              "label": "grep guid Assets/Prefabs/Enemies/Enemy_Shooter.prefab.meta",
+              "requestBytes": 58,
+              "answerBytes": 39,
+              "seconds": 0.05,
+              "exit": 0
+            },
+            {
+              "label": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity",
+              "requestBytes": 103,
+              "answerBytes": 358,
+              "seconds": 1.33,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 11,
+          "of": 11,
+          "steps": [
+            {
+              "label": "ug refs Assets/Prefabs/Enemies/Enemy_Shooter.prefab",
+              "requestBytes": 51,
+              "answerBytes": 4649,
+              "seconds": 0.4,
+              "exit": 0
+            },
+            {
+              "label": "ug refs 'Assets/Prefabs/Enemies/Enemy_Shooter.prefab' --budget 2400",
+              "requestBytes": 67,
+              "answerBytes": 9448,
+              "seconds": 0.39,
+              "exit": 0,
+              "redo": "the first answer was cut at the budget"
+            },
+            {
+              "label": "ug refs 'Assets/Prefabs/Enemies/Enemy_Shooter.prefab' --budget 4800",
+              "requestBytes": 67,
+              "answerBytes": 18272,
+              "seconds": 0.39,
+              "exit": 0,
+              "redo": "the second answer was cut at the budget"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp find_gameobjects {\"name\":\"Bar\"}",
+              "requestBytes": 53,
+              "answerBytes": 326,
+              "seconds": 0.77,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp get_serialized_fields {\"target\":\"Boot/AdOverlay/Bar\",\"component\":\"ProgressBar\"}",
+              "requestBytes": 101,
+              "answerBytes": 1165,
+              "seconds": 1,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp find_gameobjects {\"name\":\"Bar\"}",
+              "requestBytes": 53,
+              "answerBytes": 326,
+              "seconds": 0.77,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp get_serialized_fields {\"target\":\"Boot/AdOverlay/Bar\",\"component\":\"ProgressBar\"}",
+              "requestBytes": 101,
+              "answerBytes": 1165,
+              "seconds": 1,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp find_gameobjects {\"name\":\"Bar\"}",
+              "requestBytes": 53,
+              "answerBytes": 326,
+              "seconds": 0.77,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp get_serialized_fields {\"target\":\"Boot/AdOverlay/Bar\",\"component\":\"ProgressBar\"}",
+              "requestBytes": 101,
+              "answerBytes": 1165,
+              "seconds": 1,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "ug find --live Bar",
+              "requestBytes": 18,
+              "answerBytes": 50,
+              "seconds": 0.21,
+              "exit": 0
+            },
+            {
+              "label": "ug inspect Boot/AdOverlay/Bar --component ProgressBar",
+              "requestBytes": 53,
+              "answerBytes": 195,
+              "seconds": 0.21,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp set_serialized_field {\"target\":\"Boot/AdOverlay/Bar\",\"component\":\"ProgressBar\",\"field\":\"_value\",\"value\":\"0.5\"}",
+              "requestBytes": 131,
+              "answerBytes": 250,
+              "seconds": 0.92,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp set_serialized_field {\"target\":\"Boot/AdOverlay/Bar\",\"component\":\"ProgressBar\",\"field\":\"_value\",\"value\":\"0.5\"}",
+              "requestBytes": 131,
+              "answerBytes": 250,
+              "seconds": 0.92,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp set_serialized_field {\"target\":\"Boot/AdOverlay/Bar\",\"component\":\"ProgressBar\",\"field\":\"_value\",\"value\":\"0.5\"}",
+              "requestBytes": 131,
+              "answerBytes": 250,
+              "seconds": 0.92,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "ug set Boot/AdOverlay/Bar _value 0.5 --component ProgressBar",
+              "requestBytes": 60,
+              "answerBytes": 83,
+              "seconds": 0.18,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp batch {\"operations\":[{\"id\":\"p\",\"command\":\"create_gameobject\",\"params\":{\"name\":\"Probe\",\"primitive\":\"cube\",\"parent\":\"Boot\"}},{\"command\":\"set_transform\",\"params\":{\"target\":\"$p.instanceId\",\"position\":[1,2,3]}},{\"command\":\"add_component\",\"params\":{\"target\":\"$p.instanceId\",\"type\":\"Rigidbody\"}}]}",
+              "requestBytes": 312,
+              "answerBytes": 1299,
+              "seconds": 0.45,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp batch {\"operations\":[{\"id\":\"p\",\"command\":\"create_gameobject\",\"params\":{\"name\":\"Probe\",\"primitive\":\"cube\",\"parent\":\"Boot\"}},{\"command\":\"set_transform\",\"params\":{\"target\":\"$p.instanceId\",\"position\":[1,2,3]}},{\"command\":\"add_component\",\"params\":{\"target\":\"$p.instanceId\",\"type\":\"Rigidbody\"}}]}",
+              "requestBytes": 312,
+              "answerBytes": 1299,
+              "seconds": 0.45,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp batch {\"operations\":[{\"id\":\"p\",\"command\":\"create_gameobject\",\"params\":{\"name\":\"Probe\",\"primitive\":\"cube\",\"parent\":\"Boot\"}},{\"command\":\"set_transform\",\"params\":{\"target\":\"$p.instanceId\",\"position\":[1,2,3]}},{\"command\":\"add_component\",\"params\":{\"target\":\"$p.instanceId\",\"type\":\"Rigidbody\"}}]}",
+              "requestBytes": 312,
+              "answerBytes": 1299,
+              "seconds": 0.45,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "ug batch \"object create Probe --parent Boot --primitive Cube\" \"set Boot/Probe m_LocalPosition 1,2,3\" \"component add Boot/Probe Rigidbody\"",
+              "requestBytes": 137,
+              "answerBytes": 433,
+              "seconds": 0.21,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp instantiate_prefab {\"prefab\":\"Assets/Prefabs/UI/ButtonPrimary.prefab\",\"name\":\"Btn\"}",
+              "requestBytes": 105,
+              "answerBytes": 235,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp set_serialized_field {\"target\":\"Btn\",\"component\":\"Button\",\"field\":\"m_Interactable\",\"value\":\"false\"}",
+              "requestBytes": 121,
+              "answerBytes": 231,
+              "seconds": 0.41,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"timeout\":30000,\"code\":\"var go = GameObject.Find(\\u0022Btn\\u0022); var mods = UnityEditor.PrefabUtility.GetPropertyModifications(go); return string.Join(\\u0022; \\u0022, System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(mods, m =\\u003E !(m.target is Transform) \\u0026\\u0026 m.propertyPath != \\u0022m_Name\\u0022), m =\\u003E m.target.GetType().Name \\u002B \\u0022.\\u0022 \\u002B m.propertyPath \\u002B \\u0022 = \\u0022 \\u002B m.value));\"}",
+              "requestBytes": 468,
+              "answerBytes": 102,
+              "seconds": 20.87,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp revert_prefab_overrides {\"instance\":\"Btn\"}",
+              "requestBytes": 64,
+              "answerBytes": 235,
+              "seconds": 0.31,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp instantiate_prefab {\"prefab\":\"Assets/Prefabs/UI/ButtonPrimary.prefab\",\"name\":\"Btn\"}",
+              "requestBytes": 105,
+              "answerBytes": 235,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp set_serialized_field {\"target\":\"Btn\",\"component\":\"Button\",\"field\":\"m_Interactable\",\"value\":\"false\"}",
+              "requestBytes": 121,
+              "answerBytes": 231,
+              "seconds": 0.41,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"timeout\":30000,\"code\":\"var go = GameObject.Find(\\u0022Btn\\u0022); var mods = UnityEditor.PrefabUtility.GetPropertyModifications(go); return string.Join(\\u0022; \\u0022, System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(mods, m =\\u003E !(m.target is Transform) \\u0026\\u0026 m.propertyPath != \\u0022m_Name\\u0022), m =\\u003E m.target.GetType().Name \\u002B \\u0022.\\u0022 \\u002B m.propertyPath \\u002B \\u0022 = \\u0022 \\u002B m.value));\"}",
+              "requestBytes": 468,
+              "answerBytes": 102,
+              "seconds": 20.87,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp revert_prefab_overrides {\"instance\":\"Btn\"}",
+              "requestBytes": 64,
+              "answerBytes": 235,
+              "seconds": 0.31,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp instantiate_prefab {\"prefab\":\"Assets/Prefabs/UI/ButtonPrimary.prefab\",\"name\":\"Btn\"}",
+              "requestBytes": 105,
+              "answerBytes": 235,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp set_serialized_field {\"target\":\"Btn\",\"component\":\"Button\",\"field\":\"m_Interactable\",\"value\":\"false\"}",
+              "requestBytes": 121,
+              "answerBytes": 231,
+              "seconds": 0.41,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"timeout\":30000,\"code\":\"var go = GameObject.Find(\\u0022Btn\\u0022); var mods = UnityEditor.PrefabUtility.GetPropertyModifications(go); return string.Join(\\u0022; \\u0022, System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(mods, m =\\u003E !(m.target is Transform) \\u0026\\u0026 m.propertyPath != \\u0022m_Name\\u0022), m =\\u003E m.target.GetType().Name \\u002B \\u0022.\\u0022 \\u002B m.propertyPath \\u002B \\u0022 = \\u0022 \\u002B m.value));\"}",
+              "requestBytes": 468,
+              "answerBytes": 102,
+              "seconds": 20.87,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp revert_prefab_overrides {\"instance\":\"Btn\"}",
+              "requestBytes": 64,
+              "answerBytes": 235,
+              "seconds": 0.31,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "ug batch \"object create Btn --parent Boot/AdOverlay --prefab Assets/Prefabs/UI/ButtonPrimary.prefab\" \"set Boot/AdOverlay/Btn m_Interactable false --component Button\" \"prefab overrides Boot/AdOverlay/Btn\" \"prefab revert Boot/AdOverlay/Btn\"",
+              "requestBytes": 238,
+              "answerBytes": 749,
+              "seconds": 0.41,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C5",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp console_status {}",
+              "requestBytes": 39,
+              "answerBytes": 448,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.13,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 2.08,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 144,
+              "seconds": 6.13,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 144,
+              "seconds": 6.1,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 25.29,
+              "exit": 0
+            },
+            {
+              "label": "sleep 3",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 3.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp console {\"level\":\"error\",\"since\":\"${cursor}\",\"since_session\":\"${session}\"}",
+              "requestBytes": 112,
+              "answerBytes": 448,
+              "seconds": 0.01,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.02,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.46,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp console_status {}",
+              "requestBytes": 39,
+              "answerBytes": 448,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.13,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 2.08,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 144,
+              "seconds": 6.13,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 144,
+              "seconds": 6.1,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 25.29,
+              "exit": 0
+            },
+            {
+              "label": "sleep 3",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 3.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp console {\"level\":\"error\",\"since\":\"${cursor}\",\"since_session\":\"${session}\"}",
+              "requestBytes": 112,
+              "answerBytes": 448,
+              "seconds": 0.01,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.02,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.46,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp console_status {}",
+              "requestBytes": 39,
+              "answerBytes": 448,
+              "seconds": 0.06,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.13,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 2.08,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 144,
+              "seconds": 6.13,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 144,
+              "seconds": 6.1,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 25.29,
+              "exit": 0
+            },
+            {
+              "label": "sleep 3",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 3.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp console {\"level\":\"error\",\"since\":\"${cursor}\",\"since_session\":\"${session}\"}",
+              "requestBytes": 112,
+              "answerBytes": 448,
+              "seconds": 0.01,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.02,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.46,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "ug play --for 3",
+              "requestBytes": 15,
+              "answerBytes": 60,
+              "seconds": 14.7,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp recompile {}",
+              "requestBytes": 34,
+              "answerBytes": 220,
+              "seconds": 1.37,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile_status {}",
+              "requestBytes": 41,
+              "answerBytes": 195,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile {}",
+              "requestBytes": 34,
+              "answerBytes": 92,
+              "seconds": 1.49,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile_status {}",
+              "requestBytes": 41,
+              "answerBytes": 75,
+              "seconds": 0,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.5,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 6.97,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp recompile {}",
+              "requestBytes": 34,
+              "answerBytes": 220,
+              "seconds": 1.37,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile_status {}",
+              "requestBytes": 41,
+              "answerBytes": 195,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile {}",
+              "requestBytes": 34,
+              "answerBytes": 92,
+              "seconds": 1.49,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile_status {}",
+              "requestBytes": 41,
+              "answerBytes": 75,
+              "seconds": 0,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.5,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 6.97,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp recompile {}",
+              "requestBytes": 34,
+              "answerBytes": 220,
+              "seconds": 1.37,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile_status {}",
+              "requestBytes": 41,
+              "answerBytes": 195,
+              "seconds": 0.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile {}",
+              "requestBytes": 34,
+              "answerBytes": 92,
+              "seconds": 1.49,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp recompile_status {}",
+              "requestBytes": 41,
+              "answerBytes": 75,
+              "seconds": 0,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.5,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 6.97,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "ug compile",
+              "requestBytes": 10,
+              "answerBytes": 139,
+              "seconds": 1.15,
+              "exit": 0
+            },
+            {
+              "label": "ug compile",
+              "requestBytes": 10,
+              "answerBytes": 29,
+              "seconds": 11.3,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C7",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp screenshot {\"view\":\"game\",\"width\":960,\"height\":540}",
+              "requestBytes": 73,
+              "answerBytes": 328,
+              "seconds": 0.31,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"var probe = GameObject.Find(\\u0022Boot/Probe\\u0022); var cam = new GameObject(\\u0022o10cam\\u0022).AddComponent\\u003CCamera\\u003E(); cam.transform.position = new Vector3(4, 4, -4); cam.transform.LookAt(probe.transform); var rt = new RenderTexture(960, 540, 24); cam.targetTexture = rt; cam.Render(); RenderTexture.active = rt; var tex = new Texture2D(960, 540, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0); tex.Apply(); RenderTexture.active = null; System.IO.File.WriteAllBytes(\\u0022Temp/o10-view.png\\u0022, tex.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(cam.gameObject); UnityEngine.Object.DestroyImmediate(tex); rt.Release(); UnityEngine.Object.DestroyImmediate(rt); return \\u0022Temp/o10-view.png\\u0022;\"}",
+              "requestBytes": 784,
+              "answerBytes": 94,
+              "seconds": 3.97,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp screenshot {\"view\":\"game\",\"width\":960,\"height\":540}",
+              "requestBytes": 73,
+              "answerBytes": 328,
+              "seconds": 0.31,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"var probe = GameObject.Find(\\u0022Boot/Probe\\u0022); var cam = new GameObject(\\u0022o10cam\\u0022).AddComponent\\u003CCamera\\u003E(); cam.transform.position = new Vector3(4, 4, -4); cam.transform.LookAt(probe.transform); var rt = new RenderTexture(960, 540, 24); cam.targetTexture = rt; cam.Render(); RenderTexture.active = rt; var tex = new Texture2D(960, 540, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0); tex.Apply(); RenderTexture.active = null; System.IO.File.WriteAllBytes(\\u0022Temp/o10-view.png\\u0022, tex.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(cam.gameObject); UnityEngine.Object.DestroyImmediate(tex); rt.Release(); UnityEngine.Object.DestroyImmediate(rt); return \\u0022Temp/o10-view.png\\u0022;\"}",
+              "requestBytes": 784,
+              "answerBytes": 94,
+              "seconds": 3.97,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp screenshot {\"view\":\"game\",\"width\":960,\"height\":540}",
+              "requestBytes": 73,
+              "answerBytes": 328,
+              "seconds": 0.31,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"var probe = GameObject.Find(\\u0022Boot/Probe\\u0022); var cam = new GameObject(\\u0022o10cam\\u0022).AddComponent\\u003CCamera\\u003E(); cam.transform.position = new Vector3(4, 4, -4); cam.transform.LookAt(probe.transform); var rt = new RenderTexture(960, 540, 24); cam.targetTexture = rt; cam.Render(); RenderTexture.active = rt; var tex = new Texture2D(960, 540, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0); tex.Apply(); RenderTexture.active = null; System.IO.File.WriteAllBytes(\\u0022Temp/o10-view.png\\u0022, tex.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(cam.gameObject); UnityEngine.Object.DestroyImmediate(tex); rt.Release(); UnityEngine.Object.DestroyImmediate(rt); return \\u0022Temp/o10-view.png\\u0022;\"}",
+              "requestBytes": 784,
+              "answerBytes": 94,
+              "seconds": 3.97,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 1,
+          "of": 1,
+          "steps": [
+            {
+              "label": "ug shot game",
+              "requestBytes": 12,
+              "answerBytes": 74,
+              "seconds": 0.24,
+              "exit": 0
+            },
+            {
+              "label": "ug shot --from 4,4,-4 --look Boot/Probe",
+              "requestBytes": 39,
+              "answerBytes": 156,
+              "seconds": 0.2,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C9",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.09,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.71,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 9.92,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"UnityEditorInternal.ProfilerDriver.ClearAllFrames(); UnityEditorInternal.ProfilerDriver.enabled = true; return UnityEditorInternal.ProfilerDriver.lastFrameIndex;\"}",
+              "requestBytes": 199,
+              "answerBytes": 77,
+              "seconds": 4.13,
+              "exit": 0
+            },
+            {
+              "label": "sleep 1",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 1.06,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"timeout\":30000,\"code\":\"UnityEditorInternal.ProfilerDriver.enabled = false; int first = UnityEditorInternal.ProfilerDriver.firstFrameIndex, last = UnityEditorInternal.ProfilerDriver.lastFrameIndex; var self = new System.Collections.Generic.Dictionary\\u003Cstring, double\\u003E(); var ids = new System.Collections.Generic.List\\u003Cint\\u003E(); for (int f = first; f \\u003C= last; f\\u002B\\u002B) { using (var view = UnityEditorInternal.ProfilerDriver.GetHierarchyFrameDataView(f, 0, UnityEditor.Profiling.HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime, false)) { if (!view.valid) continue; var stack = new System.Collections.Generic.Stack\\u003Cint\\u003E(); int root = view.GetRootItemID(); stack.Push(root); while (stack.Count \\u003E 0) { int id = stack.Pop(); if (id != root) { string n = view.GetItemName(id); double t = view.GetItemColumnDataAsFloat(id, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime); self[n] = (self.TryGetValue(n, out var v) ? v : 0) \\u002B t; } ids.Clear(); view.GetItemChildren(id, ids); foreach (int c in ids) stack.Push(c); } } } int frames = last - first \\u002B 1; return frames \\u002B \\u0022 frames; self ms a frame: \\u0022 \\u002B string.Join(\\u0022, \\u0022, System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(self, kv =\\u003E kv.Value), 10), kv =\\u003E kv.Key \\u002B \\u0022 \\u0022 \\u002B (kv.Value / frames).ToString(\\u00220.00\\u0022)));\"}",
+              "requestBytes": 1532,
+              "answerBytes": 326,
+              "seconds": 0.82,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.12,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.53,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.09,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.71,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 9.92,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"UnityEditorInternal.ProfilerDriver.ClearAllFrames(); UnityEditorInternal.ProfilerDriver.enabled = true; return UnityEditorInternal.ProfilerDriver.lastFrameIndex;\"}",
+              "requestBytes": 199,
+              "answerBytes": 77,
+              "seconds": 4.13,
+              "exit": 0
+            },
+            {
+              "label": "sleep 1",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 1.06,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"timeout\":30000,\"code\":\"UnityEditorInternal.ProfilerDriver.enabled = false; int first = UnityEditorInternal.ProfilerDriver.firstFrameIndex, last = UnityEditorInternal.ProfilerDriver.lastFrameIndex; var self = new System.Collections.Generic.Dictionary\\u003Cstring, double\\u003E(); var ids = new System.Collections.Generic.List\\u003Cint\\u003E(); for (int f = first; f \\u003C= last; f\\u002B\\u002B) { using (var view = UnityEditorInternal.ProfilerDriver.GetHierarchyFrameDataView(f, 0, UnityEditor.Profiling.HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime, false)) { if (!view.valid) continue; var stack = new System.Collections.Generic.Stack\\u003Cint\\u003E(); int root = view.GetRootItemID(); stack.Push(root); while (stack.Count \\u003E 0) { int id = stack.Pop(); if (id != root) { string n = view.GetItemName(id); double t = view.GetItemColumnDataAsFloat(id, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime); self[n] = (self.TryGetValue(n, out var v) ? v : 0) \\u002B t; } ids.Clear(); view.GetItemChildren(id, ids); foreach (int c in ids) stack.Push(c); } } } int frames = last - first \\u002B 1; return frames \\u002B \\u0022 frames; self ms a frame: \\u0022 \\u002B string.Join(\\u0022, \\u0022, System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(self, kv =\\u003E kv.Value), 10), kv =\\u003E kv.Key \\u002B \\u0022 \\u0022 \\u002B (kv.Value / frames).ToString(\\u00220.00\\u0022)));\"}",
+              "requestBytes": 1532,
+              "answerBytes": 326,
+              "seconds": 0.82,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.12,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.53,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.09,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.71,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 9.92,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"UnityEditorInternal.ProfilerDriver.ClearAllFrames(); UnityEditorInternal.ProfilerDriver.enabled = true; return UnityEditorInternal.ProfilerDriver.lastFrameIndex;\"}",
+              "requestBytes": 199,
+              "answerBytes": 77,
+              "seconds": 4.13,
+              "exit": 0
+            },
+            {
+              "label": "sleep 1",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 1.06,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"timeout\":30000,\"code\":\"UnityEditorInternal.ProfilerDriver.enabled = false; int first = UnityEditorInternal.ProfilerDriver.firstFrameIndex, last = UnityEditorInternal.ProfilerDriver.lastFrameIndex; var self = new System.Collections.Generic.Dictionary\\u003Cstring, double\\u003E(); var ids = new System.Collections.Generic.List\\u003Cint\\u003E(); for (int f = first; f \\u003C= last; f\\u002B\\u002B) { using (var view = UnityEditorInternal.ProfilerDriver.GetHierarchyFrameDataView(f, 0, UnityEditor.Profiling.HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime, false)) { if (!view.valid) continue; var stack = new System.Collections.Generic.Stack\\u003Cint\\u003E(); int root = view.GetRootItemID(); stack.Push(root); while (stack.Count \\u003E 0) { int id = stack.Pop(); if (id != root) { string n = view.GetItemName(id); double t = view.GetItemColumnDataAsFloat(id, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime); self[n] = (self.TryGetValue(n, out var v) ? v : 0) \\u002B t; } ids.Clear(); view.GetItemChildren(id, ids); foreach (int c in ids) stack.Push(c); } } } int frames = last - first \\u002B 1; return frames \\u002B \\u0022 frames; self ms a frame: \\u0022 \\u002B string.Join(\\u0022, \\u0022, System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(self, kv =\\u003E kv.Value), 10), kv =\\u003E kv.Key \\u002B \\u0022 \\u0022 \\u002B (kv.Value / frames).ToString(\\u00220.00\\u0022)));\"}",
+              "requestBytes": 1532,
+              "answerBytes": 326,
+              "seconds": 0.82,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.12,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.53,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 3,
+          "of": 3,
+          "steps": [
+            {
+              "label": "ug play",
+              "requestBytes": 7,
+              "answerBytes": 28,
+              "seconds": 12.25,
+              "exit": 0
+            },
+            {
+              "label": "ug perf --record 1",
+              "requestBytes": 18,
+              "answerBytes": 1334,
+              "seconds": 1.74,
+              "exit": 0
+            },
+            {
+              "label": "ug stop",
+              "requestBytes": 7,
+              "answerBytes": 43,
+              "seconds": 0.83,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C10",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.22,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.61,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 10.39,
+              "exit": 0
+            },
+            {
+              "label": "sleep 4",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 4.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp find_gameobjects {\"type\":\"UnityEngine.UI.Button\"}",
+              "requestBytes": 71,
+              "answerBytes": 591,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"var b = GameObject.Find(\\u0022UI/Safe/Sheet/Deploy\\u0022); UnityEngine.EventSystems.ExecuteEvents.Execute(b, new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler); return \\u0022clicked \\u0022 \\u002B b.name;\"}",
+              "requestBytes": 343,
+              "answerBytes": 91,
+              "seconds": 4.35,
+              "exit": 0
+            },
+            {
+              "label": "sleep 3",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 3.05,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp list_open_scenes {}",
+              "requestBytes": 41,
+              "answerBytes": 224,
+              "seconds": 0.01,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.02,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.48,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "codegraph",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.22,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.61,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 10.39,
+              "exit": 0
+            },
+            {
+              "label": "sleep 4",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 4.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp find_gameobjects {\"type\":\"UnityEngine.UI.Button\"}",
+              "requestBytes": 71,
+              "answerBytes": 591,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"var b = GameObject.Find(\\u0022UI/Safe/Sheet/Deploy\\u0022); UnityEngine.EventSystems.ExecuteEvents.Execute(b, new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler); return \\u0022clicked \\u0022 \\u002B b.name;\"}",
+              "requestBytes": 343,
+              "answerBytes": 91,
+              "seconds": 4.35,
+              "exit": 0
+            },
+            {
+              "label": "sleep 3",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 3.05,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp list_open_scenes {}",
+              "requestBytes": 41,
+              "answerBytes": 224,
+              "seconds": 0.01,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.02,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.48,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "graphify",
+          "ran": true,
+          "leg": "unity-editor-mcp",
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "mcp unity-editor-mcp editor_play {}",
+              "requestBytes": 36,
+              "answerBytes": 18,
+              "seconds": 0.22,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 110,
+              "seconds": 0.61,
+              "exit": 1
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 245,
+              "seconds": 10.39,
+              "exit": 0
+            },
+            {
+              "label": "sleep 4",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 4.04,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp find_gameobjects {\"type\":\"UnityEngine.UI.Button\"}",
+              "requestBytes": 71,
+              "answerBytes": 591,
+              "seconds": 0.1,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp eval {\"code\":\"var b = GameObject.Find(\\u0022UI/Safe/Sheet/Deploy\\u0022); UnityEngine.EventSystems.ExecuteEvents.Execute(b, new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler); return \\u0022clicked \\u0022 \\u002B b.name;\"}",
+              "requestBytes": 343,
+              "answerBytes": 91,
+              "seconds": 4.35,
+              "exit": 0
+            },
+            {
+              "label": "sleep 3",
+              "requestBytes": 7,
+              "answerBytes": 0,
+              "seconds": 3.05,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp list_open_scenes {}",
+              "requestBytes": 41,
+              "answerBytes": 224,
+              "seconds": 0.01,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_stop {}",
+              "requestBytes": 36,
+              "answerBytes": 17,
+              "seconds": 0.02,
+              "exit": 0
+            },
+            {
+              "label": "mcp unity-editor-mcp editor_status {}",
+              "requestBytes": 38,
+              "answerBytes": 243,
+              "seconds": 0.48,
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "arm": "unitygraph",
+          "ran": true,
+          "found": 2,
+          "of": 2,
+          "steps": [
+            {
+              "label": "ug play",
+              "requestBytes": 7,
+              "answerBytes": 28,
+              "seconds": 12.54,
+              "exit": 0
+            },
+            {
+              "label": "ug wait 4",
+              "requestBytes": 9,
+              "answerBytes": 153,
+              "seconds": 4.31,
+              "exit": 0
+            },
+            {
+              "label": "ug ui",
+              "requestBytes": 5,
+              "answerBytes": 210,
+              "seconds": 0.24,
+              "exit": 0
+            },
+            {
+              "label": "ug click DEPLOY",
+              "requestBytes": 15,
+              "answerBytes": 97,
+              "seconds": 0.47,
+              "exit": 0
+            },
+            {
+              "label": "ug wait 3",
+              "requestBytes": 9,
+              "answerBytes": 167,
+              "seconds": 3.54,
+              "exit": 0
+            },
+            {
+              "label": "ug stop",
+              "requestBytes": 7,
+              "answerBytes": 43,
+              "seconds": 0.79,
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C8",
+      "kind": "chore",
+      "arms": [
+        {
+          "arm": "grep",
+          "ran": false,
+          "reason": "needs scenes-saved",
+          "found": 0,
+          "of": 0
+        },
+        {
+          "arm": "codegraph",
+          "ran": false,
+          "reason": "needs scenes-saved",
+          "found": 0,
+          "of": 0
+        },
+        {
+          "arm": "graphify",
+          "ran": false,
+          "reason": "needs scenes-saved",
+          "found": 0,
+          "of": 0
+        },
+        {
+          "arm": "unitygraph",
+          "ran": false,
+          "reason": "needs scenes-saved",
+          "found": 0,
+          "of": 0
+        }
+      ]
+    }
+  ],
+  "idle": [
+    {
+      "arm": "grep",
+      "alwaysBytes": 6037,
+      "onUseBytes": 10790,
+      "detail": "mcp unity-editor-mcp 151 tools, 16 used"
+    },
+    {
+      "arm": "codegraph",
+      "alwaysBytes": 6071,
+      "onUseBytes": 12529,
+      "detail": "mcp codegraph 1 tools, 1 used; mcp unity-editor-mcp 151 tools, 16 used"
+    },
+    {
+      "arm": "graphify",
+      "alwaysBytes": 6405,
+      "onUseBytes": 54112,
+      "detail": "skill graphify; mcp unity-editor-mcp 151 tools, 16 used"
+    },
+    {
+      "arm": "unitygraph",
+      "alwaysBytes": 105,
+      "onUseBytes": 2396,
+      "detail": "skill unity"
+    }
+  ],
+  "budgets": [
+    {
+      "name": "skill description",
+      "ok": true,
+      "detail": "27/300"
+    },
+    {
+      "name": "skill body",
+      "ok": true,
+      "detail": "599/600"
+    },
+    {
+      "name": "compile gate",
+      "ok": true,
+      "detail": "0 bytes clean, 20/20 error lines"
+    }
+  ]
+}
