@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\UnityGraph.Hooks\UnityGraph.Hooks.csproj" />
+    <ProjectReference Include="..\UnityGraph.Stats\UnityGraph.Stats.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UnityGraph.Bench.Tests" />
+  </ItemGroup>
+</Project>

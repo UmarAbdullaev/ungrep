@@ -1,0 +1,535 @@
+// purge-squad suite (specs/SPEC-bench.md). Keys hold for commit 9ce9995 (branch rebuild); each
+// key's "checked" says how it was verified by hand. Steps are answer-blind: they use names from
+// the question or from an earlier answer of the same arm, never from the key.
+{
+  "suite": "purge-squad",
+  "project": "D:/Projects/Unity/purge-squad",
+  "commit": "9ce9995",
+  "needs": {
+    "editor": "ug status | grep -q '  idle  '",
+    "scenes-saved": "! ug scene | grep -q '  modified  '",
+    "codegraph-index": "test -d .codegraph",
+    "graphify-graph": "test -f graphify-out/graph.json"
+  },
+  "servers": {
+    "unity-editor-mcp": { "command": "unity", "args": ["mcp", "--project-path", "."] },
+    "codegraph": { "command": "codegraph", "args": ["serve", "--mcp"] }
+  },
+  "arms": {
+    "grep": {
+      "agent": {
+        "mcp": ["unity-editor-mcp"],
+        "disallowedTools": ["Bash(ug:*)", "Bash(codegraph:*)", "Bash(graphify:*)", "Skill(graphify)"]
+      }
+    },
+    "codegraph": {
+      "needs": ["codegraph-index"],
+      "own": "mcp__codegraph__|(^|[\\s;&|(])codegraph\\s",
+      "agent": {
+        "mcp": ["codegraph", "unity-editor-mcp"],
+        "disallowedTools": ["Bash(ug:*)", "Bash(graphify:*)", "Skill(graphify)"]
+      }
+    },
+    "graphify": {
+      "needs": ["graphify-graph"],
+      "own": "(^|[\\s;&|(])graphify\\s|Skill\\(graphify",
+      "skills": ["~/.claude/skills/graphify/SKILL.md"],
+      "agent": {
+        "mcp": ["unity-editor-mcp"],
+        "disallowedTools": ["Bash(ug:*)", "Bash(codegraph:*)"]
+      }
+    },
+    "unitygraph": {
+      "own": "(^|[\\s;&|(])ug\\s|Skill\\(unitygraph",
+      "skills": ["${plugin}/skills/unity/SKILL.md"],
+      "agent": {
+        "pluginDir": true,
+        "disallowedTools": ["Bash(codegraph:*)", "Bash(graphify:*)", "Skill(graphify)"]
+      }
+    }
+  },
+  "agentPrompt": "Answer in at most 12 lines; give file:line for each place you name. Do not save scenes or assets.",
+  "gate": "Assets/UnityGraphBenchProbe.cs",
+  "questions": [
+    {
+      "id": "N1",
+      "kind": "navigation",
+      "prompt": "Where is the class RunDirector defined, and which Unity messages (Awake, Start, OnEnable, ...) does it implement?",
+      "key": {
+        "items": ["RunDirector\\.cs\\D{1,12}2[34]\\b", "\\bAwake\\b", "\\bOnEnable\\b", "\\bOnDisable\\b", "\\bStart\\b"],
+        "not": ["\\bUpdate\\b", "\\bOnDestroy\\b"],
+        "checked": "2026-10-11, RunDirector.cs read whole: attribute at 23 (ug explain starts there), class at 24; Awake 90, OnEnable 101, OnDisable 108, Start 117; no other Unity message"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep -rn \"class RunDirector\" Assets --include=*.cs" },
+          { "run": "grep -nE \"void (Awake|Start|OnEnable|OnDisable|Update|FixedUpdate|LateUpdate|OnDestroy|OnValidate|Reset|OnApplication\\w+|OnTrigger\\w+|OnCollision\\w+)\\s*\\(\" Assets/Scripts/Run/RunDirector.cs" }
+        ],
+        "unitygraph": [
+          { "run": "ug explain RunDirector" }
+        ]
+      }
+    },
+    {
+      "id": "N2",
+      "kind": "navigation",
+      "prompt": "Which methods call Wallet.TrySpend (either overload)?",
+      "key": {
+        "items": [
+          "Fabrication\\.cs\\D{1,12}32\\b", "\\bTryFabricate\\b",
+          "TrySpend_MoreThanHeld_FailsAndChangesNothing", "TrySpend_ExactlyWhatIsHeld_LeavesZero", "TrySpend_Cost_IsAllOrNothing",
+          "TrySpend_Cost_TakesEveryResource", "TrySpend_Cost_SumsRepeatedEntries", "TrySpend_NegativeAmount_Throws"
+        ],
+        "checked": "2026-10-11, grep TrySpend over Assets and each hit read: overloads at Wallet.cs:67 and :84; Fabrication.TryFabricate :32; WalletTests.cs lines 67, 77, 91, 102, 115, 122, 123 in the six named tests; no other caller"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep -rn \"TrySpend(\" Assets --include=*.cs" },
+          { "run": "grep -nE \"^\\s*(public|private|internal|protected)?\\s*(static\\s+)?\\w+\\s+\\w+\\s*\\(\" Assets/Scripts/Economy/Fabrication.cs Assets/Tests/EditMode/WalletTests.cs" }
+        ],
+        "unitygraph": [
+          { "run": "ug refs Wallet.TrySpend" }
+        ]
+      }
+    },
+    {
+      "id": "N3",
+      "kind": "navigation",
+      "prompt": "Which methods subscribe to the Health.Died event?",
+      "key": {
+        "items": ["Enemy\\.cs\\D{1,12}66\\b", "PlayerCharacter\\.cs\\D{1,12}92\\b", "RunDirector\\.cs\\D{1,12}105\\b", "\\bAwake\\b", "\\bOnEnable\\b"],
+        "not": ["TakeHit[^\\n]{0,40}subscri"],
+        "checked": "2026-10-11, grep Died over Assets/*.cs, each hit read: += in Enemy.Awake (Enemy.cs:66), PlayerCharacter.OnEnable (:92), RunDirector.OnEnable (:105); -= in PlayerCharacter.OnDisable 93, RunDirector.OnDisable 112; raised in Health.TakeHit 95"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep -rnw \"Died\" Assets --include=*.cs" },
+          { "run": "grep -nE \"void \\w+\\s*\\(\" Assets/Scripts/Combat/Enemy.cs Assets/Scripts/Combat/PlayerCharacter.cs Assets/Scripts/Run/RunDirector.cs" }
+        ],
+        "unitygraph": [
+          { "run": "ug refs Health.Died" }
+        ]
+      }
+    },
+    {
+      "id": "N4",
+      "kind": "navigation",
+      "prompt": "Which concrete classes implement IPartRule, directly or through an interface that extends it?",
+      "key": {
+        "items": ["\\bStraightPayload\\b", "\\bSimpleEmitter\\b", "\\bOnKillVolleyTrigger\\b", "WeaponRules\\.cs\\D{1,12}10\\b", "WeaponRules\\.cs\\D{1,12}71\\b", "WeaponRules\\.cs\\D{1,12}125\\b"],
+        "checked": "2026-10-11, WeaponPartDef.cs and WeaponRules.cs read: IPartRule (WeaponPartDef.cs:40) is extended by IPayload 45, IEmitter 61, ITrigger 71; implemented by StraightPayload (WeaponRules.cs:10), SimpleEmitter (:71), OnKillVolleyTrigger (:125); grep for each interface name over Assets finds no other implementer"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep -rnw \"IPartRule\" Assets --include=*.cs" },
+          { "run": "grep -rnE \"(class|struct)\\s+\\w+[^{]*:[^{]*\\b(IPartRule|IPayload|IEmitter|ITrigger)\\b\" Assets --include=*.cs" }
+        ],
+        "unitygraph": [
+          { "run": "ug refs IPartRule" },
+          { "run": "ug refs IPayload" },
+          { "run": "ug refs IEmitter" },
+          { "run": "ug refs ITrigger" }
+        ]
+      }
+    },
+    {
+      "id": "N5",
+      "kind": "navigation",
+      "prompt": "What breaks if the serialized field ProgressBar._value is renamed?",
+      "key": {
+        "items": ["ProgressBar\\.prefab", "RevivePanel\\.prefab", "\\bValue\\b|get => _value|ProgressBar\\.cs\\D{1,12}(18|21|40)\\b|(?m)^(18|21|40):"],
+        "not": ["HealthBar\\.cs[^\\n]{0,60}breaks"],
+        "checked": "2026-10-11, ProgressBar.cs read (field at 14; code uses at 18 and 21 in the Value property, 40 in OnGUI); grep _value over every prefab and scene holding the script guid: data in ProgressBar.prefab:80, override `Countdown: _value = 1` in RevivePanel.prefab:368-369; HealthBar._value (HealthBar.cs:18) is another class's field"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs" },
+          { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
+          { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity --include=*.asset" },
+          { "run": "grep -n \"_value\" Assets/Prefabs/UI/ProgressBar.prefab Assets/Prefabs/UI/MapNode.prefab Assets/Prefabs/Panels/Run/ResultsPanel.prefab Assets/Prefabs/Panels/Run/RevivePanel.prefab Assets/Scenes/Arena_Greybox.unity Assets/Scenes/Boot.unity" }
+        ],
+        "unitygraph": [
+          { "run": "ug impact ProgressBar._value" },
+          { "run": "grep -n \"_value\" Assets/Scripts/UI/ProgressBar.cs" }
+        ]
+      }
+    },
+    {
+      "id": "A1",
+      "kind": "asset",
+      "prompt": "Which prefabs and scenes use the ProgressBar script?",
+      "key": {
+        "items": ["ProgressBar\\.prefab", "MapNode\\.prefab", "ResultsPanel\\.prefab", "RevivePanel\\.prefab", "Arena_Greybox\\.unity", "Boot\\.unity"],
+        "checked": "2026-10-11, O10 chore 11 re-checked: grep of the script guid and of ProgressBar.prefab's guid over prefabs and scenes, each hit read: ProgressBar.prefab:80; MapNode.prefab:323; ResultsPanel.prefab:784; RevivePanel.prefab:54; Arena_Greybox.unity (HealthBar 377, RunHud 455); Boot.unity (PlaceholderAds 241, LoadingWindow 832)"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep guid Assets/Scripts/UI/ProgressBar.cs.meta" },
+          { "run": "grep -rl 4c022aa4dc526cd49814d0f16cd7cb71 Assets --include=*.prefab --include=*.unity" }
+        ],
+        "unitygraph": [
+          { "run": "ug impact ProgressBar" }
+        ]
+      }
+    },
+    {
+      "id": "A2",
+      "kind": "asset",
+      "prompt": "Which scenes and prefabs use the prefab Assets/Prefabs/UI/ButtonPrimary.prefab?",
+      "key": {
+        "items": ["ResultsPanel\\.prefab", "LabPanel\\.prefab", "FabricatePanel\\.prefab", "LocatePanel\\.prefab", "GalaxyMap\\.unity"],
+        "checked": "2026-10-11, grep of the prefab guid c4bb93726453a2e45977d1d160cb09f2 over Assets, each file read at the hit: instances Continue (ResultsPanel.prefab), Deploy (LabPanel.prefab, GalaxyMap.unity), Fabricate (FabricatePanel.prefab), Locate (LocatePanel.prefab); no other user"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep guid Assets/Prefabs/UI/ButtonPrimary.prefab.meta" },
+          { "run": "grep -rl c4bb93726453a2e45977d1d160cb09f2 Assets --include=*.prefab --include=*.unity" }
+        ],
+        "unitygraph": [
+          { "run": "ug refs Assets/Prefabs/UI/ButtonPrimary.prefab" }
+        ]
+      }
+    },
+    {
+      "id": "A3",
+      "kind": "asset",
+      "prompt": "Which prefabs use the material Assets/Materials/Gun_Metal.mat, and on which objects?",
+      "key": {
+        "items": [
+          "Core_Burst", "Core_Homing", "Core_Single", "Core_Spread", "Front_Bullet", "Front_Laser", "Front_Rocket",
+          "\\bBody\\b", "\\bTip\\b", "\\bProngL\\b", "\\bProngR\\b", "\\bTube\\b"
+        ],
+        "checked": "2026-10-11, grep of the material guid 39f287a42b19a594a91e2edd041ed306 over Assets: only the 7 part prefabs; each renderer's m_GameObject followed to its m_Name: Body in the four Core_ prefabs, Tip (Front_Bullet), ProngL and ProngR (Front_Laser), Tube (Front_Rocket)"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep guid Assets/Materials/Gun_Metal.mat.meta" },
+          { "run": "grep -rln 39f287a42b19a594a91e2edd041ed306 Assets --include=*.prefab --include=*.unity" },
+          { "run": "grep -rn -B20 39f287a42b19a594a91e2edd041ed306 Assets/Prefabs --include=*.prefab | grep m_GameObject" },
+          { "run": "awk '/&(113781415653558998|2810758817136334446|5491663651673104656|6780681183313136275|2296644112916184566|4513111936334990472|5415552943172750737|4724468569595232565)$/ { f = FILENAME } f && /m_Name:/ { print f \": \" $0; f = \"\" }' Assets/Prefabs/Weapons/Parts/*.prefab" }
+        ],
+        "unitygraph": [
+          { "run": "ug refs Assets/Materials/Gun_Metal.mat" }
+        ]
+      }
+    },
+    {
+      "id": "A4",
+      "kind": "asset",
+      "prompt": "In the scene Arena_Greybox, what is assigned to RunDirector's fields _nodes, _rooms, _spawner, _player and _fade?",
+      "key": {
+        "items": ["NodeCatalog", "SolReach_Rooms", "\\bWaves\\b", "\\bPlayer\\b", "\\bRoomFade\\b"],
+        "checked": "2026-10-11, Arena_Greybox.unity read at the RunDirector component (line 3386 on): _nodes NodeCatalog.asset, _rooms SolReach_Rooms.asset (guids followed to their .meta), _spawner the WaveSpawner on Waves (1063757135 -> GameObject 1063757134), _player the Player prefab instance (stripped 223296612, instance 223296611, Player.prefab), _fade the ScreenFade on RoomFade (1835141970 -> 1835141965)"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep guid Assets/Scripts/Run/RunDirector.cs.meta" },
+          { "run": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity" },
+          { "run": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject" },
+          { "run": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta" },
+          { "run": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity" }
+        ],
+        "unitygraph": [
+          { "run": "ug explain RunDirector" },
+          { "run": "grep -n -A14 \"guid: 60d50cde1992a8f49b6fcd9d19278fa1\" Assets/Scenes/Arena_Greybox.unity" },
+          { "run": "grep -n -A6 -e '&1063757135$' -e '&223296612 stripped' -e '&1835141970$' Assets/Scenes/Arena_Greybox.unity | grep -e '---' -e m_GameObject -e m_CorrespondingSourceObject" },
+          { "run": "grep -rl -e 30f216da37734ce4398d1a4da6732b4a -e fa91a8cd078791345bddec25d136f2d3 -e 90323ddedac07474eb31a0ab2441a061 Assets --include=*.meta" },
+          { "run": "awk '/&(1063757134|1835141965)$/ { f = 1 } f && /m_Name:/ { print NR \": \" $0; f = 0 }' Assets/Scenes/Arena_Greybox.unity" }
+        ]
+      }
+    },
+    {
+      "id": "A5",
+      "kind": "asset",
+      "prompt": "Which data assets spawn the enemy prefab Assets/Prefabs/Enemies/Enemy_Shooter.prefab?",
+      "key": {
+        "items": [
+          "C1_Central", "C1_Sat1", "C1_Sat2", "C1_Sat3", "C2_Sat1", "C2_Sat2", "C2_Sat3",
+          "C3_Central", "C3_Sat1", "C3_Sat2", "C3_Sat3"
+        ],
+        "not": ["C2_Central"],
+        "checked": "2026-10-11, grep of the prefab guid f62d13d931b1f8347bcc5d21ca5cc9f0 over Assets: 11 node assets in Assets/Data/Nodes (C1_Central, C1_Sat1-3, C2_Sat1-3, C3_Central, C3_Sat1-3), each as a wave group's _prefab; C2_Central does not use it; no prefab or scene does"
+      },
+      "steps": {
+        "grep": [
+          { "run": "grep guid Assets/Prefabs/Enemies/Enemy_Shooter.prefab.meta" },
+          { "run": "grep -rl f62d13d931b1f8347bcc5d21ca5cc9f0 Assets --include=*.asset --include=*.prefab --include=*.unity" }
+        ],
+        "unitygraph": [
+          { "run": "ug refs Assets/Prefabs/Enemies/Enemy_Shooter.prefab" },
+          { "run": "ug refs 'Assets/Prefabs/Enemies/Enemy_Shooter.prefab' --budget 2400", "redo": "the first answer was cut at the budget" },
+          { "run": "ug refs 'Assets/Prefabs/Enemies/Enemy_Shooter.prefab' --budget 4800", "redo": "the second answer was cut at the budget" }
+        ]
+      }
+    },
+    {
+      "id": "C1",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "In the open editor, find the progress bar object named Bar and read its live ProgressBar values.",
+      "key": {
+        "items": ["AdOverlay/Bar", "_value\\W{1,20}(float\\W+)?\\d|\"name\":\\s*\"_value\"[^}]*\"value\":\\s*-?\\d"],
+        "checked": "2026-10-11, O10 chore 1: Boot has Boot/AdOverlay/Bar with ProgressBar _value 0 (ug inspect), and Boot/LoadingWindow/ProgressBar"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug find --live Bar" },
+          { "run": "ug inspect Boot/AdOverlay/Bar --component ProgressBar" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "find_gameobjects", "args": { "name": "Bar" } },
+          { "mcp": "unity-editor-mcp", "tool": "get_serialized_fields", "args": { "target": "Boot/AdOverlay/Bar", "component": "ProgressBar" } }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C2",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "In the open editor, set Boot/AdOverlay/Bar's ProgressBar._value to 0.5 and read it back. Do not save.",
+      "before": [ { "run": "ug eval 'return UnityEditor.Undo.GetCurrentGroup();'", "capture": { "group": "result: (\\d+)" } } ],
+      "check": [ { "run": "ug inspect Boot/AdOverlay/Bar --component ProgressBar" } ],
+      "after": [ { "run": "ug eval 'UnityEditor.Undo.RevertAllDownToGroup(${group}); return \"reverted\";'" } ],
+      "key": {
+        "check": ["_value\\s+float\\s+0\\.5\\b"],
+        "checked": "2026-10-11, O10 chore 2: checked by ug inspect after the set; the after step reverts the leg's undo groups"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug set Boot/AdOverlay/Bar _value 0.5 --component ProgressBar" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "set_serialized_field", "args": { "target": "Boot/AdOverlay/Bar", "component": "ProgressBar", "field": "_value", "value": "0.5" } }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C3",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "In the open editor, create a cube named Probe under Boot at position 1,2,3 with a Rigidbody. Do not save.",
+      "before": [ { "run": "ug eval 'return UnityEditor.Undo.GetCurrentGroup();'", "capture": { "group": "result: (\\d+)" } } ],
+      "check": [
+        { "run": "ug inspect Boot/Probe" },
+        { "run": "ug eval 'var t = GameObject.Find(\"Boot/Probe\"); return t == null ? \"no Probe\" : \"Probe at \" + t.transform.localPosition.x + \",\" + t.transform.localPosition.y + \",\" + t.transform.localPosition.z;'" }
+      ],
+      "after": [ { "run": "ug eval 'UnityEditor.Undo.RevertAllDownToGroup(${group}); return \"reverted\";'" } ],
+      "key": {
+        "check": ["Rigidbody", "Probe at 1,2,3\\b"],
+        "checked": "2026-10-11, O10 chore 3: checked by ug inspect and the transform read after the leg"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug batch \"object create Probe --parent Boot --primitive Cube\" \"set Boot/Probe m_LocalPosition 1,2,3\" \"component add Boot/Probe Rigidbody\"" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "batch", "args": { "operations": [
+            { "id": "p", "command": "create_gameobject", "params": { "name": "Probe", "primitive": "cube", "parent": "Boot" } },
+            { "command": "set_transform", "params": { "target": "$p.instanceId", "position": [1, 2, 3] } },
+            { "command": "add_component", "params": { "target": "$p.instanceId", "type": "Rigidbody" } }
+          ] } }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C4",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "In the open editor, instantiate Assets/Prefabs/UI/ButtonPrimary.prefab, override its Button's interactable on the instance, list the instance's overrides, then revert them. Do not save.",
+      "before": [ { "run": "ug eval 'return UnityEditor.Undo.GetCurrentGroup();'", "capture": { "group": "result: (\\d+)" } } ],
+      "check": [
+        { "run": "ug eval 'var go = GameObject.Find(\"Btn\"); if (go == null) return \"no Btn\"; int n = 0; foreach (var m in UnityEditor.PrefabUtility.GetPropertyModifications(go) ?? new UnityEditor.PropertyModification[0]) if (m.propertyPath == \"m_Interactable\") n++; return \"Btn m_Interactable overrides \" + n;'" }
+      ],
+      "after": [ { "run": "ug eval 'UnityEditor.Undo.RevertAllDownToGroup(${group}); return \"reverted\";'" } ],
+      "key": {
+        "items": ["m_Interactable"],
+        "check": ["Btn m_Interactable overrides 0\\b"],
+        "checked": "2026-10-11, O10 chore 4: the override is listed before the revert, and none is left after it"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug batch \"object create Btn --parent Boot/AdOverlay --prefab Assets/Prefabs/UI/ButtonPrimary.prefab\" \"set Boot/AdOverlay/Btn m_Interactable false --component Button\" \"prefab overrides Boot/AdOverlay/Btn\" \"prefab revert Boot/AdOverlay/Btn\"" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "instantiate_prefab", "args": { "prefab": "Assets/Prefabs/UI/ButtonPrimary.prefab", "name": "Btn" } },
+          { "mcp": "unity-editor-mcp", "tool": "set_serialized_field", "args": { "target": "Btn", "component": "Button", "field": "m_Interactable", "value": "false" } },
+          { "mcp": "unity-editor-mcp", "tool": "eval", "args": { "timeout": 30000, "code": "var go = GameObject.Find(\"Btn\"); var mods = UnityEditor.PrefabUtility.GetPropertyModifications(go); return string.Join(\"; \", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(mods, m => !(m.target is Transform) && m.propertyPath != \"m_Name\"), m => m.target.GetType().Name + \".\" + m.propertyPath + \" = \" + m.value));" } },
+          { "mcp": "unity-editor-mcp", "tool": "revert_prefab_overrides", "args": { "instance": "Btn" } }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C5",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "Enter play mode, read the console errors that are new since entering, and stop.",
+      "check": [ { "run": "ug scene" } ],
+      "key": {
+        "items": ["(?i)nothing logged|no (new )?(console )?errors|\\b0 errors|\"entries\":\\s*\\[|error CS\\d|Exception\\b"],
+        "check": ["edit mode"],
+        "checked": "2026-10-11, O10 chore 5: the leg read the console since entering play (none are new in this project: ug says nothing logged, Pipeline answers entries []) and the editor is back in edit mode"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug play --for 3", "timeout": 180 }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "console_status", "args": {}, "capture": { "cursor": "\"cursor\":\\s*(-?\\d+)", "session": "\"session\":\\s*\"([0-9a-f]+)\"" } },
+          { "mcp": "unity-editor-mcp", "tool": "editor_play", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"playMode\":\\s*\"playing\"" },
+          { "run": "sleep 3" },
+          { "mcp": "unity-editor-mcp", "tool": "console", "args": { "level": "error", "since": "${cursor}", "since_session": "${session}" } },
+          { "mcp": "unity-editor-mcp", "tool": "editor_stop", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"playMode\":\\s*\"stopped\"" }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C6",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "Break Assets/Scripts/UI/ProgressBar.cs with a missing name, recompile and read the error, put the file back, and recompile clean.",
+      "before": [ { "run": "cp Assets/Scripts/UI/ProgressBar.cs Temp/bench-ProgressBar.cs" } ],
+      "check": [ { "run": "ug compile" } ],
+      "after": [ { "run": "cmp -s Temp/bench-ProgressBar.cs Assets/Scripts/UI/ProgressBar.cs || { cp Temp/bench-ProgressBar.cs Assets/Scripts/UI/ProgressBar.cs && ug compile; }" } ],
+      "key": {
+        "items": ["CS0103|benchMissing"],
+        "check": ["\\b0 errors\\b"],
+        "checked": "2026-10-11, O10 chore 6: the error read names the missing name (CS0103), the file is restored byte for byte and ug compile is clean after"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "printf '\\nclass BenchBroken { int X() { return benchMissing; } }\\n' >> Assets/Scripts/UI/ProgressBar.cs", "count": false },
+          { "run": "ug compile", "timeout": 180 },
+          { "run": "cp Temp/bench-ProgressBar.cs Assets/Scripts/UI/ProgressBar.cs", "count": false },
+          { "run": "ug compile", "timeout": 180, "until": "\\b0 errors\\b", "every": 2, "max": 5 }
+        ],
+        "unity-editor-mcp": [
+          { "run": "printf '\\nclass BenchBroken { int X() { return benchMissing; } }\\n' >> Assets/Scripts/UI/ProgressBar.cs", "count": false },
+          { "mcp": "unity-editor-mcp", "tool": "recompile", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "recompile_status", "args": {}, "until": "\"status\":\\s*\"(completed|up_to_date)\"" },
+          { "run": "cp Temp/bench-ProgressBar.cs Assets/Scripts/UI/ProgressBar.cs", "count": false },
+          { "mcp": "unity-editor-mcp", "tool": "recompile", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "recompile_status", "args": {}, "until": "\"status\":\\s*\"(completed|up_to_date)\"" },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"status\":\\s*\"ready\"[^}]*\"compiling\":\\s*false[^}]*\"domainReloadInProgress\":\\s*false" }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C7",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "Take a game-view picture, and a picture of Boot/Probe seen from 4,4,-4.",
+      "before": [
+        { "run": "ug eval 'return UnityEditor.Undo.GetCurrentGroup();'", "capture": { "group": "result: (\\d+)" } },
+        { "run": "ug batch \"object create Probe --parent Boot --primitive Cube\" \"set Boot/Probe m_LocalPosition 1,2,3\"" }
+      ],
+      "after": [ { "run": "ug eval 'UnityEditor.Undo.RevertAllDownToGroup(${group}); return \"reverted\";'" } ],
+      "key": {
+        "items": ["(?s)\\.png.*\\.png"],
+        "checked": "2026-10-11, O10 chore 7: two picture paths answered; each picture looked at by hand (Measured)"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug shot game" },
+          { "run": "ug shot --from 4,4,-4 --look Boot/Probe" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "screenshot", "args": { "view": "game", "width": 960, "height": 540 } },
+          { "mcp": "unity-editor-mcp", "tool": "eval", "args": { "code": "var probe = GameObject.Find(\"Boot/Probe\"); var cam = new GameObject(\"o10cam\").AddComponent<Camera>(); cam.transform.position = new Vector3(4, 4, -4); cam.transform.LookAt(probe.transform); var rt = new RenderTexture(960, 540, 24); cam.targetTexture = rt; cam.Render(); RenderTexture.active = rt; var tex = new Texture2D(960, 540, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0); tex.Apply(); RenderTexture.active = null; System.IO.File.WriteAllBytes(\"Temp/o10-view.png\", tex.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(cam.gameObject); UnityEngine.Object.DestroyImmediate(tex); rt.Release(); UnityEngine.Object.DestroyImmediate(rt); return \"Temp/o10-view.png\";" } }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C9",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "Profile one second of play mode and name the top markers by self time, then stop.",
+      "check": [ { "run": "ug scene" } ],
+      "key": {
+        "items": ["(?i)\\bframes?\\b", "\\b(PlayerLoop|EditorLoop|Idle|GC\\.\\w+|Canvas\\.\\w+|Gfx\\.\\w+|Mono\\.JIT|Camera\\.Render|BehaviourUpdate)\\W{1,4}\\d+\\.\\d\\d"],
+        "check": ["edit mode"],
+        "checked": "2026-10-11, O10 chore 9: a frame count and named markers answered; the editor is back in edit mode"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug play", "timeout": 180 },
+          { "run": "ug perf --record 1", "timeout": 180 },
+          { "run": "ug stop" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "editor_play", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"playMode\":\\s*\"playing\"" },
+          { "mcp": "unity-editor-mcp", "tool": "eval", "args": { "code": "UnityEditorInternal.ProfilerDriver.ClearAllFrames(); UnityEditorInternal.ProfilerDriver.enabled = true; return UnityEditorInternal.ProfilerDriver.lastFrameIndex;" } },
+          { "run": "sleep 1" },
+          { "mcp": "unity-editor-mcp", "tool": "eval", "args": { "timeout": 30000, "code": "UnityEditorInternal.ProfilerDriver.enabled = false; int first = UnityEditorInternal.ProfilerDriver.firstFrameIndex, last = UnityEditorInternal.ProfilerDriver.lastFrameIndex; var self = new System.Collections.Generic.Dictionary<string, double>(); var ids = new System.Collections.Generic.List<int>(); for (int f = first; f <= last; f++) { using (var view = UnityEditorInternal.ProfilerDriver.GetHierarchyFrameDataView(f, 0, UnityEditor.Profiling.HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime, false)) { if (!view.valid) continue; var stack = new System.Collections.Generic.Stack<int>(); int root = view.GetRootItemID(); stack.Push(root); while (stack.Count > 0) { int id = stack.Pop(); if (id != root) { string n = view.GetItemName(id); double t = view.GetItemColumnDataAsFloat(id, UnityEditor.Profiling.HierarchyFrameDataView.columnSelfTime); self[n] = (self.TryGetValue(n, out var v) ? v : 0) + t; } ids.Clear(); view.GetItemChildren(id, ids); foreach (int c in ids) stack.Push(c); } } } int frames = last - first + 1; return frames + \" frames; self ms a frame: \" + string.Join(\", \", System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(self, kv => kv.Value), 10), kv => kv.Key + \" \" + (kv.Value / frames).ToString(\"0.00\")));" } },
+          { "mcp": "unity-editor-mcp", "tool": "editor_stop", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"playMode\":\\s*\"stopped\"" }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C10",
+      "kind": "chore",
+      "needs": ["editor"],
+      "prompt": "In play mode, click DEPLOY on the galaxy map and confirm the screen changed, then stop.",
+      "check": [ { "run": "ug scene" } ],
+      "key": {
+        "items": ["Arena_Greybox|LoadingWindow"],
+        "check": ["edit mode"],
+        "checked": "2026-10-11, O10 chore 10: after the click the loading window opens on the way to Arena_Greybox; the editor is back in edit mode"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug play", "timeout": 180 },
+          { "run": "ug wait 4" },
+          { "run": "ug ui" },
+          { "run": "ug click DEPLOY" },
+          { "run": "ug wait 3" },
+          { "run": "ug stop" }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "editor_play", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"playMode\":\\s*\"playing\"" },
+          { "run": "sleep 4" },
+          { "mcp": "unity-editor-mcp", "tool": "find_gameobjects", "args": { "type": "UnityEngine.UI.Button" } },
+          { "mcp": "unity-editor-mcp", "tool": "eval", "args": { "code": "var b = GameObject.Find(\"UI/Safe/Sheet/Deploy\"); UnityEngine.EventSystems.ExecuteEvents.Execute(b, new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler); return \"clicked \" + b.name;" } },
+          { "run": "sleep 3" },
+          { "mcp": "unity-editor-mcp", "tool": "list_open_scenes", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_stop", "args": {} },
+          { "mcp": "unity-editor-mcp", "tool": "editor_status", "args": {}, "until": "\"playMode\":\\s*\"stopped\"" }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    },
+    {
+      "id": "C8",
+      "kind": "chore",
+      "needs": ["editor", "scenes-saved"],
+      "prompt": "Run the EditMode tests and read the failures.",
+      "key": {
+        "items": ["(?i)\\b1\\d\\d\\b[^\\n]{0,30}(pass|green)|(?i)(pass|green)[^\\n]{0,30}\\b1\\d\\d\\b"],
+        "checked": "2026-10-11, O10 chore 8: ug test ran the 167 EditMode tests green; Pipeline's run_tests ran none in this -automated editor (last in the suite: it can wedge Pipeline's queue)"
+      },
+      "steps": {
+        "unitygraph": [
+          { "run": "ug test", "timeout": 600 }
+        ],
+        "unity-editor-mcp": [
+          { "mcp": "unity-editor-mcp", "tool": "run_tests", "args": { "mode": "editor", "async_tests": true } },
+          { "mcp": "unity-editor-mcp", "tool": "test_status", "args": {}, "until": "\"status\":\\s*\"(completed|failed|error)\"", "every": 2, "max": 45 },
+          { "mcp": "unity-editor-mcp", "tool": "cancel_tests", "args": {} }
+        ],
+        "grep": "unity-editor-mcp", "codegraph": "unity-editor-mcp", "graphify": "unity-editor-mcp"
+      }
+    }
+  ]
+}

@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UnityGraph.Assets\UnityGraph.Assets.csproj" />
+    <ProjectReference Include="..\UnityGraph.Bench\UnityGraph.Bench.csproj" />
     <ProjectReference Include="..\UnityGraph.Code\UnityGraph.Code.csproj" />
     <ProjectReference Include="..\UnityGraph.Core\UnityGraph.Core.csproj" />
     <ProjectReference Include="..\UnityGraph.EditorLink\UnityGraph.EditorLink.csproj" />
